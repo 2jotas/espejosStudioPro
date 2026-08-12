@@ -273,6 +273,37 @@ export default function CalendarManager() {
     return appDate === selectedDate;
   });
 
+  const getRelativeDayLabel = (targetDateStr: string) => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const dayAfterTomorrow = new Date(today);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    const dayAfterTomorrowStr = dayAfterTomorrow.toISOString().split('T')[0];
+
+    if (targetDateStr === todayStr) return { text: 'HOY', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
+    if (targetDateStr === tomorrowStr) return { text: 'MAÑANA', color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' };
+    if (targetDateStr === yesterdayStr) return { text: 'AYER', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
+    if (targetDateStr === dayAfterTomorrowStr) return { text: 'PASADO MAÑANA', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+
+    const target = new Date(`${targetDateStr}T12:00:00Z`);
+    const current = new Date(`${todayStr}T12:00:00Z`);
+    const diffDays = Math.round((target.getTime() - current.getTime()) / (1000 * 3600 * 24));
+
+    if (diffDays > 0) return { text: `EN ${diffDays} DÍAS`, color: 'bg-slate-800 text-slate-300 border-slate-700' };
+    return { text: `HACE ${Math.abs(diffDays)} DÍAS`, color: 'bg-slate-800 text-slate-400 border-slate-700' };
+  };
+
+  const relativeBadge = getRelativeDayLabel(selectedDate);
+
   const formattedSelectedDate = new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString('es-ES', {
     weekday: 'long',
     day: 'numeric',
@@ -445,6 +476,11 @@ export default function CalendarManager() {
 
         {/* Date Display */}
         <div className="flex items-center space-x-3">
+          <span
+            className={`px-2.5 py-1 text-[11px] font-bold uppercase rounded-xl border tracking-wide ${relativeBadge.color}`}
+          >
+            {relativeBadge.text}
+          </span>
           <span className="text-xs font-bold text-white capitalize hidden lg:inline">{formattedSelectedDate}</span>
           <input
             type="date"

@@ -122,14 +122,18 @@ export async function fetchGoogleFullEventsViaApiKey(
     const items = data.items || [];
 
     return items
-      .filter((item: any) => item.start?.dateTime && item.end?.dateTime)
-      .map((item: any) => ({
-        id: item.id,
-        summary: item.summary || 'Cita de Google Calendar',
-        description: item.description || '',
-        startsAt: new Date(item.start.dateTime),
-        endsAt: new Date(item.end.dateTime),
-      }));
+      .filter((item: any) => (item.start?.dateTime || item.start?.date) && (item.end?.dateTime || item.end?.date))
+      .map((item: any) => {
+        const startStr = item.start.dateTime || `${item.start.date}T10:00:00Z`;
+        const endStr = item.end.dateTime || `${item.end.date}T11:00:00Z`;
+        return {
+          id: item.id,
+          summary: item.summary || 'Cita de Google Calendar',
+          description: item.description || '',
+          startsAt: new Date(startStr),
+          endsAt: new Date(endStr),
+        };
+      });
   } catch (err) {
     console.error('Error fetching full Google Calendar events:', err);
     return [];

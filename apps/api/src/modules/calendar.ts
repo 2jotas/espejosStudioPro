@@ -5,6 +5,7 @@ import {
   getTokensFromCode,
   fetchGoogleBusyRanges,
   fetchGoogleBusyRangesViaApiKey,
+  fetchGoogleFullEventsViaApiKey,
   verifyGoogleApiKeyConnection,
   calculateAvailableTimeSlots,
 } from '../lib/googleCalendar.js';
