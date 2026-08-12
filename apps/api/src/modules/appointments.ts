@@ -231,5 +231,163 @@ export const appointmentRoutes: FastifyPluginAsync = async (fastify) => {
 
       return { message: `Cita actualizada a ${status}`, appointment: updated };
     });
+
+    // POST /api/appointments/admin - Create appointment directly from admin panel
+    protectedRoutes.post<{
+      Body: {
+        serviceId: string;
+        startsAtIso: string;
+        endsAtIso?: string;
+        clientFirstName: string;
+        clientLastName: string;
+        clientPhone: string;
+        clientNote?: string;
+      };
+    }>('/appointments/admin', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { serviceId, startsAtIso, endsAtIso, clientFirstName, clientLastName, clientPhone, clientNote } = request.body;
+
+      if (!serviceId || !startsAtIso || !clientFirstName || !clientLastName) {
+        return reply.status(400).send({ error: 'MissingFields', message: 'Servicio, fecha de inicio, nombre y apellido son requeridos.' });
+      }
+
+      const service = await fastify.prisma.service.findFirst({
+        where: { id: serviceId, professionalId: userSession.id },
+      });
+
+      if (!service) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Servicio no encontrado.' });
+      }
+
+      const startsAt = new Date(startsAtIso);
+      const endsAt = endsAtIso ? new Date(endsAtIso) : new Date(startsAt.getTime() + service.durationMinutes * 60 * 1000);
+
+      const phone = clientPhone?.trim() || `+569${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      // Find or create Client
+      let client = await fastify.prisma.client.findFirst({
+        where: {
+          professionalId: userSession.id,
+          firstName: clientFirstName.trim(),
+          lastName: clientLastName.trim(),
+        },
+      });
+
+      if (!client) {
+        client = await fastify.prisma.client.create({
+          data: {
+            professionalId: userSession.id,
+            firstName: clientFirstName.trim(),
+            lastName: clientLastName.trim(),
+            phone,
+            authMethod: 'admin',
+          },
+        });
+
+        await fastify.prisma.clientProfile.create({
+          data: {
+            clientId: client.id,
+            professionalId: userSession.id,
+            visitCount: 1,
+            totalSpent: service.price,
+            lastVisitAt: startsAt,
+          },
+        });
+      }
+
+      const appointment = await fastify.prisma.appointment.create({
+        data: {
+          professionalId: userSession.id,
+          clientId: client.id,
+          serviceId: service.id,
+          startsAt,
+          endsAt,
+          status: 'confirmed',
+          clientNote: clientNote?.trim() || null,
+        },
+        include: {
+          client: true,
+          service: true,
+        },
+      });
+
+      return reply.status(201).send({ message: 'Cita creada exitosamente', appointment });
+    });
+
+    // PUT /api/appointments/:id - Update full appointment details
+    protectedRoutes.put<{
+      Params: { id: string };
+      Body: {
+        serviceId?: string;
+        startsAtIso?: string;
+        endsAtIso?: string;
+        status?: 'confirmed' | 'cancelled' | 'completed';
+        clientFirstName?: string;
+        clientLastName?: string;
+        clientPhone?: string;
+        clientNote?: string;
+      };
+    }>('/appointments/:id', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { id } = request.params;
+      const { serviceId, startsAtIso, endsAtIso, status, clientFirstName, clientLastName, clientPhone, clientNote } = request.body;
+
+      const appointment = await fastify.prisma.appointment.findFirst({
+        where: { id, professionalId: userSession.id },
+        include: { client: true },
+      });
+
+      if (!appointment) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Cita no encontrada.' });
+      }
+
+      // Update Client if name provided
+      if (clientFirstName || clientLastName || clientPhone) {
+        await fastify.prisma.client.update({
+          where: { id: appointment.clientId },
+          data: {
+            firstName: clientFirstName?.trim() || appointment.client.firstName,
+            lastName: clientLastName?.trim() || appointment.client.lastName,
+            phone: clientPhone?.trim() || appointment.client.phone,
+          },
+        });
+      }
+
+      const updateData: any = {};
+      if (serviceId) updateData.serviceId = serviceId;
+      if (startsAtIso) updateData.startsAt = new Date(startsAtIso);
+      if (endsAtIso) updateData.endsAt = new Date(endsAtIso);
+      if (status) updateData.status = status;
+      if (clientNote !== undefined) updateData.clientNote = clientNote?.trim() || null;
+
+      const updated = await fastify.prisma.appointment.update({
+        where: { id },
+        data: updateData,
+        include: {
+          client: true,
+          service: true,
+        },
+      });
+
+      return { message: 'Cita actualizada exitosamente', appointment: updated };
+    });
+
+    // DELETE /api/appointments/:id - Delete appointment
+    protectedRoutes.delete<{ Params: { id: string } }>('/appointments/:id', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { id } = request.params;
+
+      const appointment = await fastify.prisma.appointment.findFirst({
+        where: { id, professionalId: userSession.id },
+      });
+
+      if (!appointment) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Cita no encontrada.' });
+      }
+
+      await fastify.prisma.appointment.delete({ where: { id } });
+
+      return { message: 'Cita eliminada correctamente' };
+    });
   });
 };
