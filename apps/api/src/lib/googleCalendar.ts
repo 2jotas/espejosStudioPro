@@ -94,6 +94,48 @@ export async function fetchGoogleBusyRangesViaApiKey(
   }
 }
 
+export interface GoogleCalendarEventDetail {
+  id: string;
+  summary?: string;
+  description?: string;
+  startsAt: Date;
+  endsAt: Date;
+}
+
+export async function fetchGoogleFullEventsViaApiKey(
+  calendarId: string,
+  apiKey: string,
+  startIso: string,
+  endIso: string
+): Promise<GoogleCalendarEventDetail[]> {
+  try {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events?key=${encodeURIComponent(apiKey)}&timeMin=${encodeURIComponent(
+      startIso
+    )}&timeMax=${encodeURIComponent(endIso)}&singleEvents=true`;
+
+    const res = await fetch(url);
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const items = data.items || [];
+
+    return items
+      .filter((item: any) => item.start?.dateTime && item.end?.dateTime)
+      .map((item: any) => ({
+        id: item.id,
+        summary: item.summary || 'Cita de Google Calendar',
+        description: item.description || '',
+        startsAt: new Date(item.start.dateTime),
+        endsAt: new Date(item.end.dateTime),
+      }));
+  } catch (err) {
+    console.error('Error fetching full Google Calendar events:', err);
+    return [];
+  }
+}
+
 export async function verifyGoogleApiKeyConnection(
   calendarId: string,
   apiKey: string

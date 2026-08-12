@@ -84,10 +84,56 @@ export default function CalendarManager() {
     );
   };
 
+  const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const handleSyncGoogleEvents = async () => {
+    try {
+      setIsSyncingGoogle(true);
+      setSyncMessage(null);
+      const res = await fetch('/api/calendar/sync-events', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Error al sincronizar con Google Calendar');
+      }
+
+      setSyncMessage(data.message);
+      await fetchAppointments();
+    } catch (e: any) {
+      setSyncMessage(e.message || 'Error de sincronización');
+    } finally {
+      setIsSyncingGoogle(false);
+    }
+  };
+
+  const handlePrevDay = () => {
+    const current = new Date(`${selectedDate}T12:00:00Z`);
+    current.setUTCDate(current.getUTCDate() - 1);
+    setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const current = new Date(`${selectedDate}T12:00:00Z`);
+    current.setUTCDate(current.getUTCDate() + 1);
+    setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
+  const handleToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
   // Filter appointments for selected date
   const filteredAppointments = appointments.filter((app) => {
     const appDate = new Date(app.startsAt).toISOString().split('T')[0];
     return appDate === selectedDate;
+  });
+
+  const formattedSelectedDate = new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 
   return (
@@ -99,18 +145,36 @@ export default function CalendarManager() {
             <CalendarIcon className="w-5 h-5 text-indigo-400" />
             <span>Calendario de Reservas & Horarios</span>
           </h2>
-          <p className="text-slate-400 text-sm">Gestiona tus citas reservadas y configura la disponibilidad semanal de tu espacio</p>
+          <p className="text-slate-400 text-sm">Gestiona tus citas reservadas y sincroniza con tu asistente de Google</p>
         </div>
 
-        <button
-          onClick={fetchAppointments}
-          disabled={isLoading}
-          className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold rounded-xl flex items-center space-x-2 w-fit transition-colors"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Actualizar Citas</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleSyncGoogleEvents}
+            disabled={isSyncingGoogle}
+            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGoogle ? 'animate-spin' : ''}`} />
+            <span>Sincronizar Google Calendar</span>
+          </button>
+
+          <button
+            onClick={fetchAppointments}
+            disabled={isLoading}
+            className="px-3.5 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold rounded-xl flex items-center space-x-1.5 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Actualizar</span>
+          </button>
+        </div>
       </div>
+
+      {syncMessage && (
+        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-2xl text-xs font-semibold flex items-center justify-between">
+          <span>{syncMessage}</span>
+          <button onClick={() => setSyncMessage(null)} className="text-slate-400 hover:text-white">✕</button>
+        </div>
+      )}
 
       {/* Schedule & Rules Configuration Bar */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4 backdrop-blur-xl">
@@ -156,22 +220,41 @@ export default function CalendarManager() {
         </div>
       </div>
 
-      {/* Date Picker Selector */}
-      <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+      {/* Date Navigation & Selector Bar */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800 rounded-3xl p-5 backdrop-blur-xl">
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handlePrevDay}
+            className="px-3.5 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all"
+          >
+            ← Día Anterior
+          </button>
+          <button
+            onClick={handleToday}
+            className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-xl transition-all"
+          >
+            Hoy
+          </button>
+          <button
+            onClick={handleNextDay}
+            className="px-3.5 py-2 bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition-all"
+          >
+            Día Siguiente →
+          </button>
+        </div>
+
         <div className="flex items-center space-x-3">
-          <CalendarIcon className="w-4 h-4 text-indigo-400" />
-          <span className="text-sm font-semibold text-slate-200">Filtrar por fecha:</span>
+          <span className="text-xs font-bold text-white capitalize hidden sm:inline">{formattedSelectedDate}</span>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono"
           />
+          <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 shrink-0">
+            {filteredAppointments.length} cita(s)
+          </span>
         </div>
-
-        <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
-          {filteredAppointments.length} cita(s) en esta fecha
-        </span>
       </div>
 
       {/* Appointments List Grid */}
