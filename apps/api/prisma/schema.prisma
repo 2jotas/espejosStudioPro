@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -54,9 +54,9 @@ model ClientProfile {
   id             String       @id @default(uuid())
   clientId       String       @unique @map("client_id")
   professionalId String       @map("professional_id")
-  notes          String?      @db.Text
-  preferences    Json?
-  tags           String[]     @default([])
+  notes          String?
+  preferences    String? // JSON stringified object
+  tags           String       @default("[]") // JSON stringified array for SQLite compatibility
   lastVisitAt    DateTime?    @map("last_visit_at")
   visitCount     Int          @default(0) @map("visit_count")
   totalSpent     Float        @default(0) @map("total_spent")

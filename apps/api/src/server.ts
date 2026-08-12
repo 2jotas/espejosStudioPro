@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import prismaPlugin from './plugins/prisma.js';
 import redisPlugin from './plugins/redis.js';
 import { healthRoutes } from './modules/health.js';
+import { authRoutes } from './modules/auth.js';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ async function main() {
 
   // Register routes
   await server.register(healthRoutes);
+  await server.register(authRoutes, { prefix: '/api' });
 
   try {
     await server.listen({ port, host });
