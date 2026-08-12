@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ServicesManager from '../components/admin/ServicesManager';
+import ClientsManager from '../components/admin/ClientsManager';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
 
@@ -151,6 +152,7 @@ export default function Space() {
 
           {/* Dynamic Content by Active Tab */}
           {activeTab === 'services' && <ServicesManager />}
+          {activeTab === 'clients' && <ClientsManager />}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">

@@ -8,6 +8,7 @@ import redisPlugin from './plugins/redis.js';
 import { healthRoutes } from './modules/health.js';
 import { authRoutes } from './modules/auth.js';
 import { serviceRoutes } from './modules/services.js';
+import { clientRoutes } from './modules/clients.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ async function main() {
   await server.register(healthRoutes);
   await server.register(authRoutes, { prefix: '/api' });
   await server.register(serviceRoutes, { prefix: '/api' });
+  await server.register(clientRoutes, { prefix: '/api' });
 
   try {
     await server.listen({ port, host });
