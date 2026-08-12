@@ -41,24 +41,30 @@ export default function CalendarManager() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [activeAppForProfile, setActiveAppForProfile] = useState<AppointmentItem | null>(null);
   const [allCrmClients, setAllCrmClients] = useState<Array<{ id: string; firstName: string; lastName: string; phone: string }>>([]);
-  const [selectedReassignClientId, setSelectedReassignClientId] = useState('');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [editClientFirstName, setEditClientFirstName] = useState('');
+  const [editClientLastName, setEditClientLastName] = useState('');
+  const [editClientPhone, setEditClientPhone] = useState('');
   const [technicalNotes, setTechnicalNotes] = useState('');
   const [isSavingTechProfile, setIsSavingTechProfile] = useState(false);
   const [techProfileMsg, setTechProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const openClientProfileModal = async (app: AppointmentItem) => {
     setActiveAppForProfile(app);
+    setEditClientFirstName(app.client.firstName || '');
+    setEditClientLastName(app.client.lastName || '');
+    setEditClientPhone(app.client.phone || '');
     setTechnicalNotes('');
+    setClientSearchQuery('');
     setTechProfileMsg(null);
     setIsClientModalOpen(true);
 
     try {
-      // Fetch all clients to allow reassigning
+      // Fetch all clients to allow searching & reassigning
       const clientRes = await fetch('/api/clients');
       if (clientRes.ok) {
         const data = await clientRes.json();
         setAllCrmClients(data.clients || []);
-        setSelectedReassignClientId(app.client.id || '');
       }
 
       // Fetch client profile notes
@@ -67,6 +73,9 @@ export default function CalendarManager() {
         if (singleClientRes.ok) {
           const cData = await singleClientRes.json();
           setTechnicalNotes(cData.client?.profile?.notes || '');
+          if (cData.client?.firstName) setEditClientFirstName(cData.client.firstName);
+          if (cData.client?.lastName) setEditClientLastName(cData.client.lastName);
+          if (cData.client?.phone) setEditClientPhone(cData.client.phone);
         }
       }
     } catch (e) {
@@ -74,30 +83,45 @@ export default function CalendarManager() {
     }
   };
 
-  const handleSaveTechnicalNotes = async () => {
-    if (!activeAppForProfile?.client?.id) return;
+  const handleSaveClientDetailsAndNotes = async () => {
+    if (!activeAppForProfile) return;
     try {
       setIsSavingTechProfile(true);
       setTechProfileMsg(null);
 
-      const res = await fetch(`/api/clients/${activeAppForProfile.client.id}/profile`, {
+      // 1. Update Appointment Client Name & Phone
+      const updateAppRes = await fetch(`/api/appointments/${activeAppForProfile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: technicalNotes }),
+        body: JSON.stringify({
+          clientFirstName: editClientFirstName,
+          clientLastName: editClientLastName,
+          clientPhone: editClientPhone,
+        }),
       });
 
-      if (!res.ok) throw new Error('Error al guardar la ficha técnica');
+      if (!updateAppRes.ok) throw new Error('Error al actualizar datos del cliente');
 
-      setTechProfileMsg({ type: 'success', text: 'Ficha técnica guardada con éxito' });
+      // 2. Save Technical Notes if Client ID exists
+      if (activeAppForProfile.client.id) {
+        await fetch(`/api/clients/${activeAppForProfile.client.id}/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: technicalNotes }),
+        });
+      }
+
+      await fetchAppointments();
+      setTechProfileMsg({ type: 'success', text: '¡Cliente y Ficha Técnica guardados e integrados exitosamente en la base de datos!' });
     } catch (e: any) {
-      setTechProfileMsg({ type: 'error', text: e.message || 'Error guardando ficha' });
+      setTechProfileMsg({ type: 'error', text: e.message || 'Error guardando datos' });
     } finally {
       setIsSavingTechProfile(false);
     }
   };
 
-  const handleReassignClientToAppointment = async () => {
-    if (!activeAppForProfile || !selectedReassignClientId) return;
+  const handleReassignClientToAppointment = async (targetClientId: string) => {
+    if (!activeAppForProfile || !targetClientId) return;
     try {
       setIsSavingTechProfile(true);
       setTechProfileMsg(null);
@@ -105,13 +129,13 @@ export default function CalendarManager() {
       const res = await fetch(`/api/appointments/${activeAppForProfile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: selectedReassignClientId }),
+        body: JSON.stringify({ clientId: targetClientId }),
       });
 
-      if (!res.ok) throw new Error('Error al reasignar el cliente');
+      if (!res.ok) throw new Error('Error al vincular el cliente');
 
       await fetchAppointments();
-      setTechProfileMsg({ type: 'success', text: 'Cita reasignada correctamente al cliente seleccionado' });
+      setTechProfileMsg({ type: 'success', text: 'Cita vinculada exitosamente al historial del cliente seleccionado' });
     } catch (e: any) {
       setTechProfileMsg({ type: 'error', text: e.message });
     } finally {
@@ -949,7 +973,7 @@ export default function CalendarManager() {
       {/* CLIENT TECHNICAL PROFILE & CRM REASSIGN MODAL */}
       {isClientModalOpen && activeAppForProfile && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative space-y-6 text-left max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative space-y-5 text-left max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
@@ -957,10 +981,10 @@ export default function CalendarManager() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">
-                    Ficha Técnica CRM & Vinculación
+                    Gestión de Cliente & Ficha Técnica CRM
                   </h3>
                   <p className="text-slate-400 text-xs">
-                    {activeAppForProfile.client.firstName} {activeAppForProfile.client.lastName} ({activeAppForProfile.client.phone})
+                    Completa la ficha técnica o vincula esta cita al historial de un cliente
                   </p>
                 </div>
               </div>
@@ -985,77 +1009,132 @@ export default function CalendarManager() {
               </div>
             )}
 
-            {/* Reassign / Match Client Section */}
+            {/* Option 1: Search & Match Existing Client in CRM */}
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-white text-xs">Vincular / Reasignar Cliente CRM</h4>
+                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
+                  <User className="w-4 h-4 text-indigo-400" />
+                  <span>1. Buscar & Vincular a Cliente Registrado</span>
+                </h4>
                 <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 font-mono">
-                  ID: {activeAppForProfile.client.id || 'Nuevo'}
+                  {allCrmClients.length} clientes en CRM
                 </span>
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
-                Si esta cita fue importada desde Google Assistant y deseas vincularla a un cliente registrado previamente en tu CRM, selecciónalo a continuación:
+                Si este cliente ya existía en tu base de datos y deseas sumarle esta cita a su historial, búscalo por nombre o teléfono:
               </p>
-              <div className="flex items-center space-x-2">
-                <select
-                  value={selectedReassignClientId}
-                  onChange={(e) => setSelectedReassignClientId(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 text-xs"
-                >
-                  <option value={activeAppForProfile.client.id}>
-                    {activeAppForProfile.client.firstName} {activeAppForProfile.client.lastName} (Actual)
-                  </option>
-                  {allCrmClients
-                    .filter((c) => c.id !== activeAppForProfile.client.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.firstName} {c.lastName} ({c.phone})
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleReassignClientToAppointment}
-                  disabled={isSavingTechProfile || selectedReassignClientId === activeAppForProfile.client.id}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shrink-0 disabled:opacity-50"
-                >
-                  Vincular
-                </button>
-              </div>
-            </div>
 
-            {/* Technical File (Visagismo / Hair formula) */}
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <FileText className="w-4 h-4 text-indigo-400" />
-                  <span>Ficha Técnica del Cliente (Visagismo, Fórmula, Historial)</span>
-                </label>
-              </div>
-              <textarea
-                rows={4}
-                value={technicalNotes}
-                onChange={(e) => setTechnicalNotes(e.target.value)}
-                placeholder="Escribe la fórmula de coloración, preferencias de corte, visagismo, tipo de cuero cabelludo o notas de atención para futuras visitas..."
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 leading-relaxed"
+              <input
+                type="text"
+                value={clientSearchQuery}
+                onChange={(e) => setClientSearchQuery(e.target.value)}
+                placeholder="Escribe para buscar cliente por nombre o teléfono..."
+                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-indigo-500"
               />
+
+              {clientSearchQuery && (
+                <div className="max-h-36 overflow-y-auto space-y-1.5 bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  {allCrmClients
+                    .filter(
+                      (c) =>
+                        c.firstName.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.lastName.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.phone.includes(clientSearchQuery)
+                    )
+                    .map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs"
+                      >
+                        <div>
+                          <span className="font-bold text-white block">
+                            {c.firstName} {c.lastName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">{c.phone}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleReassignClientToAppointment(c.id)}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px]"
+                        >
+                          Vincular Cita
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
 
-            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Option 2: Edit / Create Client Details & Technical File */}
+            <div className="space-y-3 text-xs bg-slate-950 p-4 rounded-2xl border border-slate-800">
+              <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span>2. Ficha Técnica & Registro del Cliente</span>
+              </h4>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-semibold mb-1 block">Nombre</label>
+                  <input
+                    type="text"
+                    value={editClientFirstName}
+                    onChange={(e) => setEditClientFirstName(e.target.value)}
+                    placeholder="Francisco"
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 font-semibold mb-1 block">Apellido</label>
+                  <input
+                    type="text"
+                    value={editClientLastName}
+                    onChange={(e) => setEditClientLastName(e.target.value)}
+                    placeholder="Pérez"
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold mb-1 block">Teléfono / WhatsApp</label>
+                <input
+                  type="text"
+                  value={editClientPhone}
+                  onChange={(e) => setEditClientPhone(e.target.value)}
+                  placeholder="+56 9 1234 5678"
+                  className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold mb-1 block">
+                  Anotaciones Técnicas (Visagismo, Fórmula de tinte, Observaciones)
+                </label>
+                <textarea
+                  rows={3}
+                  value={technicalNotes}
+                  onChange={(e) => setTechnicalNotes(e.target.value)}
+                  placeholder="Ej: Visagismo ovalado, degradado medio con máquina 1.5, fórmula de coloración 6.1..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 leading-relaxed"
+                />
+              </div>
+
               <button
                 type="button"
-                onClick={handleSaveTechnicalNotes}
+                onClick={handleSaveClientDetailsAndNotes}
                 disabled={isSavingTechProfile}
-                className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2"
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all"
               >
                 <Check className="w-4 h-4" />
-                <span>{isSavingTechProfile ? 'Guardando Ficha...' : 'Guardar Ficha Técnica'}</span>
+                <span>{isSavingTechProfile ? 'Guardando en CRM...' : 'Guardar Cliente & Ficha Técnica en CRM'}</span>
               </button>
+            </div>
 
+            <div className="pt-1 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setIsClientModalOpen(false)}
-                className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl"
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl"
               >
                 Cerrar
               </button>
