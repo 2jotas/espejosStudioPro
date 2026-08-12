@@ -141,35 +141,41 @@ export default function EspejosGalleryEngine({
           <p className="text-sm">No hay imágenes publicadas en esta galería todavía.</p>
         </div>
       ) : (
-        /* High-Performance Mirror Grid */
+        /* High-Performance Neon Mirror Grid */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
           {images.map((img, idx) => (
-            <div key={img.id} className="group relative flex flex-col">
-              {/* Main Beveled Mirror Frame */}
-              <div
-                onClick={() => setLightboxIndex(idx)}
-                className="relative aspect-square rounded-3xl overflow-hidden cursor-pointer border border-white/10 shadow-2xl bg-slate-950 transform-gpu transition-all duration-500 group-hover:scale-[1.03] group-hover:border-indigo-500/50 group-hover:shadow-indigo-500/20"
-              >
-                {/* Metallic Bevel Inner Overlay */}
-                <div className="absolute inset-0 z-10 pointer-events-none rounded-3xl ring-1 ring-inset ring-white/10 group-hover:ring-indigo-400/30 transition-all" />
+            <div
+              key={img.id}
+              onClick={() => setLightboxIndex(idx)}
+              className="group relative cursor-pointer flex flex-col"
+            >
+              {/* Neon Ambient Backdrop Glow */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/25 via-purple-500/25 to-pink-500/25 rounded-[30px] blur-md opacity-40 group-hover:opacity-100 group-hover:blur-lg transition-all duration-500" />
 
-                {/* Lazy-loaded Hardware Accelerated Image */}
-                <img
-                  src={img.filePath}
-                  alt={img.caption || 'Trabajo Espejos'}
-                  loading="lazy"
-                  decoding="async"
-                  style={{ filter: getFilterStyle(colorFilter) }}
-                  className="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105"
-                />
+              {/* Main Metallic Neon Mirror Frame */}
+              <div className="relative aspect-square rounded-[26px] overflow-hidden bg-slate-950 p-[3px] border border-indigo-500/30 group-hover:border-indigo-400 transition-all duration-500 shadow-[0_0_20px_rgba(99,102,241,0.2)] group-hover:shadow-[0_0_35px_rgba(129,140,248,0.45)] transform-gpu group-hover:scale-[1.03]">
+                {/* Inner Metallic Rim Overlay */}
+                <div className="absolute inset-0 z-10 pointer-events-none rounded-[24px] ring-1 ring-inset ring-white/15 group-hover:ring-indigo-300/40 transition-all" />
 
-                {/* Glassmorphism Hover Overlay */}
-                <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-4 backdrop-blur-[2px]">
-                  <span className="text-xs text-white font-medium truncate max-w-[70%]">
-                    {img.caption || 'Ver en alta definición'}
-                  </span>
-                  <div className="p-2 bg-indigo-600/90 text-white rounded-xl shadow-lg">
-                    <Maximize2 className="w-4 h-4" />
+                <div className="relative w-full h-full rounded-[22px] overflow-hidden bg-slate-950">
+                  {/* Lazy-loaded Hardware Accelerated Image */}
+                  <img
+                    src={img.filePath}
+                    alt={img.caption || 'Trabajo Espejos'}
+                    loading="lazy"
+                    decoding="async"
+                    style={{ filter: getFilterStyle(colorFilter) }}
+                    className="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+
+                  {/* Glassmorphism Hover Overlay */}
+                  <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3.5 backdrop-blur-[2px]">
+                    <span className="text-[11px] text-slate-200 font-semibold truncate max-w-[75%]">
+                      {img.caption || 'Ver reflejo'}
+                    </span>
+                    <div className="p-1.5 bg-indigo-600/90 text-white rounded-lg shadow-lg">
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </div>
                   </div>
                 </div>
 
@@ -180,78 +186,70 @@ export default function EspejosGalleryEngine({
                       e.stopPropagation();
                       onDelete(img.id);
                     }}
-                    className="absolute top-3 right-3 z-30 p-2.5 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl shadow-xl transition-all"
+                    className="absolute top-3 right-3 z-30 p-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl shadow-xl transition-all"
                     title="Eliminar foto"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 )}
-              </div>
-
-              {/* Ultra-smooth Hardware Accelerated Mirror Reflection */}
-              <div className="relative aspect-[1/0.3] overflow-hidden rounded-b-3xl opacity-35 scale-y-[-1] pointer-events-none mt-1 select-none transform-gpu transition-opacity group-hover:opacity-60">
-                <img
-                  src={img.filePath}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  style={{ filter: getFilterStyle(colorFilter) }}
-                  className="w-full h-full object-cover blur-[2px]"
-                />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-950/70 to-slate-950" />
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Fullscreen Lightbox Modal */}
+      {/* Subtle Lightbox Inspection Modal */}
       {activeImage && lightboxIndex !== null && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-8">
-          {/* Close Button */}
-          <button
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-6 right-6 p-3 bg-slate-900/80 text-slate-300 hover:text-white rounded-2xl border border-slate-800 z-50 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          {/* Previous Image */}
-          {lightboxIndex > 0 && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900/95 border border-indigo-500/40 rounded-3xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(99,102,241,0.25)] relative text-center flex flex-col items-center space-y-4">
+            {/* Close Button */}
             <button
-              onClick={() => setLightboxIndex(lightboxIndex - 1)}
-              className="absolute left-4 sm:left-8 p-3 bg-slate-900/80 text-white rounded-2xl border border-slate-800 z-50 hover:bg-slate-800 transition-colors"
+              onClick={() => setLightboxIndex(null)}
+              className="absolute top-4 right-4 p-2 bg-slate-950/80 text-slate-400 hover:text-white rounded-xl border border-slate-800 z-50 transition-colors"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
-          )}
 
-          {/* Next Image */}
-          {lightboxIndex < images.length - 1 && (
-            <button
-              onClick={() => setLightboxIndex(lightboxIndex + 1)}
-              className="absolute right-4 sm:right-8 p-3 bg-slate-900/80 text-white rounded-2xl border border-slate-800 z-50 hover:bg-slate-800 transition-colors"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-          )}
+            {/* Previous Image */}
+            {lightboxIndex > 0 && (
+              <button
+                onClick={() => setLightboxIndex(lightboxIndex - 1)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-slate-950/80 text-white rounded-xl border border-slate-800 z-50 hover:bg-slate-800 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            )}
 
-          {/* Modal Content */}
-          <div className="max-w-4xl w-full flex flex-col items-center space-y-4 text-center">
-            <div className="relative rounded-3xl overflow-hidden border border-white/20 shadow-2xl max-h-[75vh]">
+            {/* Next Image */}
+            {lightboxIndex < images.length - 1 && (
+              <button
+                onClick={() => setLightboxIndex(lightboxIndex + 1)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-slate-950/80 text-white rounded-xl border border-slate-800 z-50 hover:bg-slate-800 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Frame & Image */}
+            <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-2xl max-h-[50vh] bg-slate-950 p-1">
               <img
                 src={activeImage.filePath}
                 alt={activeImage.caption || 'Foto Espejos'}
                 style={{ filter: getFilterStyle(colorFilter) }}
-                className="max-h-[75vh] w-auto object-contain rounded-3xl"
+                className="max-h-[50vh] w-auto object-contain rounded-xl"
               />
             </div>
 
-            {activeImage.caption && (
-              <p className="text-white text-base font-semibold bg-slate-900/80 px-6 py-2.5 rounded-2xl border border-slate-800">
-                {activeImage.caption}
-              </p>
-            )}
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                Espejo de Historia #{lightboxIndex + 1}
+              </h4>
+              {activeImage.caption && (
+                <p className="text-slate-200 text-xs font-medium">
+                  {activeImage.caption}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
