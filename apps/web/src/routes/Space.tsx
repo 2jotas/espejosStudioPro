@@ -231,12 +231,7 @@ export default function Space() {
             </div>
           )}
 
-          {activeTab !== 'services' && activeTab !== 'clients' && activeTab !== 'settings' && activeTab !== 'dashboard' && (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
-              <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">Módulo {activeTab}</h3>
-              <p className="text-sm">Este módulo será activado en las siguientes fases del desarrollo.</p>
-            </div>
-          )}
+
         </main>
       </div>
     );

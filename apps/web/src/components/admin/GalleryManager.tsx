@@ -81,8 +81,8 @@ export default function GalleryManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Galería de Trabajos "Espejos"</h2>
-          <p className="text-slate-400 text-sm">Muestra tus mejores cortes y tratamientos a tus clientes</p>
+          <h2 className="text-xl font-bold text-white">Colección de Espejos & Reflejos</h2>
+          <p className="text-slate-400 text-sm">Gestiona el portafolio visual de tus trabajos. Cada foto es un reflejo de una historia única en tu cliente.</p>
         </div>
 
         <label className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center space-x-2 w-fit cursor-pointer">

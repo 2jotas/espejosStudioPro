@@ -25,6 +25,11 @@ export default function EspejosGalleryEngine({
   const [colorFilter, setColorFilter] = useState<ColorFilter>('none');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Sync external loading state
+  useEffect(() => {
+    setIsLoading(externalLoading);
+  }, [externalLoading]);
+
   // Sync external images if provided
   useEffect(() => {
     if (initialImages) {
@@ -74,6 +79,17 @@ export default function EspejosGalleryEngine({
 
   return (
     <div className="space-y-6 text-left">
+      {/* Storytelling Manifesto Banner */}
+      <div className="bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950 border border-indigo-500/20 rounded-3xl p-6 backdrop-blur-xl">
+        <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <Sparkles className="w-4 h-4 text-indigo-400" />
+          <span>Colección de Espejos & Reflejos</span>
+        </div>
+        <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
+          Cada foto representa una historia única realizada en un cliente: una técnica a la medida, un acabado distintivo y una experiencia diferente proyectada en el reflejo.
+        </p>
+      </div>
+
       {/* Gallery Header & Filters Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-4 sm:p-6 backdrop-blur-xl">
         {/* Category Tabs */}
@@ -86,7 +102,7 @@ export default function EspejosGalleryEngine({
                 : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
-            Todas las Fotos ({images.length})
+            Todas las Historias ({images.length})
           </button>
         </div>
 
@@ -94,7 +110,7 @@ export default function EspejosGalleryEngine({
         <div className="flex items-center space-x-2 text-xs">
           <span className="text-slate-400 font-medium flex items-center space-x-1.5 mr-1">
             <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">Tono Visual:</span>
+            <span className="hidden sm:inline">Filtro Óptico:</span>
           </span>
           {(['none', 'monochrome', 'warm', 'cool', 'vivid'] as ColorFilter[]).map((f) => (
             <button
