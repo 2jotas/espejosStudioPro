@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ServicesManager from '../components/admin/ServicesManager';
+import ServicesManager, { ServiceItem } from '../components/admin/ServicesManager';
 import ClientsManager from '../components/admin/ClientsManager';
 import SettingsIntegrations from '../components/admin/SettingsIntegrations';
+import BookingWizard from '../components/booking/BookingWizard';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
 
@@ -13,7 +14,32 @@ export default function Space() {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('services');
 
+  // Visitor View State
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [isLoadingPublicServices, setIsLoadingPublicServices] = useState(true);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+
   const isOwner = user && user.slug === slug;
+
+  useEffect(() => {
+    if (!slug) return;
+    const fetchPublicServices = async () => {
+      try {
+        setIsLoadingPublicServices(true);
+        const res = await fetch(`/api/professionals/${slug}/services`);
+        if (res.ok) {
+          const data = await res.json();
+          setServices(data.services);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoadingPublicServices(false);
+      }
+    };
+
+    fetchPublicServices();
+  }, [slug]);
 
   if (isOwner) {
     return (
@@ -185,7 +211,7 @@ export default function Space() {
             </div>
           )}
 
-          {activeTab !== 'services' && activeTab !== 'dashboard' && (
+          {activeTab !== 'services' && activeTab !== 'clients' && activeTab !== 'settings' && activeTab !== 'dashboard' && (
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
               <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">Módulo {activeTab}</h3>
               <p className="text-sm">Este módulo será activado en las siguientes fases del desarrollo.</p>
@@ -196,9 +222,10 @@ export default function Space() {
     );
   }
 
-  // Visitor View (Client / Guest)
+  // Visitor View (Client / Guest Landing for Professional)
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
+      {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-b from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl pointer-events-none" />
 
       <header className="relative z-10 max-w-4xl mx-auto w-full flex items-center justify-between">
@@ -218,46 +245,80 @@ export default function Space() {
         )}
       </header>
 
-      <main className="relative z-10 max-w-2xl mx-auto w-full my-auto text-center py-16">
+      <main className="relative z-10 max-w-2xl mx-auto w-full my-auto text-center py-12">
         <div className="h-20 w-20 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] mb-6 shadow-xl shadow-indigo-500/25">
-          <div className="h-full w-full bg-slate-950 rounded-[22px] flex items-center justify-center">
-            <Scissors className="w-9 h-9 text-indigo-400" />
+          <div className="h-full w-full bg-slate-950 rounded-[22px] flex items-center justify-center font-extrabold text-white text-3xl">
+            {slug?.[0]?.toUpperCase()}
           </div>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-3">Espacio `{slug}`</h1>
-        <p className="text-slate-400 text-base sm:text-lg mb-8 max-w-lg mx-auto">
+        <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-2 capitalize">
+          Espacio `{slug}`
+        </h1>
+
+        <p className="text-slate-400 text-sm sm:text-base mb-8 max-w-lg mx-auto">
           Reserva tu hora online de forma rápida y sin complicaciones en <span className="text-indigo-400 font-mono">espejos.cl/{slug}</span>.
         </p>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl mb-8 text-left shadow-2xl">
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 block mb-4">Servicios Disponibles</span>
-          <div className="space-y-4">
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-white">Corte de Cabello Signature</h4>
-                <p className="text-xs text-slate-400">35 min • $15.000 CLP</p>
-              </div>
-              <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-xs rounded-xl shadow-md">
-                Reservar
-              </button>
+        <button
+          onClick={() => setIsBookingOpen(true)}
+          className="px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all mb-12"
+        >
+          Reservar Hora Ahora
+        </button>
+
+        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl mb-8 text-left shadow-2xl space-y-4">
+          <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 block">
+            Servicios Disponibles
+          </span>
+
+          {isLoadingPublicServices ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-16 bg-slate-950/60 rounded-2xl animate-pulse" />
+              ))}
             </div>
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-white">Arreglo & Ritual de Barba</h4>
-                <p className="text-xs text-slate-400">25 min • $10.000 CLP</p>
-              </div>
-              <button className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold text-xs rounded-xl shadow-md">
-                Reservar
-              </button>
+          ) : services.length === 0 ? (
+            <p className="text-slate-500 text-xs">No hay servicios publicados actualmente.</p>
+          ) : (
+            <div className="space-y-3">
+              {services.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center justify-between"
+                >
+                  <div>
+                    <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                    <p className="text-xs text-slate-400">
+                      {s.durationMinutes} min • ${s.price.toLocaleString('es-CL')} CLP
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsBookingOpen(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md transition-colors"
+                  >
+                    Reservar
+                  </button>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </main>
 
       <footer className="relative z-10 max-w-4xl mx-auto w-full text-center text-xs text-slate-500">
         Reserva tu hora en {slug} a través de Espejos Studio.
       </footer>
+
+      {/* Booking Wizard Modal Overlay */}
+      {isBookingOpen && (
+        <BookingWizard
+          slug={slug!}
+          businessName={slug!}
+          services={services}
+          onClose={() => setIsBookingOpen(false)}
+        />
+      )}
     </div>
   );
 }
