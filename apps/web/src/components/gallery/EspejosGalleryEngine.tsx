@@ -78,14 +78,14 @@ export default function EspejosGalleryEngine({
 
   return (
     <div className="space-y-6 text-left">
-      {/* Dimmed Soft White Wall Gallery Container */}
-      <div className="bg-gradient-to-b from-stone-100 via-zinc-200/90 to-stone-200 border border-stone-300/80 rounded-[32px] p-6 sm:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.08)] relative overflow-hidden">
+      {/* Dark Night Wall Gallery Container */}
+      <div className="bg-slate-950/80 border border-slate-900 rounded-[32px] p-6 sm:p-10 shadow-2xl relative overflow-hidden backdrop-blur-xl">
         {/* Gallery Header & Filters Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/70 border border-stone-300/80 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-sm mb-8">
-          {/* Title with Intermittent Sparkling Glow */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-lg mb-8">
+          {/* Title with Intermittent White Sparkling Glow */}
           <div className="flex items-center space-x-2.5">
-            <Sparkles className="w-5 h-5 text-amber-500 animate-pulse drop-shadow-[0_0_8px_rgba(245,158,11,0.7)]" />
-            <h3 className="text-base font-extrabold uppercase tracking-widest text-slate-900">
+            <Sparkles className="w-5 h-5 text-white animate-pulse drop-shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+            <h3 className="text-base font-extrabold uppercase tracking-widest bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
               Espejos
             </h3>
             <span className="text-xs text-slate-500 font-mono">({images.length})</span>
@@ -93,8 +93,8 @@ export default function EspejosGalleryEngine({
 
           {/* Visual Color Preset Selector */}
           <div className="flex items-center space-x-2 text-xs">
-            <span className="text-slate-600 font-semibold flex items-center space-x-1.5 mr-1">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-700" />
+            <span className="text-slate-400 font-medium flex items-center space-x-1.5 mr-1">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
               <span className="hidden sm:inline">Filtro Óptico:</span>
             </span>
             {(['none', 'monochrome', 'warm', 'cool', 'vivid'] as ColorFilter[]).map((f) => (
@@ -103,8 +103,8 @@ export default function EspejosGalleryEngine({
                 onClick={() => setColorFilter(f)}
                 className={`px-3 py-1 rounded-lg text-[11px] font-semibold capitalize transition-all border ${
                   colorFilter === f
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                    : 'bg-white/80 text-slate-700 border-stone-300 hover:bg-white hover:text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-950 border-white shadow-[0_0_12px_rgba(255,255,255,0.4)]'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
                 }`}
               >
                 {f === 'none' ? 'Original' : f}
@@ -117,16 +117,16 @@ export default function EspejosGalleryEngine({
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="aspect-square bg-stone-300/50 rounded-3xl border border-stone-300 animate-pulse" />
+              <div key={i} className="aspect-square bg-slate-900/60 rounded-3xl border border-slate-800/80 animate-pulse" />
             ))}
           </div>
         ) : images.length === 0 ? (
-          <div className="bg-white/60 border border-stone-300/80 rounded-3xl p-12 text-center text-slate-500">
-            <Sparkles className="w-10 h-10 text-amber-500/60 mx-auto mb-3 animate-pulse" />
+          <div className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-12 text-center text-slate-500">
+            <Sparkles className="w-10 h-10 text-white/60 mx-auto mb-3 animate-pulse" />
             <p className="text-sm font-medium">No hay cuadros exhibidos en esta galería todavía.</p>
           </div>
         ) : (
-          /* Minimalist White Wall Grid with Top Spotlight Lamps */
+          /* Dark Night Wall Grid with Bright White Frames & Top Spotlight Beams */
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 sm:gap-10">
             {images.map((img, idx) => (
               <div
@@ -134,16 +134,16 @@ export default function EspejosGalleryEngine({
                 onClick={() => setLightboxIndex(idx)}
                 className="group relative cursor-pointer flex flex-col items-center"
               >
-                {/* Top Spotlight Lamp Fixture Bar */}
-                <div className="w-14 h-1.5 bg-gradient-to-r from-amber-400 via-amber-200 to-amber-400 rounded-full mx-auto shadow-[0_2px_8px_rgba(245,158,11,0.5)] z-20 relative mb-2" />
+                {/* Top Spotlight Fixture Bar */}
+                <div className="w-14 h-1.5 bg-gradient-to-r from-slate-200 via-white to-slate-200 rounded-full mx-auto shadow-[0_0_12px_rgba(255,255,255,0.9)] z-20 relative mb-2" />
 
-                {/* Soft Warm Spotlight Cone / Beam Radiating Downwards */}
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-44 h-52 bg-gradient-to-b from-amber-300/40 via-amber-200/15 to-transparent blur-md pointer-events-none rounded-t-full opacity-90 group-hover:opacity-100 transition-opacity duration-500" />
+                {/* Bright White Downward Spotlight Cone / Beam */}
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-44 h-56 bg-gradient-to-b from-white/35 via-slate-100/10 to-transparent blur-md pointer-events-none rounded-t-full opacity-90 group-hover:opacity-100 transition-opacity duration-500" />
 
-                {/* Museum Mirror Frame (Dimmed White Wall Hanging Frame) */}
-                <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-slate-950 p-[3px] border-4 border-slate-950 ring-1 ring-amber-400/30 group-hover:ring-amber-400/80 group-hover:border-slate-800 transition-all duration-500 shadow-[0_15px_30px_rgba(0,0,0,0.18)] group-hover:shadow-[0_25px_45px_rgba(0,0,0,0.28)] transform-gpu group-hover:scale-[1.02]">
+                {/* Museum Mirror Frame (Bright White Glowing Frame) */}
+                <div className="relative w-full aspect-square rounded-[24px] overflow-hidden bg-slate-950 p-[4px] border-4 border-white shadow-[0_0_20px_rgba(255,255,255,0.35)] group-hover:border-slate-100 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.65)] ring-1 ring-white/50 transition-all duration-500 transform-gpu group-hover:scale-[1.02]">
                   {/* Inner Frame Rim Overlay */}
-                  <div className="absolute inset-0 z-10 pointer-events-none rounded-[20px] ring-1 ring-inset ring-white/15 group-hover:ring-amber-200/40 transition-all" />
+                  <div className="absolute inset-0 z-10 pointer-events-none rounded-[20px] ring-1 ring-inset ring-white/30 group-hover:ring-white/60 transition-all" />
 
                   <div className="relative w-full h-full rounded-[18px] overflow-hidden bg-slate-950">
                     {/* Lazy-loaded Image */}
@@ -161,7 +161,7 @@ export default function EspejosGalleryEngine({
                       <span className="text-[11px] text-slate-100 font-semibold truncate max-w-[75%]">
                         {img.caption || 'Ver cuadro'}
                       </span>
-                      <div className="p-1.5 bg-amber-500/90 text-slate-950 rounded-lg shadow-lg">
+                      <div className="p-1.5 bg-white text-slate-950 rounded-lg shadow-lg">
                         <Maximize2 className="w-3.5 h-3.5" />
                       </div>
                     </div>
