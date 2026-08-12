@@ -39,17 +39,19 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
     const duration = durationMinutes ? parseInt(durationMinutes, 10) : 30;
 
-    // Start & End ISO for the requested day
-    const dayStartIso = `${date}T00:00:00.000Z`;
-    const dayEndIso = `${date}T23:59:59.999Z`;
+    // Start & End ISO window (+/- 24h around date to capture all timezones)
+    const windowStart = new Date(`${date}T00:00:00.000Z`);
+    windowStart.setUTCDate(windowStart.getUTCDate() - 1);
+    const windowEnd = new Date(`${date}T23:59:59.999Z`);
+    windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
 
-    // Fetch existing appointments in database for this day
+    // Fetch existing appointments in database for this window
     const dbAppointments = await fastify.prisma.appointment.findMany({
       where: {
         professionalId: professional.id,
         status: { in: ['pending', 'confirmed'] },
-        startsAt: { gte: new Date(dayStartIso) },
-        endsAt: { lte: new Date(dayEndIso) },
+        startsAt: { lte: windowEnd },
+        endsAt: { gte: windowStart },
       },
     });
 
@@ -57,6 +59,10 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       start: app.startsAt,
       end: app.endsAt,
     }));
+
+    // Start & End ISO for Google Calendar queries
+    const dayStartIso = `${date}T00:00:00.000Z`;
+    const dayEndIso = `${date}T23:59:59.999Z`;
 
     // If Google Calendar is connected via OAuth
     if (professional.googleCalendarConnected && professional.googleRefreshToken) {

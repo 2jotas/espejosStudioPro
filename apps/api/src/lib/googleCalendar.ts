@@ -253,9 +253,31 @@ export function calculateAvailableTimeSlots(params: {
     // Check if slot is explicitly blocked (e.g. 10:00 or 20:00)
     const isBlocked = blockedSlots.includes(timeStr);
 
-    // Check overlap with busy ranges
+    const slotStartMinutes = slotStart.getUTCHours() * 60 + slotStart.getUTCMinutes();
+    const slotEndMinutes = slotStartMinutes + durationMinutes;
+
+    // Check overlap with busy ranges (using direct timestamp overlap + time-of-day overlap)
     const isConflict = busyRanges.some((busy) => {
-      return slotStart < busy.end && slotEnd > busy.start;
+      // 1. Direct timestamp overlap
+      if (slotStart < busy.end && slotEnd > busy.start) return true;
+
+      // 2. Time-of-day overlap on target date
+      const busyStartUtcMin = busy.start.getUTCHours() * 60 + busy.start.getUTCMinutes();
+      const busyEndUtcMin = busy.end.getUTCHours() * 60 + busy.end.getUTCMinutes();
+
+      const busyStartLocalMin = busy.start.getHours() * 60 + busy.start.getMinutes();
+      const busyEndLocalMin = busy.end.getHours() * 60 + busy.end.getMinutes();
+
+      const overlapUtc = slotStartMinutes < busyEndUtcMin && slotEndMinutes > busyStartUtcMin;
+      const overlapLocal = slotStartMinutes < busyEndLocalMin && slotEndMinutes > busyStartLocalMin;
+
+      // Check if busy range belongs to the same target date
+      const busyDateUtc = busy.start.toISOString().split('T')[0];
+      const busyDateLocal = busy.start.toLocaleDateString('sv-SE');
+
+      const isSameDate = busyDateUtc === dateStr || busyDateLocal === dateStr;
+
+      return isSameDate && (overlapUtc || overlapLocal);
     });
 
     if (!isConflict && !isBlocked) {
