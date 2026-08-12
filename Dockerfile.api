@@ -14,6 +14,9 @@ RUN npm ci
 COPY apps/api ./apps/api
 COPY packages ./packages
 
+# Build shared types package first
+RUN npm run build --workspace=@espejos/shared-types
+
 # Generate Prisma Client & Build
 WORKDIR /app/apps/api
 RUN npx prisma generate

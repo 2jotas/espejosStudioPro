@@ -11,6 +11,8 @@ RUN npm ci
 COPY apps/web ./apps/web
 COPY packages ./packages
 
+# Build shared types package first, then Web frontend app
+RUN npm run build --workspace=@espejos/shared-types
 WORKDIR /app/apps/web
 RUN npm run build
 
