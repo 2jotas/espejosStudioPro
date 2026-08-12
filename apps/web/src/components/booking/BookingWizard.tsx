@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Clock, DollarSign, ArrowLeft, ArrowRight, CheckCircle2, MapPin, Download, Check, ShieldCheck, Camera, FileText } from 'lucide-react';
 import { ServiceItem } from '../admin/ServicesManager';
+import ClientPasskeyAuth from '../auth/ClientPasskeyAuth';
 
 interface BookingWizardProps {
   slug: string;
@@ -581,6 +582,16 @@ export default function BookingWizard({ slug, businessName, address, services, o
                   <span>Ver en Google Maps</span>
                 </a>
               )}
+            </div>
+
+            {/* Client Passkeys Auth Setup */}
+            <div className="max-w-md mx-auto text-left">
+              <ClientPasskeyAuth
+                clientId={confirmedAppointmentId || 'demo-client-id'}
+                clientName={`${firstName} ${lastName}`}
+                phone={phoneVal}
+                slug={slug}
+              />
             </div>
 
             {onClose && (

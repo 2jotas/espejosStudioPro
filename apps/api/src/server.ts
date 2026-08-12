@@ -11,6 +11,7 @@ import { serviceRoutes } from './modules/services.js';
 import { clientRoutes } from './modules/clients.js';
 import { calendarRoutes } from './modules/calendar.js';
 import { appointmentRoutes } from './modules/appointments.js';
+import { clientAuthRoutes } from './modules/clientAuth.js';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ async function main() {
   await server.register(clientRoutes, { prefix: '/api' });
   await server.register(calendarRoutes, { prefix: '/api' });
   await server.register(appointmentRoutes, { prefix: '/api' });
+  await server.register(clientAuthRoutes, { prefix: '/api' });
 
   try {
     await server.listen({ port, host });
