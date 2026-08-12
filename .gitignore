@@ -1,0 +1,28 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.vite
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Database & Cache data / volumes
+*.db
+*.sqlite
+
+# IDEs & System files
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Docker persistent volumes local mounts
+postgres_data
+redis_data
+gallery_uploads

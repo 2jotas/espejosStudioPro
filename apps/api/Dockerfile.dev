@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy root workspace definition
+COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+COPY packages/shared-types/package*.json ./packages/shared-types/
+
+RUN npm install
+
+COPY packages/shared-types ./packages/shared-types
+COPY apps/api ./apps/api
+
+WORKDIR /app/packages/shared-types
+RUN npm run build
+
+WORKDIR /app/apps/api
+RUN npx prisma generate
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
