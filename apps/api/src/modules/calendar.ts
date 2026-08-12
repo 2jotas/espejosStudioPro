@@ -290,23 +290,36 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (existing) continue;
 
-        // Parse summary to extract client name
-        let rawSummary = (gEvent.summary || 'Cliente Google').trim();
-        rawSummary = rawSummary.replace(/^Cita:?\s*/i, '').replace(/^Reserva:?\s*/i, '');
+        // Smart parse summary to extract clean client name
+        let cleanText = (gEvent.summary || 'Cliente Google').trim();
+        cleanText = cleanText
+          .replace(/^Cita:?\s*/i, '')
+          .replace(/^Reserva:?\s*/i, '')
+          .replace(/^Corte y Barba\s*/i, '')
+          .replace(/^Corte de cabello\s*/i, '')
+          .replace(/^Corte clasico\s*/i, '')
+          .replace(/^Corte fade\s*/i, '')
+          .replace(/para\s+/i, '')
+          .replace(/-\s*.*$/i, '')
+          .trim();
 
-        const parts = rawSummary.split('-')[0].trim().split(' ');
-        const firstName = parts[0] || 'Cliente';
-        const lastName = parts.slice(1).join(' ') || 'Google Assistant';
+        const words = cleanText.split(/\s+/).filter(Boolean);
+        let firstName = words[0] || 'Cliente';
+        let lastName = words.slice(1).join(' ') || 'Google Assistant';
 
-        // Find or create Client by phone or name
+        // 1. Try to find existing client by exact or partial first name / last name match
         let client = await fastify.prisma.client.findFirst({
           where: {
             professionalId: professional.id,
-            firstName,
-            lastName,
+            OR: [
+              { firstName: { contains: firstName } },
+              { lastName: { contains: firstName } },
+              { firstName: { contains: lastName } },
+            ],
           },
         });
 
+        // 2. If no match, create new Client & Profile in CRM
         if (!client) {
           const pseudoPhone = `+569${Math.floor(10000000 + Math.random() * 90000000)}`;
           client = await fastify.prisma.client.create({
@@ -323,6 +336,8 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
             data: {
               clientId: client.id,
               professionalId: professional.id,
+              notes: `Ficha creada automáticamente desde Google Calendar: "${gEvent.summary}"`,
+              tags: JSON.stringify(['Google Assistant']),
               visitCount: 1,
               totalSpent: service.price,
               lastVisitAt: gEvent.startsAt,
