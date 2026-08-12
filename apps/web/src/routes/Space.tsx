@@ -1,16 +1,21 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ServicesManager from '../components/admin/ServicesManager';
+
+type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
 
 export default function Space() {
   const { slug } = useParams<{ slug: string }>();
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTab>('services');
 
   const isOwner = user && user.slug === slug;
 
   if (isOwner) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-indigo-500 selection:text-white">
         {/* Sidebar */}
         <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 p-6 flex flex-col justify-between">
           <div>
@@ -27,34 +32,81 @@ export default function Space() {
             </div>
 
             <nav className="space-y-1">
-              <a href="#dashboard" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl bg-indigo-600 text-white font-medium text-sm">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'dashboard'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <LayoutDashboard className="w-4 h-4" />
                 <span>Dashboard</span>
-              </a>
-              <a href="#citas" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors">
+              </button>
+
+              <button
+                onClick={() => setActiveTab('calendar')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'calendar'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <Calendar className="w-4 h-4" />
                 <span>Calendario</span>
-              </a>
-              <a href="#clientes" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors">
+              </button>
+
+              <button
+                onClick={() => setActiveTab('clients')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'clients'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <Users className="w-4 h-4" />
                 <span>Clientes (CRM)</span>
-              </a>
-              <a href="#servicios" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors">
+              </button>
+
+              <button
+                onClick={() => setActiveTab('services')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'services'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <Scissors className="w-4 h-4" />
                 <span>Servicios</span>
-              </a>
-              <a href="#galeria" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors">
+              </button>
+
+              <button
+                onClick={() => setActiveTab('gallery')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'gallery'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <ImageIcon className="w-4 h-4" />
                 <span>Galería Espejos</span>
-              </a>
-              <a href="#config" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors">
+              </button>
+
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  activeTab === 'settings'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
                 <Settings className="w-4 h-4" />
                 <span>Configuración</span>
-              </a>
+              </button>
             </nav>
           </div>
 
-          <div className="pt-6 border-t border-slate-800">
+          <div className="pt-6 border-t border-slate-800 mt-6">
             <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Plan Actual</span>
@@ -97,30 +149,44 @@ export default function Space() {
             </a>
           </header>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-              <span className="text-slate-400 text-xs font-semibold uppercase">Citas de hoy</span>
-              <div className="text-3xl font-extrabold text-white mt-2">0</div>
-              <span className="text-xs text-slate-500 mt-1 block">Próximas reservas</span>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-              <span className="text-slate-400 text-xs font-semibold uppercase">Clientes Activos</span>
-              <div className="text-3xl font-extrabold text-white mt-2">5</div>
-              <span className="text-xs text-slate-500 mt-1 block">En base de datos CRM</span>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-              <span className="text-slate-400 text-xs font-semibold uppercase">Servicios Activos</span>
-              <div className="text-3xl font-extrabold text-white mt-2">3</div>
-              <span className="text-xs text-slate-500 mt-1 block">Disponibles para reserva</span>
-            </div>
-          </div>
+          {/* Dynamic Content by Active Tab */}
+          {activeTab === 'services' && <ServicesManager />}
 
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8">
-            <h3 className="text-lg font-bold text-white mb-2">Bienvenido a tu nuevo espacio Espejos</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              En las siguientes fases activaremos la sincronización en tiempo real con tu Google Calendar y la gestión de tu galería de fotos.
-            </p>
-          </div>
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                  <span className="text-slate-400 text-xs font-semibold uppercase">Citas de hoy</span>
+                  <div className="text-3xl font-extrabold text-white mt-2">0</div>
+                  <span className="text-xs text-slate-500 mt-1 block">Próximas reservas</span>
+                </div>
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                  <span className="text-slate-400 text-xs font-semibold uppercase">Clientes Activos</span>
+                  <div className="text-3xl font-extrabold text-white mt-2">5</div>
+                  <span className="text-xs text-slate-500 mt-1 block">En base de datos CRM</span>
+                </div>
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
+                  <span className="text-slate-400 text-xs font-semibold uppercase">Servicios Activos</span>
+                  <div className="text-3xl font-extrabold text-white mt-2">3</div>
+                  <span className="text-xs text-slate-500 mt-1 block">Disponibles para reserva</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8">
+                <h3 className="text-lg font-bold text-white mb-2">Bienvenido a tu panel de administración</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Usa el menú lateral para gestionar tus servicios, clientes e integraciones.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab !== 'services' && activeTab !== 'dashboard' && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
+              <h3 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">Módulo {activeTab}</h3>
+              <p className="text-sm">Este módulo será activado en las siguientes fases del desarrollo.</p>
+            </div>
+          )}
         </main>
       </div>
     );
@@ -128,7 +194,7 @@ export default function Space() {
 
   // Visitor View (Client / Guest)
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-b from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl pointer-events-none" />
 
       <header className="relative z-10 max-w-4xl mx-auto w-full flex items-center justify-between">
@@ -155,9 +221,9 @@ export default function Space() {
           </div>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-3">Página del Espacio `{slug}`</h1>
+        <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-3">Espacio `{slug}`</h1>
         <p className="text-slate-400 text-base sm:text-lg mb-8 max-w-lg mx-auto">
-          Esta es la vista pública que verán tus clientes al ingresar a <span className="text-indigo-400 font-mono">espejos.cl/{slug}</span>.
+          Reserva tu hora online de forma rápida y sin complicaciones en <span className="text-indigo-400 font-mono">espejos.cl/{slug}</span>.
         </p>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 backdrop-blur-xl mb-8 text-left shadow-2xl">
