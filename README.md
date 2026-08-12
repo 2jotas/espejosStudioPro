@@ -29,40 +29,73 @@ espejos/
 ├── packages/
 │   └── shared-types/         # Tipos e interfaces TypeScript compartidas
 ├── infra/
-│   └── docker-compose.yml    # Configuración de contenedores (Postgres, Redis, API, Web)
+│   ├── docker-compose.yml     # Configuración local de desarrollo
+│   ├── docker-compose.prod.yml# Configuración de producción para VPS
+│   ├── nginx/
+│   │   └── espejos.conf      # Reverse Proxy Nginx & Rate Limiting
+│   └── scripts/
+│       └── deploy.sh         # Script automatizado de actualización en 1 toque
 ├── .env.example
 └── README.md
 ```
 
 ---
 
-## Instrucciones para Ejecutar en Desarrollo Local
+## Guía de Despliegue en VPS (Producción por primera vez)
 
-### Requisitos Previos
-- Node.js >= 20.x
-- Docker & Docker Compose
+### 1. Clonar el repositorio en el VPS
+```bash
+git clone https://github.com/tu-usuario/espejos.git /var/www/espejos
+cd /var/www/espejos
+```
 
-### Pasos
-1. Clonar el repositorio y copiar el archivo de variables de entorno:
-   ```bash
-   cp .env.example .env
-   ```
+### 2. Configurar el archivo `.env` de producción
+Copia `.env.example` y define credenciales seguras de producción:
+```bash
+cp .env.example .env
+nano .env
+```
+Asegúrate de ajustar `JWT_SECRET`, `POSTGRES_PASSWORD`, y credenciales de Google OAuth.
 
-2. Instalar dependencias en el monorepo:
-   ```bash
-   npm install
-   ```
+### 3. Otorgar permisos de ejecución al script de despliegue
+```bash
+chmod +x infra/scripts/deploy.sh
+```
 
-3. Construir los paquetes compartidos:
-   ```bash
-   npm run build --workspace=packages/shared-types
-   ```
+### 4. Ejecutar el primer despliegue
+```bash
+./infra/scripts/deploy.sh
+```
 
-4. Levantamiento de servicios con Docker Compose:
-   ```bash
-   docker compose -f infra/docker-compose.yml up -d --build
-   ```
+---
 
-5. Verificación de servicios:
-   - **Frontend Web**: [http://localhost:5173](http://localhost:5173)
-   - **API Healthcheck**: [http://localhost:3000/health](http://localhost:3000/health)
+## Actualización Día a Día en el VPS
+
+Cada vez que subas cambios a la rama `main` en GitHub, conéctate por SSH al VPS y ejecuta:
+```bash
+cd /var/www/espejos
+./infra/scripts/deploy.sh
+```
+
+---
+
+## Configuración de SSL Gratis con Certbot (Let's Encrypt)
+
+```bash
+sudo apt update
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d espejos.cl -d www.espejos.cl
+```
+
+---
+
+## Copias de Seguridad Automáticas de PostgreSQL (Cronjob)
+
+Para programar un backup diario a las 03:00 AM:
+```bash
+crontab -e
+```
+Agrega la siguiente línea:
+```cron
+0 3 * * * docker exec espejos_postgres_prod pg_dump -U espejos_user espejos_db | gzip > /backups/db_espejos_$(date +\%Y\%m\%d).sql.gz
+```
