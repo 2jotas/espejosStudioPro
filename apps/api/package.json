@@ -20,6 +20,7 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
     "fastify-plugin": "^4.5.1",
+    "googleapis": "^174.0.1",
     "ioredis": "^5.4.1",
     "pino": "^9.1.0"
   },

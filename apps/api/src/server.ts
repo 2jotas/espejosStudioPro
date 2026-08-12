@@ -9,6 +9,7 @@ import { healthRoutes } from './modules/health.js';
 import { authRoutes } from './modules/auth.js';
 import { serviceRoutes } from './modules/services.js';
 import { clientRoutes } from './modules/clients.js';
+import { calendarRoutes } from './modules/calendar.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ async function main() {
   await server.register(authRoutes, { prefix: '/api' });
   await server.register(serviceRoutes, { prefix: '/api' });
   await server.register(clientRoutes, { prefix: '/api' });
+  await server.register(calendarRoutes, { prefix: '/api' });
 
   try {
     await server.listen({ port, host });

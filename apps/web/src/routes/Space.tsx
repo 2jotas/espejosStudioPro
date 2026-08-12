@@ -4,6 +4,7 @@ import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIco
 import { useAuth } from '../context/AuthContext';
 import ServicesManager from '../components/admin/ServicesManager';
 import ClientsManager from '../components/admin/ClientsManager';
+import SettingsIntegrations from '../components/admin/SettingsIntegrations';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
 
@@ -153,6 +154,7 @@ export default function Space() {
           {/* Dynamic Content by Active Tab */}
           {activeTab === 'services' && <ServicesManager />}
           {activeTab === 'clients' && <ClientsManager />}
+          {activeTab === 'settings' && <SettingsIntegrations />}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
