@@ -18,6 +18,7 @@ export default function Space() {
   const [activeTab, setActiveTab] = useState<AdminTab>('services');
 
   // Visitor View State
+  const [profInfo, setProfInfo] = useState<{ businessName: string; bio?: string; phone?: string; address?: string } | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoadingPublicServices, setIsLoadingPublicServices] = useState(true);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -27,12 +28,22 @@ export default function Space() {
 
   useEffect(() => {
     if (!slug) return;
-    const fetchPublicServices = async () => {
+    const fetchPublicData = async () => {
       try {
         setIsLoadingPublicServices(true);
-        const res = await fetch(`/api/professionals/${slug}/services`);
-        if (res.ok) {
-          const data = await res.json();
+
+        const [infoRes, servicesRes] = await Promise.all([
+          fetch(`/api/professionals/${slug}/info`),
+          fetch(`/api/professionals/${slug}/services`),
+        ]);
+
+        if (infoRes.ok) {
+          const data = await infoRes.json();
+          setProfInfo(data.professional);
+        }
+
+        if (servicesRes.ok) {
+          const data = await servicesRes.json();
           setServices(data.services);
         }
       } catch (e) {
@@ -42,7 +53,7 @@ export default function Space() {
       }
     };
 
-    fetchPublicServices();
+    fetchPublicData();
   }, [slug]);
 
   if (isOwner) {
@@ -269,19 +280,33 @@ export default function Space() {
       </header>
 
       <main className="relative z-10 max-w-2xl mx-auto w-full my-auto text-center py-12">
-        <div className="h-20 w-20 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[2px] mb-6 shadow-xl shadow-indigo-500/25">
-          <div className="h-full w-full bg-slate-950 rounded-[22px] flex items-center justify-center font-extrabold text-white text-3xl">
-            {slug?.[0]?.toUpperCase()}
-          </div>
+        {/* Top Branding Pill */}
+        <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-1.5 rounded-full text-indigo-400 text-xs font-bold uppercase tracking-wider mb-6 backdrop-blur-md">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Refleja Tu Mejor Versión</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-2 capitalize">
-          Espacio `{slug}`
+        {/* Business Name Header */}
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-white mb-4 tracking-tight leading-tight">
+          {profInfo?.businessName || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Estudio')}
         </h1>
 
-        <p className="text-slate-400 text-sm sm:text-base mb-8 max-w-lg mx-auto">
-          Reserva tu hora online de forma rápida y sin complicaciones en <span className="text-indigo-400 font-mono">espejos.cl/{slug}</span>.
+        {/* Professional Slogan / Bio */}
+        <p className="text-slate-300 text-sm sm:text-base mb-6 max-w-xl mx-auto leading-relaxed font-normal">
+          {profInfo?.bio || 'Especialistas en cortes a la medida, visagismo y cuidado personal. Reserva tu hora online y refleja tu mejor versión.'}
         </p>
+
+        {/* Trust Badges */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-8 text-xs font-medium text-slate-400">
+          <span className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-xl">
+            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Agendamiento 1-Tap Passkeys</span>
+          </span>
+          <span className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-xl">
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Confirmación Instantánea</span>
+          </span>
+        </div>
 
         <button
           onClick={() => setIsBookingOpen(true)}

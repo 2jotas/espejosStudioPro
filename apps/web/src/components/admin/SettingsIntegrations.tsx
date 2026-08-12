@@ -10,11 +10,18 @@ export default function SettingsIntegrations() {
   // Profile Edit State
   const [businessName, setBusinessName] = useState(user?.businessName || '');
   const [slug, setSlug] = useState(user?.slug || '');
+  const [bio, setBio] = useState('');
   const [isSlugAvailable, setIsSlugAvailable] = useState<boolean | null>(true);
   const [slugReason, setSlugReason] = useState<string | null>(null);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const presets = [
+    'Especialistas en cortes a la medida, visagismo y cuidado personal. Refleja tu mejor versión.',
+    'Asesores de imagen & estética profesional. Diseños exclusivos de barba, corte y tratamientos capilares.',
+    'Experiencia de barbería & salón boutique. Atención personalizada orientada al detalle y la precisión.',
+  ];
 
   // Google Calendar Integration State
   const [isConnected, setIsConnected] = useState(false);
@@ -77,6 +84,7 @@ export default function SettingsIntegrations() {
         body: JSON.stringify({
           businessName,
           slug: slug.trim().toLowerCase(),
+          bio,
         }),
       });
 
@@ -84,7 +92,7 @@ export default function SettingsIntegrations() {
       if (!res.ok) throw new Error(data.message || 'Error al actualizar el perfil');
 
       await refetchUser();
-      setProfileMessage({ type: 'success', text: 'Perfil y URL de tu espacio actualizados correctamente.' });
+      setProfileMessage({ type: 'success', text: 'Perfil y presentación de tu espacio actualizados correctamente.' });
 
       if (data.slugChanged) {
         // Redirect to new slug URL
@@ -212,6 +220,34 @@ export default function SettingsIntegrations() {
               placeholder="Ej: Bernal Master Barbershop"
               className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Slogan / Mensaje de Presentación del Espacio
+            </label>
+            <textarea
+              rows={2}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Especialistas en cortes a la medida, visagismo y cuidado personal. Refleja tu mejor versión."
+              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500"
+            />
+            <div className="mt-2 space-y-1">
+              <span className="text-[11px] text-slate-500 font-semibold block">Sugerencias profesionales (Haz clic para usar):</span>
+              <div className="flex flex-wrap gap-1.5">
+                {presets.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setBio(preset)}
+                    className="text-[10px] bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 border border-slate-800 px-2.5 py-1 rounded-lg transition-colors text-left"
+                  >
+                    "{preset}"
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div>

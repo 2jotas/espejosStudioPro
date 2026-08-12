@@ -177,16 +177,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { user: request.userSession };
   });
 
-  // Update Professional Profile (Business Name & Slug)
+  // Update Professional Profile (Business Name, Slug, Bio)
   fastify.put<{
     Body: {
       businessName?: string;
       slug?: string;
+      bio?: string;
       phone?: string;
     };
   }>('/auth/profile', { preHandler: [authenticateProfessional] }, async (request, reply) => {
     const userSession = request.userSession!;
-    const { businessName, slug, phone } = request.body;
+    const { businessName, slug, bio, phone } = request.body;
 
     const professional = await fastify.prisma.professional.findUnique({
       where: { id: userSession.id },
@@ -227,6 +228,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       data: {
         businessName: businessName ? businessName.trim() : professional.businessName,
         slug: newSlug,
+        bio: bio !== undefined ? bio.trim() : professional.bio,
         phone: phone !== undefined ? phone.trim() : professional.phone,
       },
     });

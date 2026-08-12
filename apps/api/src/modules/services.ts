@@ -3,6 +3,29 @@ import { authenticateProfessional } from '../plugins/authHook.js';
 
 export const serviceRoutes: FastifyPluginAsync = async (fastify) => {
 
+  // Public Endpoint: Get professional info by slug
+  fastify.get<{ Params: { slug: string } }>('/professionals/:slug/info', async (request, reply) => {
+    const { slug } = request.params;
+
+    const professional = await fastify.prisma.professional.findUnique({
+      where: { slug: slug.toLowerCase() },
+      select: {
+        id: true,
+        businessName: true,
+        slug: true,
+        bio: true,
+        phone: true,
+        address: true,
+      },
+    });
+
+    if (!professional) {
+      return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+    }
+
+    return { professional };
+  });
+
   // Public Endpoint: Get active services for a professional by slug
   fastify.get<{ Params: { slug: string } }>('/professionals/:slug/services', async (request, reply) => {
     const { slug } = request.params;

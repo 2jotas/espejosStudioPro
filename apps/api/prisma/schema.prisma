@@ -16,6 +16,7 @@ model Professional {
   phone                   String?
   address                 String?
   whatsapp                String?
+  bio                     String?
   plan                    String         @default("free") // "free" | "pro"
   planExpiresAt           DateTime?      @map("plan_expires_at")
   googleCalendarConnected Boolean        @default(false) @map("google_calendar_connected")
