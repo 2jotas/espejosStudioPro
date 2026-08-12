@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  espejos-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: espejos-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:/app/apps/api/prisma/dev.db
+      - JWT_SECRET=super_secret_jwt_espejos_pro_2026
+    volumes:
+      - ./apps/api/prisma:/app/apps/api/prisma
+      - ./apps/api/uploads:/app/apps/api/uploads
+
+  espejos-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: espejos-web
+    restart: always
+    ports:
+      - "5173:80"
+    depends_on:
+      - espejos-api
