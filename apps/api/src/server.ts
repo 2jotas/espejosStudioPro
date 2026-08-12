@@ -20,19 +20,14 @@ import { planRoutes } from './modules/plans.js';
 import { initializeGalleryWatcher } from './lib/galleryWatcher.js';
 
 dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), './.env') });
 
 const port = Number(process.env.PORT) || 3000;
 const host = '0.0.0.0';
 
 const server = Fastify({
-  logger: {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-      },
-    },
-  },
+  logger: true,
 });
 
 async function main() {

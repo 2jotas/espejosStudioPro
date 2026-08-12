@@ -326,7 +326,7 @@ export default function ServicesManager() {
                     type="number"
                     required
                     min={0}
-                    step={500}
+                    step={1}
                     value={price}
                     onChange={(e) => setPrice(Number(e.target.value))}
                     className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"

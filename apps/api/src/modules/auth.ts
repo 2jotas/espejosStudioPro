@@ -176,4 +176,97 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/auth/me', { preHandler: [authenticateProfessional] }, async (request, reply) => {
     return { user: request.userSession };
   });
+
+  // Update Professional Profile (Business Name & Slug)
+  fastify.put<{
+    Body: {
+      businessName?: string;
+      slug?: string;
+      phone?: string;
+    };
+  }>('/auth/profile', { preHandler: [authenticateProfessional] }, async (request, reply) => {
+    const userSession = request.userSession!;
+    const { businessName, slug, phone } = request.body;
+
+    const professional = await fastify.prisma.professional.findUnique({
+      where: { id: userSession.id },
+    });
+
+    if (!professional) {
+      return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+    }
+
+    let newSlug = professional.slug;
+    let slugChanged = false;
+
+    if (slug && slug.trim().toLowerCase() !== professional.slug) {
+      const cleanSlug = slug.trim().toLowerCase();
+
+      if (!/^[a-z0-9-]+$/.test(cleanSlug)) {
+        return reply.status(400).send({ error: 'InvalidSlug', message: 'El slug solo puede contener letras minúsculas, números y guiones.' });
+      }
+
+      if (isSlugReserved(cleanSlug)) {
+        return reply.status(400).send({ error: 'ReservedSlug', message: 'El slug ingresado está reservado por el sistema.' });
+      }
+
+      const existingSlug = await fastify.prisma.professional.findUnique({
+        where: { slug: cleanSlug },
+      });
+
+      if (existingSlug && existingSlug.id !== professional.id) {
+        return reply.status(409).send({ error: 'SlugConflict', message: 'El nombre de usuario/slug elegido ya está en uso por otro profesional.' });
+      }
+
+      newSlug = cleanSlug;
+      slugChanged = true;
+    }
+
+    const updated = await fastify.prisma.professional.update({
+      where: { id: professional.id },
+      data: {
+        businessName: businessName ? businessName.trim() : professional.businessName,
+        slug: newSlug,
+        phone: phone !== undefined ? phone.trim() : professional.phone,
+      },
+    });
+
+    const updatedSession: UserSession = {
+      id: updated.id,
+      email: updated.email,
+      slug: updated.slug,
+      businessName: updated.businessName,
+      plan: updated.plan as 'free' | 'pro',
+    };
+
+    const token = fastify.jwt.sign(updatedSession, { expiresIn: '7d' });
+
+    reply.setCookie('token', token, {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return {
+      message: 'Perfil actualizado exitosamente',
+      user: updatedSession,
+      slugChanged,
+    };
+  });
+
+  // Delete / Cancel Account
+  fastify.delete('/auth/account', { preHandler: [authenticateProfessional] }, async (request, reply) => {
+    const userSession = request.userSession!;
+
+    // Delete professional and cascaded records (services, clients, appointments, gallery, credentials)
+    await fastify.prisma.professional.delete({
+      where: { id: userSession.id },
+    });
+
+    reply.clearCookie('token', { path: '/' });
+
+    return { message: 'Tu cuenta ha sido eliminada y dada de baja exitosamente.' };
+  });
 };

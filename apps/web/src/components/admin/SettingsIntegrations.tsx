@@ -1,11 +1,103 @@
 import { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, ExternalLink, RefreshCw, MessageSquare, Sliders } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, CheckCircle2, ExternalLink, RefreshCw, MessageSquare, Store, Check, AlertTriangle, Trash2, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function SettingsIntegrations() {
-  const { refetchUser } = useAuth();
+  const { user, refetchUser } = useAuth();
+  const navigate = useNavigate();
+
+  // Profile Edit State
+  const [businessName, setBusinessName] = useState(user?.businessName || '');
+  const [slug, setSlug] = useState(user?.slug || '');
+  const [isSlugAvailable, setIsSlugAvailable] = useState<boolean | null>(true);
+  const [slugReason, setSlugReason] = useState<string | null>(null);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Google Calendar Integration State
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Account Deletion State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Sync user state when loaded
+  useEffect(() => {
+    if (user) {
+      setBusinessName(user.businessName);
+      setSlug(user.slug);
+    }
+  }, [user]);
+
+  // Debounced Slug Availability Checker
+  useEffect(() => {
+    if (!slug || slug.trim().toLowerCase() === user?.slug) {
+      setIsSlugAvailable(true);
+      setSlugReason(null);
+      return;
+    }
+
+    const cleanSlug = slug.trim().toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(cleanSlug)) {
+      setIsSlugAvailable(false);
+      setSlugReason('El slug solo puede contener letras minúsculas, números y guiones.');
+      return;
+    }
+
+    setIsCheckingSlug(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-slug/${encodeURIComponent(cleanSlug)}`);
+        const data = await res.json();
+        setIsSlugAvailable(data.available);
+        setSlugReason(data.reason || null);
+      } catch (e) {
+        setIsSlugAvailable(false);
+      } finally {
+        setIsCheckingSlug(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [slug, user?.slug]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    setProfileMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName,
+          slug: slug.trim().toLowerCase(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al actualizar el perfil');
+
+      await refetchUser();
+      setProfileMessage({ type: 'success', text: 'Perfil y URL de tu espacio actualizados correctamente.' });
+
+      if (data.slugChanged) {
+        // Redirect to new slug URL
+        setTimeout(() => {
+          navigate(`/${data.user.slug}`);
+        }, 1000);
+      }
+    } catch (err: any) {
+      setProfileMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   useEffect(() => {
     // Listen for postMessage from Google OAuth popup window
@@ -29,7 +121,6 @@ export default function SettingsIntegrations() {
       if (!res.ok) throw new Error('Error al obtener la URL de autenticación');
       const data = await res.json();
 
-      // Open OAuth popup window
       const width = 500;
       const height = 600;
       const left = window.screen.width / 2 - width / 2;
@@ -64,15 +155,125 @@ export default function SettingsIntegrations() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch('/api/auth/account', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Error al eliminar la cuenta');
+
+      alert('Tu cuenta ha sido dada de baja exitosamente.');
+      window.location.href = '/';
+    } catch (err: any) {
+      alert(err.message);
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
-        <h2 className="text-xl font-bold text-white">Configuración e Integraciones</h2>
-        <p className="text-slate-400 text-sm">Conecta tus herramientas externas para automatizar tu agenda y comunicaciones</p>
+        <h2 className="text-xl font-bold text-white">Configuración del Espacio</h2>
+        <p className="text-slate-400 text-sm">Personaliza el nombre de tu negocio, tu enlace de reserva e integraciones</p>
+      </div>
+
+      {/* Profile & Slug Settings Form */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl space-y-6">
+        <div className="flex items-center space-x-3 pb-4 border-b border-slate-800">
+          <div className="h-10 w-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <Store className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Información del Espacio</h3>
+            <p className="text-slate-400 text-xs">Cambia el nombre de tu negocio y la dirección URL pública</p>
+          </div>
+        </div>
+
+        {profileMessage && (
+          <div
+            className={`p-4 rounded-2xl border text-xs font-semibold flex items-center space-x-2 ${
+              profileMessage.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+            }`}
+          >
+            {profileMessage.type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+            <span>{profileMessage.text}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveProfile} className="space-y-4 max-w-xl">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Nombre de tu Espacio / Negocio</label>
+            <input
+              type="text"
+              required
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Ej: Bernal Master Barbershop"
+              className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Dirección URL de Reserva (`espejos.cl/{'{slug}'}`)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 text-xs font-mono">
+                espejos.cl/
+              </div>
+              <input
+                type="text"
+                required
+                value={slug}
+                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                placeholder="bernal-barber"
+                className="w-full pl-24 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 font-mono text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                {isCheckingSlug ? (
+                  <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                ) : isSlugAvailable ? (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                )}
+              </div>
+            </div>
+
+            {slugReason && (
+              <p className="text-[11px] text-rose-400 mt-1 font-medium">{slugReason}</p>
+            )}
+
+            <p className="text-[11px] text-slate-500 mt-1">
+              Esta es la URL que compartirás a tus clientes para agendar citas.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSavingProfile || isSlugAvailable === false}
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
+          >
+            {isSavingProfile ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Guardando...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Guardar Cambios</span>
+              </>
+            )}
+          </button>
+        </form>
       </div>
 
       {/* Integrations List Grid */}
       <div className="space-y-4">
+        <h3 className="text-base font-bold text-white">Integraciones Externas</h3>
+
         {/* Google Calendar Card */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 backdrop-blur-xl">
           <div className="flex items-start space-x-4">
@@ -136,7 +337,7 @@ export default function SettingsIntegrations() {
           </div>
         </div>
 
-        {/* WhatsApp Reminders Placeholder (Future Integration) */}
+        {/* WhatsApp Reminders Placeholder */}
         <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 opacity-75">
           <div className="flex items-start space-x-4">
             <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
@@ -152,35 +353,80 @@ export default function SettingsIntegrations() {
               </div>
 
               <p className="text-slate-400 text-xs leading-relaxed max-w-lg">
-                Envía confirmaciones y recordatorios automáticos por WhatsApp a tus clientes 24 horas antes de su cita para reducir las inasistencias.
+                Envía confirmaciones y recordatorios automáticos por WhatsApp a tus clientes 24 horas antes de su cita.
               </p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* General Settings Section */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 mt-8">
-          <div className="flex items-center space-x-2 text-indigo-400 font-bold text-sm">
-            <Sliders className="w-4 h-4" />
-            <span>Preferencia de Horario Laboral</span>
-          </div>
+      {/* Danger Zone (Account Deletion) */}
+      <div className="bg-rose-950/20 border border-rose-500/20 rounded-3xl p-6 sm:p-8 space-y-4">
+        <div className="flex items-center space-x-3 text-rose-400 font-bold text-sm">
+          <ShieldAlert className="w-5 h-5" />
+          <span>Zona de Peligro</span>
+        </div>
 
-          <p className="text-slate-400 text-xs">
-            Horario predeterminado para el cálculo de disponibilidad de tus citas:
-          </p>
+        <p className="text-slate-400 text-xs leading-relaxed max-w-xl">
+          Si deseas suspender o eliminar permanentemente tu cuenta y tu espacio de agendamiento, puedes hacerlo desde aquí.
+        </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md pt-2">
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-              <span className="text-slate-500 block">Hora de inicio</span>
-              <span className="text-white font-bold text-sm">09:00 AM</span>
+        <button
+          type="button"
+          onClick={() => setIsDeleteModalOpen(true)}
+          className="px-4 py-2.5 bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 hover:border-rose-600 text-rose-300 hover:text-white font-semibold text-xs rounded-xl transition-colors flex items-center space-x-2"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Dar de baja / Eliminar mi cuenta</span>
+        </button>
+      </div>
+
+      {/* Account Deletion Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-center">
+            <div className="h-12 w-12 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-4">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
-              <span className="text-slate-500 block">Hora de término</span>
-              <span className="text-white font-bold text-sm">07:00 PM</span>
+
+            <h3 className="text-lg font-bold text-white mb-1">¿Dar de baja tu cuenta?</h3>
+            <p className="text-slate-400 text-xs mb-4 leading-relaxed">
+              Esta acción eliminará de forma permanente tu espacio <strong className="text-white">espejos.cl/{user?.slug}</strong>, tus servicios, tu CRM de clientes y todo tu historial de citas.
+            </p>
+
+            <div className="mb-4 text-left">
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                Escribe <span className="text-rose-400 font-mono font-bold">ELIMINAR</span> para confirmar:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="ELIMINAR"
+                className="w-full px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm font-mono focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="w-1/2 py-2.5 bg-slate-800 text-slate-400 text-xs font-semibold rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmationText.trim().toUpperCase() !== 'ELIMINAR' || isDeletingAccount}
+                className="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl disabled:opacity-50 transition-colors"
+              >
+                {isDeletingAccount ? 'Eliminando...' : 'Eliminar Definivamente'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
