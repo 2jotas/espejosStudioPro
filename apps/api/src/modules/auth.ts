@@ -166,6 +166,52 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // Reset Password for Professional
+  fastify.post<{
+    Body: {
+      email: string;
+      newPassword: string;
+    };
+  }>('/auth/reset-password', async (request, reply) => {
+    const { email, newPassword } = request.body;
+
+    if (!email || !newPassword) {
+      return reply.status(400).send({
+        error: 'MissingFields',
+        message: 'El correo electrónico y la nueva contraseña son obligatorios.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return reply.status(400).send({
+        error: 'PasswordTooShort',
+        message: 'La nueva contraseña debe tener al menos 6 caracteres.',
+      });
+    }
+
+    const professional = await fastify.prisma.professional.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!professional) {
+      return reply.status(404).send({
+        error: 'NotFound',
+        message: 'No existe ninguna cuenta registrada con este correo electrónico.',
+      });
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await fastify.prisma.professional.update({
+      where: { id: professional.id },
+      data: { passwordHash },
+    });
+
+    return {
+      message: '¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión.',
+    };
+  });
+
   // Logout Professional
   fastify.post('/auth/logout', async (request, reply) => {
     reply.clearCookie('token', { path: '/' });
