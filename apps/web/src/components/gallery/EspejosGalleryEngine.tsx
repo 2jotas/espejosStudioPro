@@ -21,7 +21,6 @@ export default function EspejosGalleryEngine({
 }: EspejosGalleryEngineProps) {
   const [images, setImages] = useState<GalleryItem[]>(initialImages || []);
   const [isLoading, setIsLoading] = useState<boolean>(externalLoading);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [colorFilter, setColorFilter] = useState<ColorFilter>('none');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -79,31 +78,15 @@ export default function EspejosGalleryEngine({
 
   return (
     <div className="space-y-6 text-left">
-      {/* Storytelling Manifesto Banner */}
-      <div className="bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950 border border-indigo-500/20 rounded-3xl p-6 backdrop-blur-xl">
-        <div className="flex items-center space-x-2 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
-          <span>Colección de Espejos & Reflejos</span>
-        </div>
-        <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
-          Cada foto representa una historia única realizada en un cliente: una técnica a la medida, un acabado distintivo y una experiencia diferente proyectada en el reflejo.
-        </p>
-      </div>
-
       {/* Gallery Header & Filters Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-4 sm:p-6 backdrop-blur-xl">
-        {/* Category Tabs */}
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              selectedCategory === 'all'
-                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/20'
-                : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            Todas las Historias ({images.length})
-          </button>
+        {/* Title with Intermittent Sparkling Glow */}
+        <div className="flex items-center space-x-2.5">
+          <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse drop-shadow-[0_0_10px_rgba(129,140,248,0.9)]" />
+          <h3 className="text-base font-extrabold uppercase tracking-widest bg-gradient-to-r from-white via-indigo-200 to-purple-200 bg-clip-text text-transparent">
+            Espejos
+          </h3>
+          <span className="text-xs text-slate-500 font-mono">({images.length})</span>
         </div>
 
         {/* Visual Color Preset Selector */}
@@ -130,71 +113,76 @@ export default function EspejosGalleryEngine({
 
       {/* Gallery Skeleton / Empty State */}
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="aspect-square bg-slate-900/40 rounded-3xl border border-slate-800/60 animate-pulse" />
           ))}
         </div>
       ) : images.length === 0 ? (
         <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-12 text-center text-slate-500">
-          <Sparkles className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-          <p className="text-sm">No hay imágenes publicadas en esta galería todavía.</p>
+          <Sparkles className="w-10 h-10 text-slate-700 mx-auto mb-3 animate-pulse" />
+          <p className="text-sm">No hay cuadros exhibidos en esta galería todavía.</p>
         </div>
       ) : (
-        /* High-Performance Neon Mirror Grid */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
-          {images.map((img, idx) => (
-            <div
-              key={img.id}
-              onClick={() => setLightboxIndex(idx)}
-              className="group relative cursor-pointer flex flex-col"
-            >
-              {/* Neon Ambient Backdrop Glow */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/25 via-purple-500/25 to-pink-500/25 rounded-[30px] blur-md opacity-40 group-hover:opacity-100 group-hover:blur-lg transition-all duration-500" />
+        /* Minimalist Museum Wall Grid with Spotlight Lamps */
+        <div className="bg-slate-950/70 border border-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 sm:gap-10">
+            {images.map((img, idx) => (
+              <div
+                key={img.id}
+                onClick={() => setLightboxIndex(idx)}
+                className="group relative cursor-pointer flex flex-col items-center"
+              >
+                {/* Museum Lamp Fixture at Top of Frame */}
+                <div className="w-14 h-1.5 bg-gradient-to-r from-indigo-500 via-amber-200 to-indigo-500 rounded-full mx-auto shadow-[0_0_12px_rgba(251,191,36,0.7)] z-20 relative mb-1.5" />
 
-              {/* Main Metallic Neon Mirror Frame */}
-              <div className="relative aspect-square rounded-[26px] overflow-hidden bg-slate-950 p-[3px] border border-indigo-500/30 group-hover:border-indigo-400 transition-all duration-500 shadow-[0_0_20px_rgba(99,102,241,0.2)] group-hover:shadow-[0_0_35px_rgba(129,140,248,0.45)] transform-gpu group-hover:scale-[1.03]">
-                {/* Inner Metallic Rim Overlay */}
-                <div className="absolute inset-0 z-10 pointer-events-none rounded-[24px] ring-1 ring-inset ring-white/15 group-hover:ring-indigo-300/40 transition-all" />
+                {/* Soft Light Cone / Spotlight Beam Radiating Downwards */}
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-48 bg-gradient-to-b from-amber-200/20 via-indigo-500/10 to-transparent blur-md pointer-events-none rounded-t-full opacity-90 group-hover:opacity-100 transition-opacity duration-500" />
 
-                <div className="relative w-full h-full rounded-[22px] overflow-hidden bg-slate-950">
-                  {/* Lazy-loaded Hardware Accelerated Image */}
-                  <img
-                    src={img.filePath}
-                    alt={img.caption || 'Trabajo Espejos'}
-                    loading="lazy"
-                    decoding="async"
-                    style={{ filter: getFilterStyle(colorFilter) }}
-                    className="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105"
-                  />
+                {/* Museum Picture Frame (Hanging Frame Style) */}
+                <div className="relative w-full aspect-square rounded-[22px] overflow-hidden bg-slate-950 p-[3px] border-2 border-slate-800 ring-1 ring-amber-400/20 group-hover:ring-amber-300/60 group-hover:border-indigo-400 transition-all duration-500 shadow-[0_15px_35px_rgba(0,0,0,0.8)] transform-gpu group-hover:scale-[1.02]">
+                  {/* Inner Frame Rim Overlay */}
+                  <div className="absolute inset-0 z-10 pointer-events-none rounded-[20px] ring-1 ring-inset ring-white/10 group-hover:ring-amber-200/30 transition-all" />
 
-                  {/* Glassmorphism Hover Overlay */}
-                  <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3.5 backdrop-blur-[2px]">
-                    <span className="text-[11px] text-slate-200 font-semibold truncate max-w-[75%]">
-                      {img.caption || 'Ver reflejo'}
-                    </span>
-                    <div className="p-1.5 bg-indigo-600/90 text-white rounded-lg shadow-lg">
-                      <Maximize2 className="w-3.5 h-3.5" />
+                  <div className="relative w-full h-full rounded-[18px] overflow-hidden bg-slate-950">
+                    {/* Lazy-loaded Image */}
+                    <img
+                      src={img.filePath}
+                      alt={img.caption || 'Trabajo del día'}
+                      loading="lazy"
+                      decoding="async"
+                      style={{ filter: getFilterStyle(colorFilter) }}
+                      className="w-full h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+
+                    {/* Glassmorphism Hover Overlay */}
+                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3.5 backdrop-blur-[2px]">
+                      <span className="text-[11px] text-slate-200 font-semibold truncate max-w-[75%]">
+                        {img.caption || 'Ver cuadro'}
+                      </span>
+                      <div className="p-1.5 bg-indigo-600/90 text-white rounded-lg shadow-lg">
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Admin Mode Delete Button */}
-                {mode === 'admin' && onDelete && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(img.id);
-                    }}
-                    className="absolute top-3 right-3 z-30 p-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl shadow-xl transition-all"
-                    title="Eliminar foto"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                  {/* Admin Mode Delete Button */}
+                  {mode === 'admin' && onDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(img.id);
+                      }}
+                      className="absolute top-3 right-3 z-30 p-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl shadow-xl transition-all"
+                      title="Eliminar foto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
