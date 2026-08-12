@@ -7,6 +7,8 @@ import ClientsManager from '../components/admin/ClientsManager';
 import SettingsIntegrations from '../components/admin/SettingsIntegrations';
 import GalleryManager from '../components/admin/GalleryManager';
 import PricingUpgrade from '../components/admin/PricingUpgrade';
+import CalendarManager from '../components/admin/CalendarManager';
+import DashboardManager from '../components/admin/DashboardManager';
 import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
 
@@ -196,40 +198,13 @@ export default function Space() {
           </header>
 
           {/* Dynamic Content by Active Tab */}
+          {activeTab === 'dashboard' && <DashboardManager />}
+          {activeTab === 'calendar' && <CalendarManager />}
           {activeTab === 'services' && <ServicesManager />}
           {activeTab === 'clients' && <ClientsManager />}
           {activeTab === 'settings' && <SettingsIntegrations />}
           {activeTab === 'gallery' && <GalleryManager />}
           {activeTab === 'pricing' && <PricingUpgrade />}
-
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                  <span className="text-slate-400 text-xs font-semibold uppercase">Citas de hoy</span>
-                  <div className="text-3xl font-extrabold text-white mt-2">0</div>
-                  <span className="text-xs text-slate-500 mt-1 block">Próximas reservas</span>
-                </div>
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                  <span className="text-slate-400 text-xs font-semibold uppercase">Clientes Activos</span>
-                  <div className="text-3xl font-extrabold text-white mt-2">5</div>
-                  <span className="text-xs text-slate-500 mt-1 block">En base de datos CRM</span>
-                </div>
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                  <span className="text-slate-400 text-xs font-semibold uppercase">Servicios Activos</span>
-                  <div className="text-3xl font-extrabold text-white mt-2">3</div>
-                  <span className="text-xs text-slate-500 mt-1 block">Disponibles para reserva</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8">
-                <h3 className="text-lg font-bold text-white mb-2">Bienvenido a tu panel de administración</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Usa el menú lateral para gestionar tus servicios, clientes e integraciones.
-                </p>
-              </div>
-            </div>
-          )}
 
 
         </main>

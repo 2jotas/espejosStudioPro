@@ -198,5 +198,38 @@ export const appointmentRoutes: FastifyPluginAsync = async (fastify) => {
 
       return { appointments };
     });
+
+    // PUT /api/appointments/:id/status - Update appointment status
+    protectedRoutes.put<{
+      Params: { id: string };
+      Body: { status: 'confirmed' | 'cancelled' | 'completed' };
+    }>('/appointments/:id/status', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { id } = request.params;
+      const { status } = request.body;
+
+      if (!['confirmed', 'cancelled', 'completed'].includes(status)) {
+        return reply.status(400).send({ error: 'InvalidStatus', message: 'Estado no válido.' });
+      }
+
+      const appointment = await fastify.prisma.appointment.findFirst({
+        where: { id, professionalId: userSession.id },
+      });
+
+      if (!appointment) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Cita no encontrada.' });
+      }
+
+      const updated = await fastify.prisma.appointment.update({
+        where: { id },
+        data: { status },
+        include: {
+          client: true,
+          service: true,
+        },
+      });
+
+      return { message: `Cita actualizada a ${status}`, appointment: updated };
+    });
   });
 };

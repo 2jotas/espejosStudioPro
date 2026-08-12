@@ -158,11 +158,21 @@ export async function createGoogleCalendarEvent(
 export function calculateAvailableTimeSlots(params: {
   dateStr: string; // YYYY-MM-DD
   durationMinutes: number;
-  busyRanges: BusyRange[]; // From Google Calendar or local appointments
-  workStartHour?: number; // default 9
-  workEndHour?: number; // default 19
+  busyRanges: BusyRange[];
+  workStartHour?: number; // default 10 (10:00 AM)
+  workEndHour?: number; // default 20 (08:00 PM / 20:00)
+  disabledDays?: number[]; // default [2, 3] (Tuesday & Wednesday off)
+  blockedSlots?: string[]; // default ['10:00', '20:00']
 }): Array<{ timeStr: string; startIso: string; endIso: string }> {
-  const { dateStr, durationMinutes, busyRanges, workStartHour = 9, workEndHour = 19 } = params;
+  const {
+    dateStr,
+    durationMinutes,
+    busyRanges,
+    workStartHour = 10,
+    workEndHour = 20,
+    disabledDays = [2, 3], // Tuesday (2) & Wednesday (3) disabled by default
+    blockedSlots = ['10:00', '20:00'], // 10:00 AM and 20:00 PM always reserved by default
+  } = params;
 
   const slots: Array<{ timeStr: string; startIso: string; endIso: string }> = [];
 
@@ -173,6 +183,14 @@ export function calculateAvailableTimeSlots(params: {
   const month = parseInt(dateParts[1], 10) - 1;
   const day = parseInt(dateParts[2], 10);
 
+  const targetDate = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  const dayOfWeek = targetDate.getUTCDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+
+  // If day is disabled (e.g. Tuesday or Wednesday), return no slots
+  if (disabledDays.includes(dayOfWeek)) {
+    return slots;
+  }
+
   const startOfDay = new Date(Date.UTC(year, month, day, workStartHour, 0, 0));
   const endOfDay = new Date(Date.UTC(year, month, day, workEndHour, 0, 0));
 
@@ -182,23 +200,28 @@ export function calculateAvailableTimeSlots(params: {
     const slotStart = new Date(currentPointer.getTime());
     const slotEnd = new Date(currentPointer.getTime() + durationMinutes * 60 * 1000);
 
+    const hoursStr = String(slotStart.getUTCHours()).padStart(2, '0');
+    const minsStr = String(slotStart.getUTCMinutes()).padStart(2, '0');
+    const timeStr = `${hoursStr}:${minsStr}`;
+
+    // Check if slot is explicitly blocked (e.g. 10:00 or 20:00)
+    const isBlocked = blockedSlots.includes(timeStr);
+
     // Check overlap with busy ranges
     const isConflict = busyRanges.some((busy) => {
       return slotStart < busy.end && slotEnd > busy.start;
     });
 
-    if (!isConflict) {
-      const hoursStr = String(slotStart.getUTCHours()).padStart(2, '0');
-      const minsStr = String(slotStart.getUTCMinutes()).padStart(2, '0');
+    if (!isConflict && !isBlocked) {
       slots.push({
-        timeStr: `${hoursStr}:${minsStr}`,
+        timeStr,
         startIso: slotStart.toISOString(),
         endIso: slotEnd.toISOString(),
       });
     }
 
-    // Step by 15 minutes
-    currentPointer = new Date(currentPointer.getTime() + 15 * 60 * 1000);
+    // Step by 30 minutes
+    currentPointer = new Date(currentPointer.getTime() + 30 * 60 * 1000);
   }
 
   return slots;
