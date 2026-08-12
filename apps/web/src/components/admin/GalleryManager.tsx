@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Trash2, FolderSync, Image as ImageIcon, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FolderSync, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import EspejosGalleryEngine from '../gallery/EspejosGalleryEngine';
 
 export interface GalleryItem {
   id: string;
@@ -131,50 +132,14 @@ export default function GalleryManager() {
         </div>
       )}
 
-      {/* Gallery Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-slate-900/40 border border-slate-800/60 rounded-2xl animate-pulse" />
-          ))}
-        </div>
-      ) : images.length === 0 ? (
-        <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
-          <ImageIcon className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <p className="mb-4 text-sm">Aún no has subido fotos a tu galería.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {images.map((img) => (
-            <div key={img.id} className="group relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
-              {/* Photo with Mirror Effect */}
-              <div className="relative aspect-square overflow-hidden bg-slate-950">
-                <img
-                  src={img.filePath}
-                  alt={img.caption || 'Galería Espejos'}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-
-              {/* Source Tag Badge */}
-              <div className="absolute top-2 left-2 px-2 py-0.5 bg-slate-950/80 border border-slate-800 backdrop-blur-md rounded-md text-[10px] font-semibold text-slate-300 uppercase">
-                {img.source === 'watched_folder' ? 'Auto-Watch' : 'Manual'}
-              </div>
-
-              {/* Delete Hover Overlay */}
-              <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                <button
-                  onClick={() => handleDeleteImage(img.id)}
-                  className="p-3 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl shadow-lg transition-colors"
-                  title="Eliminar foto"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Gallery Engine */}
+      <EspejosGalleryEngine
+        slug={user?.slug || ''}
+        mode="admin"
+        images={images}
+        onDelete={handleDeleteImage}
+        isLoading={isLoading}
+      />
     </div>
   );
 }
