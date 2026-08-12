@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck } from 'lucide-react';
+import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck, Eye } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ServicesManager, { ServiceItem } from '../components/admin/ServicesManager';
 import ClientsManager from '../components/admin/ClientsManager';
@@ -22,7 +22,8 @@ export default function Space() {
   const [isLoadingPublicServices, setIsLoadingPublicServices] = useState(true);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
 
-  const isOwner = user && user.slug === slug;
+  const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
+  const isOwner = user && user.slug === slug && !isPreviewMode;
 
   useEffect(() => {
     if (!slug) return;
@@ -232,11 +233,25 @@ export default function Space() {
 
   // Visitor View (Client / Guest Landing for Professional)
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-6 md:p-12 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-indigo-500 selection:text-white">
+      {/* Preview Mode Top Banner for Space Owner */}
+      {user && user.slug === slug && isPreviewMode && (
+        <div className="bg-indigo-600/90 text-white text-xs font-bold py-2.5 px-4 text-center flex items-center justify-center space-x-3 backdrop-blur-md sticky top-0 z-50 shadow-lg">
+          <Eye className="w-4 h-4 flex-shrink-0" />
+          <span>Vista Previa: Así es como tus clientes ven tu página de reserva pública</span>
+          <Link
+            to={`/${slug}`}
+            className="bg-slate-950 text-indigo-300 hover:text-white px-3 py-1 rounded-lg text-[11px] font-semibold border border-indigo-400/30 transition-colors"
+          >
+            Volver a mi Panel
+          </Link>
+        </div>
+      )}
+
       {/* Background glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-b from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl pointer-events-none" />
 
-      <header className="relative z-10 max-w-4xl mx-auto w-full flex items-center justify-between">
+      <header className="relative z-10 max-w-4xl mx-auto w-full flex items-center justify-between p-6 md:px-0 pt-6">
         <Link to="/" className="flex items-center space-x-2 text-slate-400 hover:text-white text-sm font-semibold transition-colors">
           <Sparkles className="w-4 h-4 text-indigo-400" />
           <span>Espejos</span>
