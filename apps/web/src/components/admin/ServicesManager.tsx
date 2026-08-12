@@ -25,8 +25,8 @@ export default function ServicesManager() {
   // Form State
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(30);
-  const [price, setPrice] = useState(15000);
+  const [durationMinutes, setDurationMinutes] = useState<number | string>(30);
+  const [price, setPrice] = useState<number | string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -53,7 +53,7 @@ export default function ServicesManager() {
     setName('');
     setDescription('');
     setDurationMinutes(30);
-    setPrice(15000);
+    setPrice('');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -313,9 +313,9 @@ export default function ServicesManager() {
                     type="number"
                     required
                     min={5}
-                    step={5}
+                    step={1}
                     value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                    onChange={(e) => setDurationMinutes(e.target.value)}
                     className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -328,7 +328,8 @@ export default function ServicesManager() {
                     min={0}
                     step={1}
                     value={price}
-                    onChange={(e) => setPrice(Number(e.target.value))}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="17990"
                     className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
                   />
                 </div>
