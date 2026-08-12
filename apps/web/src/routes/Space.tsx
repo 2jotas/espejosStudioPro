@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import ServicesManager, { ServiceItem } from '../components/admin/ServicesManager';
 import ClientsManager from '../components/admin/ClientsManager';
 import SettingsIntegrations from '../components/admin/SettingsIntegrations';
+import GalleryManager from '../components/admin/GalleryManager';
+import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
@@ -181,6 +183,7 @@ export default function Space() {
           {activeTab === 'services' && <ServicesManager />}
           {activeTab === 'clients' && <ClientsManager />}
           {activeTab === 'settings' && <SettingsIntegrations />}
+          {activeTab === 'gallery' && <GalleryManager />}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
@@ -304,6 +307,9 @@ export default function Space() {
             </div>
           )}
         </div>
+
+        {/* Public Mirror Reflection Gallery */}
+        <MirrorGallery slug={slug!} />
       </main>
 
       <footer className="relative z-10 max-w-4xl mx-auto w-full text-center text-xs text-slate-500">

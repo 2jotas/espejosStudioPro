@@ -5,6 +5,9 @@ import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import prismaPlugin from './plugins/prisma.js';
 import redisPlugin from './plugins/redis.js';
+import fastifyMultipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import { healthRoutes } from './modules/health.js';
 import { authRoutes } from './modules/auth.js';
 import { serviceRoutes } from './modules/services.js';
@@ -12,6 +15,8 @@ import { clientRoutes } from './modules/clients.js';
 import { calendarRoutes } from './modules/calendar.js';
 import { appointmentRoutes } from './modules/appointments.js';
 import { clientAuthRoutes } from './modules/clientAuth.js';
+import { galleryRoutes } from './modules/gallery.js';
+import { initializeGalleryWatcher } from './lib/galleryWatcher.js';
 
 dotenv.config();
 
@@ -41,6 +46,12 @@ async function main() {
     secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production-espejos-2026',
   });
 
+  await server.register(fastifyMultipart, { limits: { fileSize: 10 * 1024 * 1024 } });
+  await server.register(fastifyStatic, {
+    root: path.resolve(process.cwd(), './uploads'),
+    prefix: '/uploads/',
+  });
+
   await server.register(prismaPlugin);
   await server.register(redisPlugin);
 
@@ -52,6 +63,10 @@ async function main() {
   await server.register(calendarRoutes, { prefix: '/api' });
   await server.register(appointmentRoutes, { prefix: '/api' });
   await server.register(clientAuthRoutes, { prefix: '/api' });
+  await server.register(galleryRoutes, { prefix: '/api' });
+
+  // Initialize file watcher for auto-publishing photos
+  initializeGalleryWatcher(server.prisma);
 
   try {
     await server.listen({ port, host });
