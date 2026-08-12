@@ -21,6 +21,8 @@ model Professional {
   planExpiresAt           DateTime?      @map("plan_expires_at")
   googleCalendarConnected Boolean        @default(false) @map("google_calendar_connected")
   googleRefreshToken      String?        @map("google_refresh_token")
+  googleCalendarId        String?        @map("google_calendar_id")
+  googleApiKey            String?        @map("google_api_key")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 

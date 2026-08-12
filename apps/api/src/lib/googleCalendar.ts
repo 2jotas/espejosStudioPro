@@ -61,6 +61,64 @@ export async function fetchGoogleBusyRanges(
   }
 }
 
+export async function fetchGoogleBusyRangesViaApiKey(
+  calendarId: string,
+  apiKey: string,
+  startIso: string,
+  endIso: string
+): Promise<BusyRange[]> {
+  try {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events?key=${encodeURIComponent(apiKey)}&timeMin=${encodeURIComponent(
+      startIso
+    )}&timeMax=${encodeURIComponent(endIso)}&singleEvents=true`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('Error fetching Google Calendar events via API key:', await res.text());
+      return [];
+    }
+
+    const data = await res.json();
+    const items = data.items || [];
+    return items
+      .filter((item: any) => item.start?.dateTime && item.end?.dateTime)
+      .map((item: any) => ({
+        start: new Date(item.start.dateTime),
+        end: new Date(item.end.dateTime),
+      }));
+  } catch (err) {
+    console.error('Error in fetchGoogleBusyRangesViaApiKey:', err);
+    return [];
+  }
+}
+
+export async function verifyGoogleApiKeyConnection(
+  calendarId: string,
+  apiKey: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const now = new Date().toISOString();
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events?key=${encodeURIComponent(apiKey)}&timeMin=${encodeURIComponent(
+      now
+    )}&maxResults=1`;
+
+    const res = await fetch(url);
+    if (res.ok) {
+      return { success: true, message: '¡Conexión exitosa! El calendario de Google ha sido verificado.' };
+    }
+
+    const errorData = await res.json().catch(() => ({}));
+    const errorMsg = errorData.error?.message || 'No se pudo conectar al calendario con esa Clave API y Nombre/ID.';
+    return { success: false, message: errorMsg };
+  } catch (err: any) {
+    return { success: false, message: `Error de red al verificar Google Calendar: ${err.message || err}` };
+  }
+}
+
 export async function createGoogleCalendarEvent(
   refreshToken: string,
   eventData: {

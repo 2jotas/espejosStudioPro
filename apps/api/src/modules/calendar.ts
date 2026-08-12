@@ -4,6 +4,8 @@ import {
   getGoogleAuthUrl,
   getTokensFromCode,
   fetchGoogleBusyRanges,
+  fetchGoogleBusyRangesViaApiKey,
+  verifyGoogleApiKeyConnection,
   calculateAvailableTimeSlots,
 } from '../lib/googleCalendar.js';
 
@@ -55,10 +57,20 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       end: app.endsAt,
     }));
 
-    // If Google Calendar is connected, fetch Google busy ranges
+    // If Google Calendar is connected via OAuth
     if (professional.googleCalendarConnected && professional.googleRefreshToken) {
       const googleBusy = await fetchGoogleBusyRanges(
         professional.googleRefreshToken,
+        dayStartIso,
+        dayEndIso
+      );
+      busyRanges.push(...googleBusy);
+    }
+    // Or if connected via API Key & Calendar ID
+    else if (professional.googleCalendarConnected && professional.googleApiKey && professional.googleCalendarId) {
+      const googleBusy = await fetchGoogleBusyRangesViaApiKey(
+        professional.googleCalendarId,
+        professional.googleApiKey,
         dayStartIso,
         dayEndIso
       );
@@ -140,6 +152,47 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
 
+    // POST /api/calendar/connect-api-key - Test and save API Key & Calendar ID
+    protectedRoutes.post<{
+      Body: {
+        calendarId: string;
+        apiKey: string;
+      };
+    }>('/calendar/connect-api-key', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { calendarId, apiKey } = request.body;
+
+      if (!calendarId || !apiKey) {
+        return reply.status(400).send({
+          error: 'MissingFields',
+          message: 'Se requiere el Nombre/ID del Calendario y la Clave API de Google.',
+        });
+      }
+
+      const verification = await verifyGoogleApiKeyConnection(calendarId, apiKey);
+
+      if (!verification.success) {
+        return reply.status(400).send({
+          error: 'ConnectionFailed',
+          message: verification.message,
+        });
+      }
+
+      await fastify.prisma.professional.update({
+        where: { id: userSession.id },
+        data: {
+          googleCalendarConnected: true,
+          googleCalendarId: calendarId,
+          googleApiKey: apiKey,
+        },
+      });
+
+      return {
+        message: '¡Calendario de Google conectado exitosamente!',
+        googleCalendarId: calendarId,
+      };
+    });
+
     // GET /api/calendar/auth-url - Get OAuth Authorization URL
     protectedRoutes.get('/calendar/auth-url', async (request, reply) => {
       const userSession = request.userSession!;
@@ -156,6 +209,8 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           googleCalendarConnected: false,
           googleRefreshToken: null,
+          googleCalendarId: null,
+          googleApiKey: null,
         },
       });
 
