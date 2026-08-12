@@ -6,10 +6,11 @@ import ServicesManager, { ServiceItem } from '../components/admin/ServicesManage
 import ClientsManager from '../components/admin/ClientsManager';
 import SettingsIntegrations from '../components/admin/SettingsIntegrations';
 import GalleryManager from '../components/admin/GalleryManager';
+import PricingUpgrade from '../components/admin/PricingUpgrade';
 import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
 
-type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings';
+type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings' | 'pricing';
 
 export default function Space() {
   const { slug } = useParams<{ slug: string }>();
@@ -137,13 +138,16 @@ export default function Space() {
           </div>
 
           <div className="pt-6 border-t border-slate-800 mt-6">
-            <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 flex items-center justify-between">
+            <div
+              onClick={() => setActiveTab('pricing')}
+              className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-colors"
+            >
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Plan Actual</span>
                 <span className="text-xs font-bold text-indigo-400 uppercase">{user.plan}</span>
               </div>
               <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold rounded-full border border-emerald-500/20">
-                Activo
+                Ver Planes
               </span>
             </div>
 
@@ -184,6 +188,7 @@ export default function Space() {
           {activeTab === 'clients' && <ClientsManager />}
           {activeTab === 'settings' && <SettingsIntegrations />}
           {activeTab === 'gallery' && <GalleryManager />}
+          {activeTab === 'pricing' && <PricingUpgrade />}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">

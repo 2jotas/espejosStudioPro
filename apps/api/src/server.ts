@@ -16,6 +16,7 @@ import { calendarRoutes } from './modules/calendar.js';
 import { appointmentRoutes } from './modules/appointments.js';
 import { clientAuthRoutes } from './modules/clientAuth.js';
 import { galleryRoutes } from './modules/gallery.js';
+import { planRoutes } from './modules/plans.js';
 import { initializeGalleryWatcher } from './lib/galleryWatcher.js';
 
 dotenv.config();
@@ -64,6 +65,7 @@ async function main() {
   await server.register(appointmentRoutes, { prefix: '/api' });
   await server.register(clientAuthRoutes, { prefix: '/api' });
   await server.register(galleryRoutes, { prefix: '/api' });
+  await server.register(planRoutes, { prefix: '/api' });
 
   // Initialize file watcher for auto-publishing photos
   initializeGalleryWatcher(server.prisma);
