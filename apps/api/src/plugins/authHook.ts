@@ -9,7 +9,15 @@ declare module 'fastify' {
 
 export async function authenticateProfessional(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const token = request.cookies.token;
+    const authHeader = request.headers.authorization;
+    let token: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (request.cookies && request.cookies.token) {
+      token = request.cookies.token;
+    }
+
     if (!token) {
       return reply.status(401).send({ error: 'Unauthorized', message: 'No authentication token provided' });
     }

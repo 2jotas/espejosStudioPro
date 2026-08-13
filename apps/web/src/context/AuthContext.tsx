@@ -16,9 +16,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('espejos_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   const refetchUser = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -55,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(data.message || 'Error al iniciar sesión');
     }
 
+    if (data.token) {
+      localStorage.setItem('espejos_token', data.token);
+    }
+
     setUser(data.user);
     return data.user;
   };
@@ -71,12 +86,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(data.message || 'Error al crear la cuenta');
     }
 
+    if (data.token) {
+      localStorage.setItem('espejos_token', data.token);
+    }
+
     setUser(data.user);
     return data.user;
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
+    } catch {
+      // Ignore network errors on logout
+    }
+    localStorage.removeItem('espejos_token');
     setUser(null);
   };
 

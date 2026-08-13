@@ -105,7 +105,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     reply.setCookie('token', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.COOKIE_SECURE === 'true',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
@@ -113,6 +113,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.status(201).send({
       message: 'Registro exitoso',
       user: userSession,
+      token,
     });
   });
 
@@ -162,7 +163,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     reply.setCookie('token', token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: process.env.COOKIE_SECURE === 'true',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
     });
@@ -170,6 +171,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       message: 'Inicio de sesión exitoso',
       user: userSession,
+      token,
     };
   });
 
