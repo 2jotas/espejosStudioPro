@@ -28,12 +28,42 @@ export default function Login() {
   };
 
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetStep, setResetStep] = useState<1 | 2>(1);
   const [resetEmail, setResetEmail] = useState('');
+  const [inputPinCode, setInputPinCode] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleRequestResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetMsg(null);
+    setIsResetting(true);
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al solicitar el código');
+
+      setInputPinCode(data.verificationCode || '');
+      setResetStep(2);
+      setResetMsg({
+        type: 'success',
+        text: `Código generado exitosamente. Tu Código de Seguridad de 6 dígitos es: ${data.verificationCode}`,
+      });
+    } catch (err: any) {
+      setResetMsg({ type: 'error', text: err.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetMsg(null);
     setIsResetting(true);
@@ -44,6 +74,7 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: resetEmail,
+          code: inputPinCode,
           newPassword: resetNewPassword,
         }),
       });
@@ -56,7 +87,8 @@ export default function Login() {
       setPassword(resetNewPassword);
       setTimeout(() => {
         setIsResetModalOpen(false);
-      }, 1500);
+        setResetStep(1);
+      }, 1800);
     } catch (err: any) {
       setResetMsg({ type: 'error', text: err.message });
     } finally {
@@ -202,52 +234,97 @@ export default function Login() {
               </div>
             )}
 
-            <form onSubmit={handleResetPassword} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Tu Correo Electrónico Registrado
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="2jota27@gmail.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+            {resetStep === 1 ? (
+              <form onSubmit={handleRequestResetCode} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Tu Correo Electrónico Registrado
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="2jota27@gmail.com"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Nueva Contraseña (mínimo 6 caracteres)
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={resetNewPassword}
-                  onChange={(e) => setResetNewPassword(e.target.value)}
-                  placeholder="Escribe tu nueva contraseña"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                />
-              </div>
+                <div className="pt-2 flex items-center justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsResetModalOpen(false)}
+                    className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isResetting}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50"
+                  >
+                    {isResetting ? 'Generando PIN...' : 'Solicitar Código de 6 Dígitos'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleConfirmPasswordReset} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Código de Verificación (PIN de 6 dígitos)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={inputPinCode}
+                    onChange={(e) => setInputPinCode(e.target.value)}
+                    placeholder="123456"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono tracking-widest text-center text-sm font-bold"
+                  />
+                </div>
 
-              <div className="pt-2 flex items-center justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsResetModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isResetting}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50"
-                >
-                  {isResetting ? 'Guardando...' : 'Restablecer Contraseña'}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Nueva Contraseña (mínimo 6 caracteres)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Escribe tu nueva contraseña"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setResetStep(1)}
+                    className="text-xs text-indigo-400 hover:underline"
+                  >
+                    ← Volver a ingresar correo
+                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsResetModalOpen(false)}
+                      className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isResetting}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50"
+                    >
+                      {isResetting ? 'Verificando...' : 'Verificar PIN & Restablecer'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

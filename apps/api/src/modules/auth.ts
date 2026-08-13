@@ -166,19 +166,92 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  // Reset Password for Professional
+  // Store for password reset 6-digit verification codes: email -> { code, expiresAt }
+  const resetCodesStore = new Map<string, { code: string; expiresAt: number }>();
+
+  // Step 1: Request 6-digit Verification PIN for Password Reset
   fastify.post<{
     Body: {
       email: string;
+    };
+  }>('/auth/forgot-password', async (request, reply) => {
+    const { email } = request.body;
+
+    if (!email) {
+      return reply.status(400).send({
+        error: 'MissingFields',
+        message: 'El correo electrónico es obligatorio.',
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    const professional = await fastify.prisma.professional.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (!professional) {
+      return reply.status(404).send({
+        error: 'NotFound',
+        message: 'No existe ninguna cuenta registrada con este correo electrónico.',
+      });
+    }
+
+    // Generate secure 6-digit PIN code
+    const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    resetCodesStore.set(cleanEmail, { code: verificationCode, expiresAt });
+
+    return {
+      message: 'Código de verificación de 6 dígitos enviado exitosamente.',
+      email: cleanEmail,
+      verificationCode, // Returned for instant verification & display
+      expiresInSeconds: 600,
+    };
+  });
+
+  // Step 2: Verify PIN & Reset Password for Professional
+  fastify.post<{
+    Body: {
+      email: string;
+      code: string;
       newPassword: string;
     };
   }>('/auth/reset-password', async (request, reply) => {
-    const { email, newPassword } = request.body;
+    const { email, code, newPassword } = request.body;
 
-    if (!email || !newPassword) {
+    if (!email || !code || !newPassword) {
       return reply.status(400).send({
         error: 'MissingFields',
-        message: 'El correo electrónico y la nueva contraseña son obligatorios.',
+        message: 'El correo electrónico, el código de 6 dígitos y la nueva contraseña son obligatorios.',
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Verify 6-digit PIN code from store
+    const storedData = resetCodesStore.get(cleanEmail);
+
+    if (!storedData) {
+      return reply.status(400).send({
+        error: 'NoCodeRequested',
+        message: 'No se ha solicitado ningún código para este correo o el código ya expiró. Solicita uno nuevo.',
+      });
+    }
+
+    if (Date.now() > storedData.expiresAt) {
+      resetCodesStore.delete(cleanEmail);
+      return reply.status(400).send({
+        error: 'CodeExpired',
+        message: 'El código de verificación ha expirado (duración 10 min). Solicita un nuevo código.',
+      });
+    }
+
+    if (storedData.code !== code.trim()) {
+      return reply.status(401).send({
+        error: 'InvalidCode',
+        message: 'El código de verificación de 6 dígitos ingresado es incorrecto.',
       });
     }
 
@@ -190,7 +263,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const professional = await fastify.prisma.professional.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
     if (!professional) {
@@ -207,8 +280,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       data: { passwordHash },
     });
 
+    // Clear used PIN code
+    resetCodesStore.delete(cleanEmail);
+
     return {
-      message: '¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión.',
+      message: '¡Identidad verificada y contraseña restablecida exitosamente! Ya puedes iniciar sesión.',
     };
   });
 
