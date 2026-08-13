@@ -129,14 +129,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'MissingFields', message: 'Email y contraseña son obligatorios.' });
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanInput = email.trim().toLowerCase();
 
-    const professional = await fastify.prisma.professional.findUnique({
-      where: { email: cleanEmail },
+    const professional = await fastify.prisma.professional.findFirst({
+      where: {
+        OR: [
+          { email: cleanInput },
+          { slug: cleanInput },
+        ],
+      },
     });
 
     if (!professional) {
-      return reply.status(401).send({ error: 'UserNotFound', message: 'El usuario / correo electrónico no existe en el sistema.' });
+      return reply.status(401).send({ error: 'UserNotFound', message: 'El correo electrónico o usuario (slug) no existe en el sistema.' });
     }
 
     const validPassword = await argon2.verify(professional.passwordHash, password);

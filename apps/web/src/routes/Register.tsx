@@ -45,14 +45,22 @@ export default function Register() {
       setSlugStatus({ isChecking: true, available: null, message: null });
       try {
         const res = await fetch(`/api/auth/check-slug/${encodeURIComponent(slug.trim())}`);
-        const data = await res.json();
-        if (res.ok && data.available) {
+        const text = await res.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(text);
+        } catch {
+          setSlugStatus({ isChecking: false, available: false, message: 'No se pudo verificar la dirección' });
+          return;
+        }
+
+        if (data.available) {
           setSlugStatus({ isChecking: false, available: true, message: 'Dirección disponible' });
         } else {
-          setSlugStatus({ isChecking: false, available: false, message: data.reason || 'No disponible' });
+          setSlugStatus({ isChecking: false, available: false, message: data.reason || 'Esta dirección no está disponible' });
         }
       } catch {
-        setSlugStatus({ isChecking: false, available: false, message: 'Error verificando slug' });
+        setSlugStatus({ isChecking: false, available: false, message: 'Error al verificar la dirección' });
       }
     }, 400);
 
