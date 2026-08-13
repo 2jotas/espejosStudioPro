@@ -129,8 +129,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'MissingFields', message: 'Email y contraseña son obligatorios.' });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
     const professional = await fastify.prisma.professional.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: cleanEmail },
     });
 
     if (!professional) {
