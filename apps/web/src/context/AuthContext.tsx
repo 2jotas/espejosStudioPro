@@ -43,7 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Error de respuesta del servidor (${res.status}).`);
+    }
+
     if (!res.ok) {
       throw new Error(data.message || 'Error al iniciar sesión');
     }

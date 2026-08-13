@@ -134,12 +134,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     if (!professional) {
-      return reply.status(401).send({ error: 'InvalidCredentials', message: 'Credenciales inválidas.' });
+      return reply.status(401).send({ error: 'UserNotFound', message: 'El usuario / correo electrónico no existe en el sistema.' });
     }
 
     const validPassword = await argon2.verify(professional.passwordHash, password);
     if (!validPassword) {
-      return reply.status(401).send({ error: 'InvalidCredentials', message: 'Credenciales inválidas.' });
+      return reply.status(401).send({ error: 'IncorrectPassword', message: 'La contraseña ingresada es incorrecta. Por favor verifica tus datos.' });
     }
 
     const userSession: UserSession = {

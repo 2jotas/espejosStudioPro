@@ -47,7 +47,14 @@ export default function Login() {
         body: JSON.stringify({ email: resetEmail }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Error de respuesta del servidor (${res.status}).`);
+      }
+
       if (!res.ok) throw new Error(data.message || 'Error al solicitar el código');
 
       setInputPinCode(data.verificationCode || '');
@@ -79,7 +86,14 @@ export default function Login() {
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Error de respuesta del servidor (${res.status}).`);
+      }
+
       if (!res.ok) throw new Error(data.message || 'Error al restablecer la contraseña');
 
       setResetMsg({ type: 'success', text: data.message });
