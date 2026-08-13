@@ -36,7 +36,11 @@ export default function Login() {
 
     try {
       const user = await login(email, password);
-      navigate(`/${user.slug}`);
+      if (user.slug === 'admin' || user.email === 'admin@espejos.cl') {
+        navigate('/super-admin');
+      } else {
+        navigate(`/${user.slug}`);
+      }
     } catch (err: any) {
       setError(sanitizeErrorMessage(err));
     } finally {
@@ -128,15 +132,15 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px] pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden font-sans">
+      {/* Background glow effects */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-600/15 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Header */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md z-10">
+        {/* Logo Header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2 mb-4 group">
+          <Link to="/" className="inline-flex items-center space-x-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="h-full w-full bg-slate-950 rounded-[11px] flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -160,17 +164,17 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Correo Electrónico
+                Correo Electrónico o Usuario (Slug)
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 text-slate-500 absolute left-4 top-3.5" />
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="ejemplo@espejos.cl"
-                  className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm"
+                  placeholder="correo@ejemplo.com o nombre (ej: john, admin)"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm font-mono"
                 />
               </div>
             </div>
