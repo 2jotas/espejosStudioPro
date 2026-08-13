@@ -12,6 +12,23 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const sanitizeErrorMessage = (rawError: any): string => {
+    const msg = String(rawError?.message || rawError || '');
+
+    if (
+      msg.includes('Unexpected token') ||
+      msg.includes('JSON') ||
+      msg.includes('<html>') ||
+      msg.includes('502') ||
+      msg.includes('504') ||
+      msg.includes('respuesta del servidor')
+    ) {
+      return 'No se pudo establecer conexión con el servidor. Por favor intenta de nuevo en unos momentos.';
+    }
+
+    return msg || 'Ocurrió un error al procesar tu solicitud.';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -21,7 +38,7 @@ export default function Login() {
       const user = await login(email, password);
       navigate(`/${user.slug}`);
     } catch (err: any) {
-      setError(err.message || 'Credenciales incorrectas');
+      setError(sanitizeErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -52,7 +69,7 @@ export default function Login() {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(`Error de respuesta del servidor (${res.status}).`);
+        throw new Error('ServerConnectionError');
       }
 
       if (!res.ok) throw new Error(data.message || 'Error al solicitar el código');
@@ -64,7 +81,7 @@ export default function Login() {
         text: `Código generado exitosamente. Tu Código de Seguridad de 6 dígitos es: ${data.verificationCode}`,
       });
     } catch (err: any) {
-      setResetMsg({ type: 'error', text: err.message });
+      setResetMsg({ type: 'error', text: sanitizeErrorMessage(err) });
     } finally {
       setIsResetting(false);
     }
@@ -91,7 +108,7 @@ export default function Login() {
       try {
         data = JSON.parse(text);
       } catch {
-        throw new Error(`Error de respuesta del servidor (${res.status}).`);
+        throw new Error('ServerConnectionError');
       }
 
       if (!res.ok) throw new Error(data.message || 'Error al restablecer la contraseña');
@@ -104,7 +121,7 @@ export default function Login() {
         setResetStep(1);
       }, 1800);
     } catch (err: any) {
-      setResetMsg({ type: 'error', text: err.message });
+      setResetMsg({ type: 'error', text: sanitizeErrorMessage(err) });
     } finally {
       setIsResetting(false);
     }
