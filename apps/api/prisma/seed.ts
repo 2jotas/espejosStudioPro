@@ -4,7 +4,7 @@ import argon2 from 'argon2';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('🌱 Seeding database with default professionals and super admin...');
 
   // Clean existing data
   await prisma.appointment.deleteMany();
@@ -15,154 +15,138 @@ async function main() {
   await prisma.galleryImage.deleteMany();
   await prisma.professional.deleteMany();
 
-  // Create Demo Professional
-  const passwordHash = await argon2.hash('Password123!');
+  const defaultPasswordHash = await argon2.hash('Password123!');
+  const adminPasswordHash = await argon2.hash('Admin123!');
 
+  // 1. Create Super Admin Professional
+  const adminProf = await prisma.professional.create({
+    data: {
+      slug: 'admin',
+      email: 'admin@espejos.cl',
+      passwordHash: adminPasswordHash,
+      businessName: 'Administración Espejos Studio',
+      phone: '+56900000000',
+      whatsapp: '+56900000000',
+      address: 'Casa Matriz Espejos Studio Pro',
+      plan: 'pro',
+    },
+  });
+
+  // 2. Create User's Account (2jota27@gmail.com / john)
+  const johnProf = await prisma.professional.create({
+    data: {
+      slug: 'john',
+      email: '2jota27@gmail.com',
+      passwordHash: defaultPasswordHash,
+      businessName: 'Espejos Studio - John',
+      phone: '+56912345678',
+      whatsapp: '+56912345678',
+      address: 'Estudio Central, Santiago',
+      plan: 'pro',
+    },
+  });
+
+  // 3. Create Demo Professional
   const demoProf = await prisma.professional.create({
     data: {
       slug: 'demo',
       email: 'demo@espejos.cl',
-      passwordHash,
+      passwordHash: defaultPasswordHash,
       businessName: 'Estudio Demo Palumbo',
-      phone: '+56912345678',
-      whatsapp: '+56912345678',
+      phone: '+56987654321',
+      whatsapp: '+56987654321',
       address: 'Av. Andrés Bello 2425, Providencia, Santiago',
       plan: 'pro',
-      googleCalendarConnected: false,
     },
   });
 
-  console.log(`✅ Demo Professional created: ${demoProf.businessName} (slug: ${demoProf.slug})`);
+  console.log(`✅ Default Professionals created:
+    - Admin: admin@espejos.cl (Password: Admin123!)
+    - John: 2jota27@gmail.com (Password: Password123!)
+    - Demo: demo@espejos.cl (Password: Password123!)
+  `);
 
-  // Create Services
-  const servicesData = [
+  // Create Services for John
+  const servicesJohn = [
     {
-      name: 'Corte de Cabello Signature',
-      description: 'Corte personalizado con lavado, asesoría de imagen y peinado con producto premium.',
-      durationMinutes: 35,
+      name: 'Corte clásico / Fade',
+      description: 'Corte de precisión con degradado impecable, lavado y peinado.',
+      durationMinutes: 30,
       price: 15000,
       order: 1,
+      professionalId: johnProf.id,
     },
     {
-      name: 'Arreglo & Ritual de Barba',
-      description: 'Diseño de barba con toalla caliente, perfilado a navaja y aceites hidratantes.',
-      durationMinutes: 25,
+      name: 'Perfilado de Barba & Ritual',
+      description: 'Diseño de barba con toalla caliente y aceites naturales.',
+      durationMinutes: 30,
       price: 10000,
       order: 2,
-    },
-    {
-      name: 'Servicio Completo (Corte + Barba)',
-      description: 'La experiencia completa: corte signature + ritual de barba + bebida de cortesía.',
-      durationMinutes: 60,
-      price: 22000,
-      order: 3,
+      professionalId: johnProf.id,
     },
   ];
 
-  for (const s of servicesData) {
-    await prisma.service.create({
-      data: {
-        ...s,
-        professionalId: demoProf.id,
-      },
-    });
+  for (const s of servicesJohn) {
+    await prisma.service.create({ data: s });
   }
 
-  console.log(`✅ Created ${servicesData.length} initial services.`);
-
-  // Create Fictitious Clients with Profiles
-  const clientsData = [
+  // Create Services for Demo
+  const servicesDemo = [
     {
-      firstName: 'Matías',
-      lastName: 'González',
-      phone: '+56987654321',
-      authMethod: 'passkey',
-      profile: {
-        notes: 'Prefiere degradado bajo (fade). Sensible al alcohol post-afeitado.',
-        preferences: { aroma: 'Eucalipto', corte: 'Fade bajo #1', refresco: 'Espresso' },
-        tags: ['VIP', 'Recurrente'],
-        visitCount: 6,
-        totalSpent: 90000,
-      },
-    },
-    {
-      firstName: 'Camila',
-      lastName: 'Rojas',
-      phone: '+56976543210',
-      authMethod: 'otp',
-      profile: {
-        notes: 'Corte de puntas y perfilado ligero de cejas.',
-        preferences: { aroma: 'Menta', peinado: 'Ondas suaves' },
-        tags: ['Nuevo'],
-        visitCount: 1,
-        totalSpent: 15000,
-      },
-    },
-    {
-      firstName: 'Ignacio',
-      lastName: 'Silva',
-      phone: '+56965432109',
-      authMethod: 'passkey',
-      profile: {
-        notes: 'Barba larga. Usa bálsamo de cedro.',
-        preferences: { barba: 'Larga cuadrada', aceite: 'Cedro y Naranja' },
-        tags: ['VIP', 'Fidelizado'],
-        visitCount: 10,
-        totalSpent: 180000,
-      },
-    },
-    {
-      firstName: 'Felipe',
-      lastName: 'Morales',
-      phone: '+56954321098',
-      authMethod: 'otp',
-      profile: {
-        notes: 'Suele pedir cita los sábados por la mañana.',
-        preferences: { horario: 'Sábados AM' },
-        tags: ['Fin de semana'],
-        visitCount: 3,
-        totalSpent: 45000,
-      },
-    },
-    {
-      firstName: 'Valentina',
-      lastName: 'Castro',
-      phone: '+56943210987',
-      authMethod: 'otp',
-      profile: {
-        notes: 'Alergia leve a la fijación con aroma intenso.',
-        preferences: { producto: 'Sin fragancia' },
-        tags: ['Atención especial'],
-        visitCount: 2,
-        totalSpent: 30000,
-      },
+      name: 'Corte Signature & Peinado',
+      description: 'Asesoría de visagismo y corte personalizado.',
+      durationMinutes: 40,
+      price: 18000,
+      order: 1,
+      professionalId: demoProf.id,
     },
   ];
 
-  for (const c of clientsData) {
-    const { profile, ...clientInfo } = c;
-    const createdClient = await prisma.client.create({
-      data: {
-        ...clientInfo,
-        professionalId: demoProf.id,
-      },
-    });
-
-    await prisma.clientProfile.create({
-      data: {
-        clientId: createdClient.id,
-        professionalId: demoProf.id,
-        notes: profile.notes,
-        preferences: JSON.stringify(profile.preferences),
-        tags: JSON.stringify(profile.tags),
-        visitCount: profile.visitCount,
-        totalSpent: profile.totalSpent,
-        lastVisitAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-      },
-    });
+  for (const s of servicesDemo) {
+    await prisma.service.create({ data: s });
   }
 
-  console.log(`✅ Created ${clientsData.length} demo clients with detailed profiles.`);
+  // Create Sample Clients for John
+  const client1 = await prisma.client.create({
+    data: {
+      firstName: 'Francisco',
+      lastName: 'Pérez',
+      phone: '+56911223344',
+      professionalId: johnProf.id,
+    },
+  });
+
+  await prisma.clientProfile.create({
+    data: {
+      clientId: client1.id,
+      professionalId: johnProf.id,
+      notes: 'Visagismo ovalado. Degradado medio máquina 1.5. Prefiere corte clásico arriba.',
+      tags: JSON.stringify(['Google Assistant', 'Fidelizado']),
+      visitCount: 4,
+      totalSpent: 60000,
+    },
+  });
+
+  // Create Sample Tomorrow Appointment for John
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(10, 30, 0, 0);
+
+  const tomorrowEnd = new Date(tomorrow);
+  tomorrowEnd.setHours(11, 30, 0, 0);
+
+  await prisma.appointment.create({
+    data: {
+      professionalId: johnProf.id,
+      clientId: client1.id,
+      serviceId: (await prisma.service.findFirst({ where: { professionalId: johnProf.id } }))!.id,
+      startsAt: tomorrow,
+      endsAt: tomorrowEnd,
+      status: 'confirmed',
+      clientNote: 'Cita reservada automáticamente desde Google Assistant',
+    },
+  });
+
   console.log('🌱 Seeding completed successfully!');
 }
 
