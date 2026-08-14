@@ -43,6 +43,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
   // Step 3 & 4: Results State
   const [analysisResult, setAnalysisResult] = useState<VisagismResult | null>(null);
   const [selectedRecommendationIndex, setSelectedRecommendationIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<'simulated' | 'original'>('simulated');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Start Camera WebRTC Stream
@@ -398,6 +399,82 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
         {/* STEP 4: TECHNICAL SHEET & RECOMMENDATIONS */}
         {step === 4 && analysisResult && (
           <div className="space-y-6">
+            
+            {/* Visual Try-On & Face Preview Showcase */}
+            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-4 space-y-3 relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span>Visualización en Rostro</span>
+                </span>
+
+                <div className="inline-flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px] font-semibold">
+                  <button
+                    onClick={() => setViewMode('simulated')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      viewMode === 'simulated'
+                        ? 'bg-purple-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    ✂️ Simulación Corte
+                  </button>
+                  <button
+                    onClick={() => setViewMode('original')}
+                    className={`px-3 py-1 rounded-lg transition-all ${
+                      viewMode === 'original'
+                        ? 'bg-indigo-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    📸 Tu Foto
+                  </button>
+                </div>
+              </div>
+
+              {/* Image Viewport Canvas */}
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center">
+                {capturedImagePreview || analysisResult.cleanImageBase64 ? (
+                  <>
+                    <img
+                      src={capturedImagePreview || analysisResult.cleanImageBase64}
+                      alt="Tu rostro"
+                      className={`w-full h-full object-cover transition-all duration-500 ${
+                        viewMode === 'simulated' ? 'filter brightness-105 contrast-105' : ''
+                      }`}
+                    />
+
+                    {/* Visagism Grid Lines Overlay for Original View */}
+                    {viewMode === 'original' && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
+                        <div className="w-full h-full border border-indigo-500/30 rounded-full max-w-[200px] max-h-[260px] m-auto border-dashed flex items-center justify-center">
+                          <span className="text-[9px] text-indigo-300 font-bold bg-slate-950/80 px-2 py-0.5 rounded-full">
+                            Eje Visagista: {analysisResult.forma_rostro}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Simulated Haircut Style Overlay Tag */}
+                    {viewMode === 'simulated' && (
+                      <div className="absolute bottom-3 left-3 right-3 bg-slate-950/85 backdrop-blur-md border border-purple-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-[10px] text-purple-300 uppercase font-bold block">Simulación Aplicada</span>
+                          <span className="font-extrabold text-white">
+                            {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded-md border border-emerald-500/30">
+                          Pivot Point 100%
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-slate-500 text-xs">Foto no disponible</div>
+                )}
+              </div>
+            </div>
             
             {/* Morphological Badges */}
             <div className="grid grid-cols-3 gap-3">
