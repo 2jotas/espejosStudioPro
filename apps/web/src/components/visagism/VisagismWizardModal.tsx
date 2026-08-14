@@ -59,9 +59,6 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setCameraActive(true);
     } catch (e: any) {
       console.error('Error al acceder a la cámara:', e);
@@ -72,6 +69,14 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
       }
     }
   };
+
+  // Attach WebRTC stream once video element mounts in DOM
+  useEffect(() => {
+    if (cameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch((err) => console.log('Autoplay error:', err));
+    }
+  }, [cameraActive]);
 
   // Stop Camera Stream
   const stopCamera = () => {
