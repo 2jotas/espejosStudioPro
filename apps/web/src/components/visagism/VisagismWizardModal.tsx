@@ -167,13 +167,14 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
-      <div className="bg-[#0c0e17] border border-amber-500/30 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative space-y-6 text-left my-8">
+    /* FIXED OVERFLOW & TOP SCROLL CUT-OFF: Use items-start so top header is ALWAYS accessible and scrollable */
+    <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start font-sans">
+      <div className="bg-[#0c0e17] border border-amber-500/30 rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl relative space-y-5 text-left my-2 sm:my-6">
         
         {/* Retro Luxury Italian Master Header */}
         <div className="flex items-center justify-between border-b border-amber-500/20 pb-4">
           <div className="flex items-center space-x-3.5">
-            <div className="relative w-14 h-14 rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-lg shadow-amber-500/10 flex-shrink-0">
+            <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border-2 border-amber-500/40 shadow-lg shadow-amber-500/10 flex-shrink-0">
               <img src={maestroAvatar} alt="Maestro Giovanni" className="w-full h-full object-cover" />
             </div>
             <div>
@@ -189,7 +190,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-base">✕</button>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white text-base">✕</button>
         </div>
 
         {errorMsg && (
@@ -201,7 +202,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
 
         {/* STEP 1: PROFILING QUESTIONS WITH MAESTRO GIOVANNI */}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             
             {/* Maestro Giovanni Dialogue Box */}
             <div className="bg-gradient-to-r from-amber-950/30 via-slate-900 to-amber-950/20 border border-amber-500/25 rounded-2xl p-4 flex items-start space-x-3 text-xs leading-relaxed">
@@ -413,13 +414,13 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
           </div>
         )}
 
-        {/* STEP 4: MAESTRO GIOVANNI TECHNICAL SHEET & CLIENT HAIRCUT SIMULATION */}
+        {/* STEP 4: STREAMLINED TECHNICAL SHEET & VIRTUAL HAIRCUT FUSION ON CLIENT FACE */}
         {step === 4 && analysisResult && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             
             {/* Maestro Giovanni Sartorial Greeting */}
             {analysisResult.saludo_maestro && (
-              <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/20 border border-amber-500/30 rounded-2xl p-4 flex items-start space-x-3 text-xs leading-relaxed">
+              <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/20 border border-amber-500/30 rounded-2xl p-3.5 flex items-start space-x-3 text-xs leading-relaxed">
                 <img src={maestroAvatar} alt="Maestro Giovanni" className="w-10 h-10 rounded-xl object-cover border border-amber-500/40 flex-shrink-0" />
                 <p className="text-slate-200 italic">
                   <strong className="text-amber-300 not-italic font-bold block mb-0.5">Diagnóstico del Maestro Giovanni:</strong>
@@ -428,8 +429,8 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
               </div>
             )}
 
-            {/* Visual Haircut Synthesis Canvas on Client Face */}
-            <div className="bg-slate-950 border border-amber-500/30 rounded-3xl p-4 space-y-4 relative overflow-hidden">
+            {/* Haircut Fusion Visual Try-On Canvas */}
+            <div className="bg-slate-950 border border-amber-500/30 rounded-3xl p-3.5 sm:p-4 space-y-3 relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
@@ -460,7 +461,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                 </div>
               </div>
 
-              {/* Client Face & Synthesized Haircut Viewport */}
+              {/* Client Face & Fused Haircut Viewport Canvas */}
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center">
                 {capturedImagePreview || analysisResult.cleanImageBase64 ? (
                   <>
@@ -471,6 +472,22 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                         viewMode === 'simulated' ? 'filter brightness-105 contrast-105' : ''
                       }`}
                     />
+
+                    {/* Fused Haircut Crown Overlay Layer */}
+                    {viewMode === 'simulated' && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-start items-center pt-2">
+                        {/* Dynamic Haircut Styling Mesh Overlay */}
+                        <div
+                          className={`w-full h-2/5 transition-all duration-500 opacity-80 ${
+                            selectedRecommendationIndex === 0
+                              ? 'bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-transparent mix-blend-overlay'
+                              : selectedRecommendationIndex === 1
+                              ? 'bg-gradient-to-b from-amber-950/70 via-slate-950/40 to-transparent mix-blend-color-burn'
+                              : 'bg-gradient-to-b from-slate-950/90 via-slate-900/50 to-transparent mix-blend-soft-light'
+                          }`}
+                        />
+                      </div>
+                    )}
 
                     {/* Visagism Grid Lines Overlay for Original View */}
                     {viewMode === 'original' && (
@@ -485,14 +502,14 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
 
                     {/* Simulated Haircut Style Overlay Tag */}
                     {viewMode === 'simulated' && (
-                      <div className="absolute bottom-3 left-3 right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-3 flex items-center justify-between text-xs">
+                      <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
                         <div>
                           <span className="text-[10px] text-amber-400 uppercase font-bold block">Estilo Aplicado al Rostro</span>
                           <span className="font-extrabold text-white">
                             {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
                           </span>
                         </div>
-                        <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
                           Volumen: {hairVolume} | {hairFinish}
                         </span>
                       </div>
@@ -505,9 +522,9 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
 
               {/* Sartorial Haircut Customizer Bar */}
               {viewMode === 'simulated' && (
-                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center space-x-2 text-slate-400 font-semibold">
-                    <Sliders className="w-4 h-4 text-amber-400" />
+                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center space-x-2 text-slate-400 font-semibold text-[11px]">
+                    <Sliders className="w-3.5 h-3.5 text-amber-400" />
                     <span>Ajustes Sartoriales:</span>
                   </div>
 
@@ -546,25 +563,25 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
               )}
             </div>
 
-            {/* Morphological Badges */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Geometría Facial</span>
-                <span className="text-xs font-bold text-amber-400">{analysisResult.forma_rostro}</span>
+            {/* Streamlined Morphological Badges */}
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 text-center space-y-0.5">
+                <span className="text-[9px] text-slate-500 uppercase font-bold block">Geometría Facial</span>
+                <span className="text-xs font-extrabold text-amber-400">{analysisResult.forma_rostro}</span>
               </div>
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Tipo de Cabello</span>
-                <span className="text-xs font-bold text-purple-400">{analysisResult.tipo_cabello}</span>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 text-center space-y-0.5">
+                <span className="text-[9px] text-slate-500 uppercase font-bold block">Tipo de Cabello</span>
+                <span className="text-xs font-extrabold text-purple-400">{analysisResult.tipo_cabello}</span>
               </div>
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Tono de Piel</span>
-                <span className="text-xs font-bold text-emerald-400">{analysisResult.tono_piel}</span>
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-2.5 text-center space-y-0.5">
+                <span className="text-[9px] text-slate-500 uppercase font-bold block">Tono de Piel</span>
+                <span className="text-xs font-extrabold text-emerald-400">{analysisResult.tono_piel}</span>
               </div>
             </div>
 
             {/* Haircut Recommendations Selector */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Cortes Recomendados por Maestro Giovanni</h4>
+            <div className="space-y-2.5">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider">Cortes Sugeridos por Maestro Giovanni</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {analysisResult.recomendaciones.map((rec, idx) => (
                   <button
@@ -580,21 +597,21 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                       <span>Corte #{idx + 1}</span>
                       {selectedRecommendationIndex === idx && <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />}
                     </div>
-                    <div className="text-xs font-semibold truncate text-white">{rec.nombre_corte}</div>
+                    <div className="text-xs font-bold truncate text-white">{rec.nombre_corte}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Selected Haircut Detail Card */}
+            {/* Streamlined Professional Haircut Card */}
             {analysisResult.recomendaciones[selectedRecommendationIndex] && (
-              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-5 space-y-3">
+              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-4 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-white flex items-center space-x-2">
                     <Scissors className="w-4 h-4 text-amber-400" />
                     <span>{analysisResult.recomendaciones[selectedRecommendationIndex].nombre_corte}</span>
                   </h4>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                     PIVOT POINT 100%
                   </span>
                 </div>
@@ -617,7 +634,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
               </div>
             )}
 
-            {/* Booking CTA */}
+            {/* Booking CTA Bar */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800">
               <button
                 onClick={() => setStep(2)}
