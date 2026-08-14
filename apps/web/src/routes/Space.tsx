@@ -8,7 +8,7 @@ import SettingsIntegrations from '../components/admin/SettingsIntegrations';
 import GalleryManager from '../components/admin/GalleryManager';
 import PricingUpgrade from '../components/admin/PricingUpgrade';
 import CalendarManager from '../components/admin/CalendarManager';
-import DashboardManager from '../components/admin/DashboardManager';
+import DashboardTab from '../components/DashboardTab';
 import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
 
@@ -17,7 +17,7 @@ type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 
 export default function Space() {
   const { slug } = useParams<{ slug: string }>();
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>('services');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
   // Visitor View State
   const [profInfo, setProfInfo] = useState<{ businessName: string; bio?: string; phone?: string; address?: string } | null>(null);
@@ -198,7 +198,7 @@ export default function Space() {
           </header>
 
           {/* Dynamic Content by Active Tab */}
-          {activeTab === 'dashboard' && <DashboardManager />}
+          {activeTab === 'dashboard' && <DashboardTab professionalSlug={user.slug} />}
           {activeTab === 'calendar' && <CalendarManager />}
           {activeTab === 'services' && <ServicesManager />}
           {activeTab === 'clients' && <ClientsManager />}

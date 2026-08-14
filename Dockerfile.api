@@ -28,5 +28,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Ensure SQLite DB tables are created and seeded on container start
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx tsx prisma/seed.ts && npx tsx src/server.ts"]
+# Protect production data: sync schema without data loss and start Fastify server
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npx tsx src/server.ts"]
