@@ -56,17 +56,26 @@ export const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
         orderBy: { startsAt: 'asc' },
       });
 
-      // 2. Fetch today's appointments
-      const todayAppointments = await fastify.prisma.appointment.findMany({
-        where: {
-          professionalId,
-          startsAt: { gte: startOfToday, lte: endOfToday },
-        },
-        include: {
-          service: true,
-          client: true,
-        },
+      const formatChileDate = (d: Date) => {
+        return new Intl.DateTimeFormat('es-CL', {
+          timeZone: 'America/Santiago',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(d);
+      };
+
+      const todayChileStr = formatChileDate(now);
+
+      // 2. Fetch today's appointments matching Chilean local date
+      const allAppointmentsForProf = await fastify.prisma.appointment.findMany({
+        where: { professionalId },
+        include: { service: true, client: true },
         orderBy: { startsAt: 'asc' },
+      });
+
+      const todayAppointments = allAppointmentsForProf.filter((a) => {
+        return formatChileDate(new Date(a.startsAt)) === todayChileStr;
       });
 
       // 3. Compute Financial Metrics

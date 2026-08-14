@@ -26,7 +26,7 @@ export default function Space() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
-  const isOwner = user && user.slug === slug && !isPreviewMode;
+  const isOwner = Boolean(user && user.slug === slug && !isPreviewMode);
 
   useEffect(() => {
     if (!slug) return;
@@ -58,7 +58,7 @@ export default function Space() {
     fetchPublicData();
   }, [slug]);
 
-  if (isOwner) {
+  if (isOwner && user) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-indigo-500 selection:text-white">
         {/* Sidebar */}
