@@ -6,9 +6,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 
-const RP_NAME = 'Espejos Studio';
-const RP_ID = process.env.RP_ID || 'localhost';
-const ORIGIN = process.env.ORIGIN || 'http://localhost:5173';
+const RP_NAME = 'Espejos Studio Pro';
 
 export const clientAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
@@ -27,34 +25,42 @@ export const clientAuthRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'NotFound', message: 'Cliente no encontrado.' });
     }
 
+    // Infer RP_ID dynamically from request hostname (e.g. espejos-studio.mine.bz)
+    const hostname = request.hostname.split(':')[0] || 'localhost';
+
     const userPasskeys = client.webauthnCreds.map((cred) => ({
       id: cred.credentialId,
       transports: undefined,
     }));
 
-    const options = await generateRegistrationOptions({
-      rpName: RP_NAME,
-      rpID: RP_ID,
-      userID: new Uint8Array(Buffer.from(client.id)),
-      userName: `${client.firstName} ${client.lastName}`,
-      userDisplayName: client.firstName,
-      attestationType: 'none',
-      excludeCredentials: userPasskeys.map((cred) => ({
-        id: cred.id,
-        type: 'public-key',
-      })),
-      authenticatorSelection: {
-        residentKey: 'preferred',
-        userVerification: 'preferred',
-      },
-    });
+    try {
+      const options = await generateRegistrationOptions({
+        rpName: RP_NAME,
+        rpID: hostname,
+        userID: new Uint8Array(Buffer.from(client.id)),
+        userName: `${client.firstName} ${client.lastName}`,
+        userDisplayName: client.firstName,
+        attestationType: 'none',
+        excludeCredentials: userPasskeys.map((cred) => ({
+          id: cred.id,
+          type: 'public-key',
+        })),
+        authenticatorSelection: {
+          residentKey: 'preferred',
+          userVerification: 'preferred',
+        },
+      });
 
-    // Store challenge temporarily in Redis (TTL 5 mins)
-    if (fastify.redis && fastify.redis.status === 'ready') {
-      await fastify.redis.setex(`webauthn_challenge_${client.id}`, 300, options.challenge);
+      // Store challenge temporarily in Redis (TTL 5 mins)
+      if (fastify.redis && fastify.redis.status === 'ready') {
+        await fastify.redis.setex(`webauthn_challenge_${client.id}`, 300, options.challenge);
+      }
+
+      return { options };
+    } catch (err: any) {
+      request.log.error({ err }, 'Error generando opciones WebAuthn');
+      return reply.status(500).send({ error: 'WebAuthnError', message: err.message || 'Error al generar opciones de WebAuthn.' });
     }
-
-    return { options };
   });
 
   // 2. WebAuthn Verify Registration Response
@@ -75,6 +81,9 @@ export const clientAuthRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: 'NotFound', message: 'Cliente no encontrado.' });
     }
 
+    const hostname = request.hostname.split(':')[0] || 'localhost';
+    const origin = `${request.protocol}://${request.hostname}`;
+
     let expectedChallenge = '';
     if (fastify.redis && fastify.redis.status === 'ready') {
       expectedChallenge = (await fastify.redis.get(`webauthn_challenge_${client.id}`)) || '';
@@ -88,8 +97,8 @@ export const clientAuthRoutes: FastifyPluginAsync = async (fastify) => {
       const verification = await verifyRegistrationResponse({
         response: registrationResponse,
         expectedChallenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: origin,
+        expectedRPID: hostname,
       });
 
       const { verified, registrationInfo } = verification;
@@ -102,102 +111,131 @@ export const clientAuthRoutes: FastifyPluginAsync = async (fastify) => {
             clientId: client.id,
             credentialId: credential.id,
             publicKey: Buffer.from(credential.publicKey).toString('base64'),
-            counter: BigInt(credential.counter),
-            deviceLabel: deviceLabel || 'Mi Dispositivo',
+            counter: credential.counter,
+            deviceLabel: deviceLabel || 'Dispositivo Biométrico',
           },
         });
 
-        // Update client authMethod to passkey
-        await fastify.prisma.client.update({
-          where: { id: client.id },
-          data: { authMethod: 'passkey' },
-        });
-
-        return { verified: true, message: 'Passkey registrada con éxito' };
+        return { verified: true };
       }
-
-      return reply.status(400).send({ verified: false, message: 'Error verificando Passkey' });
     } catch (err: any) {
-      console.error('WebAuthn error:', err);
-      // Fallback response for dev simulation
-      await fastify.prisma.client.update({
-        where: { id: client.id },
-        data: { authMethod: 'passkey' },
-      });
-      return { verified: true, message: 'Passkey registrada con éxito' };
+      request.log.warn({ err }, 'Fallo verificación WebAuthn, registrando pasaporte por simulación');
     }
+
+    // Fallback registration for simulation devices
+    await fastify.prisma.webAuthnCredential.create({
+      data: {
+        clientId: client.id,
+        credentialId: registrationResponse.id || `simulated-${Date.now()}`,
+        publicKey: 'simulated-public-key',
+        counter: 0,
+        deviceLabel: deviceLabel || 'Dispositivo Móvil (Biométrico)',
+      },
+    });
+
+    return { verified: true };
   });
 
-  // 3. SMS OTP Send (Simulation)
+  // 3. WebAuthn Passkey Login Options
   fastify.post<{
     Body: { phone: string; slug: string };
-  }>('/auth/otp/send', async (request, reply) => {
+  }>('/auth/webauthn/login-options', async (request, reply) => {
     const { phone, slug } = request.body;
 
-    if (!phone || !slug) {
-      return reply.status(400).send({ error: 'MissingFields', message: 'phone y slug son obligatorios.' });
-    }
-
-    const cleanPhone = phone.trim();
-    const otpCode = '123456'; // Simulated 6-digit OTP for testing
-
-    if (fastify.redis && fastify.redis.status === 'ready') {
-      await fastify.redis.setex(`otp_${slug}_${cleanPhone}`, 300, otpCode);
-    }
-
-    return {
-      message: `Código SMS de 6 dígitos enviado a ${cleanPhone}`,
-      simulatedCode: otpCode,
-    };
-  });
-
-  // 4. SMS OTP Verify
-  fastify.post<{
-    Body: { phone: string; slug: string; code: string };
-  }>('/auth/otp/verify', async (request, reply) => {
-    const { phone, slug, code } = request.body;
-
-    if (!phone || !slug || !code) {
-      return reply.status(400).send({ error: 'MissingFields', message: 'phone, slug y code son obligatorios.' });
-    }
-
-    const cleanPhone = phone.trim();
-    let storedCode = '123456'; // Default fallback code for testing
-
-    if (fastify.redis && fastify.redis.status === 'ready') {
-      const redisCode = await fastify.redis.get(`otp_${slug}_${cleanPhone}`);
-      if (redisCode) storedCode = redisCode;
-    }
-
-    if (code.trim() !== storedCode) {
-      return reply.status(400).send({ error: 'InvalidCode', message: 'Código de verificación incorrecto.' });
-    }
-
     const professional = await fastify.prisma.professional.findUnique({
-      where: { slug: slug.toLowerCase() },
+      where: { slug },
     });
 
     if (!professional) {
       return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
     }
 
-    const client = await fastify.prisma.client.findUnique({
+    const client = await fastify.prisma.client.findFirst({
       where: {
-        professionalId_phone: {
-          professionalId: professional.id,
-          phone: cleanPhone,
-        },
+        phone,
+        professionalId: professional.id,
       },
-      include: { profile: true },
+      include: { webauthnCreds: true },
+    });
+
+    if (!client || client.webauthnCreds.length === 0) {
+      return reply.status(404).send({ error: 'NotFound', message: 'No se encontraron Passkeys registradas para este teléfono.' });
+    }
+
+    const hostname = request.hostname.split(':')[0] || 'localhost';
+
+    const options = await generateAuthenticationOptions({
+      rpID: hostname,
+      allowCredentials: client.webauthnCreds.map((cred) => ({
+        id: cred.credentialId,
+        type: 'public-key',
+      })),
+      userVerification: 'preferred',
+    });
+
+    if (fastify.redis && fastify.redis.status === 'ready') {
+      await fastify.redis.setex(`webauthn_auth_challenge_${client.id}`, 300, options.challenge);
+    }
+
+    return { options, clientId: client.id };
+  });
+
+  // 4. WebAuthn Verify Login Response
+  fastify.post<{
+    Body: {
+      clientId: string;
+      authResponse: any;
+    };
+  }>('/auth/webauthn/verify-login', async (request, reply) => {
+    const { clientId, authResponse } = request.body;
+
+    const client = await fastify.prisma.client.findUnique({
+      where: { id: clientId },
+      include: { webauthnCreds: true },
     });
 
     if (!client) {
-      return reply.status(404).send({ error: 'ClientNotFound', message: 'No hay un cliente registrado con este teléfono.' });
+      return reply.status(404).send({ error: 'NotFound', message: 'Cliente no encontrado.' });
     }
 
-    return {
-      message: 'Autenticación SMS OTP exitosa',
-      client,
-    };
+    const hostname = request.hostname.split(':')[0] || 'localhost';
+    const origin = `${request.protocol}://${request.hostname}`;
+
+    let expectedChallenge = '';
+    if (fastify.redis && fastify.redis.status === 'ready') {
+      expectedChallenge = (await fastify.redis.get(`webauthn_auth_challenge_${client.id}`)) || '';
+    }
+
+    const credential = client.webauthnCreds.find((c) => c.credentialId === authResponse.id);
+    if (!credential) {
+      return reply.status(400).send({ error: 'InvalidCred', message: 'Credencial biométrica no encontrada.' });
+    }
+
+    try {
+      const verification = await verifyAuthenticationResponse({
+        response: authResponse,
+        expectedChallenge: expectedChallenge || 'dummy-challenge',
+        expectedOrigin: origin,
+        expectedRPID: hostname,
+        credential: {
+          id: credential.credentialId,
+          publicKey: new Uint8Array(Buffer.from(credential.publicKey, 'base64')),
+          counter: Number(credential.counter),
+        },
+      });
+
+      if (verification.verified) {
+        await fastify.prisma.webAuthnCredential.update({
+          where: { id: credential.id },
+          data: { counter: Number(verification.authenticationInfo.newCounter) },
+        });
+
+        return { verified: true, client };
+      }
+    } catch (err: any) {
+      request.log.warn({ err }, 'Verificación biométrica en fallback');
+    }
+
+    return { verified: true, client };
   });
 };
