@@ -49,6 +49,8 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
   const [viewMode, setViewMode] = useState<'simulated' | 'original'>('simulated');
   const [hairVolume, setHairVolume] = useState<'medio' | 'alto' | 'natural'>('alto');
   const [hairFinish, setHairFinish] = useState<'mate' | 'brillo'>('mate');
+  const [aiTransformedUrlMap, setAiTransformedUrlMap] = useState<Record<number, string>>({});
+  const [isGeneratingInpainting, setIsGeneratingInpainting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Photorealistic Haircut Transformations
@@ -180,6 +182,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
 
       setAnalysisResult(data);
       setStep(4);
+      triggerReplicateInpainting(0, data);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Error al procesar la sesión de visagismo con Maestro Giovanni.');
@@ -187,10 +190,42 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
     }
   };
 
+  // Request AI Inpainting Transformation from Replicate API
+  const triggerReplicateInpainting = async (index: number, currentResult?: VisagismResult) => {
+    const resObj = currentResult || analysisResult;
+    if (!resObj || aiTransformedUrlMap[index] || isGeneratingInpainting) return;
+
+    const rec = resObj.recomendaciones[index];
+    const imageBase64 = capturedImagePreview || resObj.cleanImageBase64;
+    if (!rec || !imageBase64) return;
+
+    setIsGeneratingInpainting(true);
+    try {
+      const res = await fetch('/api/visagism/transform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          nombreCorte: rec.nombre_corte,
+          editPrompt: resObj.prompt_edicion_imagen,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.transformedImageUrl) {
+        setAiTransformedUrlMap((prev) => ({ ...prev, [index]: data.transformedImageUrl }));
+      }
+    } catch (err) {
+      console.warn('Error solicitando transformación Replicate:', err);
+    } finally {
+      setIsGeneratingInpainting(false);
+    }
+  };
+
   // Download Synthesized Haircut Image
   const downloadTransformationImage = () => {
     const activeImg = viewMode === 'simulated'
-      ? realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview
+      ? aiTransformedUrlMap[selectedRecommendationIndex] || realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview
       : capturedImagePreview || analysisResult?.cleanImageBase64;
     if (!activeImg) return;
     const link = document.createElement('a');
@@ -504,10 +539,17 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                 {viewMode === 'simulated' ? (
                   <>
                     <img
-                      src={realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview || undefined}
+                      src={aiTransformedUrlMap[selectedRecommendationIndex] || realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview || undefined}
                       alt="Corte Generado"
                       className="w-full h-full object-cover transition-all duration-700 animate-fadeIn"
                     />
+
+                    {isGeneratingInpainting && (
+                      <div className="absolute top-3 left-3 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold px-3 py-1 rounded-full flex items-center space-x-1.5 animate-pulse">
+                        <Sparkles className="w-3 h-3 animate-spin" />
+                        <span>Generando Transformación Replicate IA...</span>
+                      </div>
+                    )}
 
                     {/* Simulated Haircut Style Overlay Tag */}
                     <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
@@ -616,7 +658,10 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                 {analysisResult.recomendaciones.map((rec, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setSelectedRecommendationIndex(idx)}
+                    onClick={() => {
+                      setSelectedRecommendationIndex(idx);
+                      triggerReplicateInpainting(idx);
+                    }}
                     className={`p-3 rounded-2xl border text-left space-y-1 transition-all ${
                       selectedRecommendationIndex === idx
                         ? 'bg-amber-500/20 border-amber-500 text-white shadow-md'

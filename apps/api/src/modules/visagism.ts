@@ -157,32 +157,97 @@ export const visagismRoutes: FastifyPluginAsync = async (fastify) => {
     });
   });
 
-  // POST /api/visagism/:id/apply - Aplica y genera la simulación del corte sobre el rostro del cliente
-  fastify.post('/visagism/:id/apply', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  // POST /api/visagism/transform - Realiza inpainting de corte con Replicate (FLUX.1-Fill / SDXL)
+  fastify.post('/visagism/transform', async (req: FastifyRequest, reply: FastifyReply) => {
     if (isRateLimited(req.ip)) {
       return reply.code(429).send({ error: 'Demasiadas solicitudes. Intenta más tarde.' });
     }
 
     const BodySchema = z.object({
-      promptEdicionImagen: z.string().min(1).max(500),
-      nombreCorte: z.string().optional(),
+      imageBase64: z.string().min(1),
+      nombreCorte: z.string().min(1),
+      editPrompt: z.string().optional(),
     });
 
     const body = BodySchema.safeParse((req.body as any) ?? {});
     if (!body.success) {
-      return reply.code(400).send({ error: 'Datos de edición inválidos.' });
+      return reply.code(400).send({ error: 'Datos de transformación inválidos.' });
     }
 
+    const transformedUrl = await generateReplicateInpainting(body.data.imageBase64, body.data.nombreCorte, body.data.editPrompt);
+
     return reply.send({
-      message: 'Simulación visual de corte aplicada por Maestro Giovanni',
-      nombreCorte: body.data.nombreCorte || 'Corte Sugerido Maestro Giovanni',
-      status: 'simulated',
+      transformedImageUrl: transformedUrl,
+      nombreCorte: body.data.nombreCorte,
+      status: transformedUrl ? 'replicate_success' : 'fallback',
     });
   });
 };
 
 function stripMarkdownFences(text: string): string {
   return text.replace(/^```json\s*|```$/g, '').trim();
+}
+
+// Replicate AI Inpainting Haircut Generator (FLUX.1 Fill / SDXL)
+async function generateReplicateInpainting(
+  imageBase64: string,
+  nombreCorte: string,
+  editPrompt?: string
+): Promise<string | null> {
+  const replicateToken = process.env.REPLICATE_API_TOKEN;
+  if (!replicateToken) {
+    console.log('ℹ️ REPLICATE_API_TOKEN no configurado en .env');
+    return null;
+  }
+
+  try {
+    const prompt = editPrompt || `Photorealistic barbershop portrait of this man with a ${nombreCorte} haircut, natural hair texture matching head shape, high quality photography`;
+
+    const response = await fetch('https://api.replicate.com/v1/predictions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${replicateToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        version: 'black-forest-labs/flux-1-fill-dev',
+        input: {
+          image: imageBase64,
+          prompt: prompt,
+          output_format: 'jpg',
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error al solicitar predicción Replicate:', await response.text());
+      return null;
+    }
+
+    const initialData = await response.json();
+    let prediction = initialData;
+
+    // Poll status until succeeded or failed (max 30s)
+    let attempts = 0;
+    while (prediction.status !== 'succeeded' && prediction.status !== 'failed' && attempts < 30) {
+      await new Promise((r) => setTimeout(r, 1000));
+      attempts++;
+      const pollRes = await fetch(prediction.urls.get, {
+        headers: { 'Authorization': `Token ${replicateToken}` },
+      });
+      if (pollRes.ok) {
+        prediction = await pollRes.json();
+      }
+    }
+
+    if (prediction.status === 'succeeded' && prediction.output?.[0]) {
+      return prediction.output[0];
+    }
+  } catch (e) {
+    console.error('Error en integración Replicate Inpainting:', e);
+  }
+
+  return null;
 }
 
 // Multimodal Analysis Engine Function with Gemini 1.5 API & Pivot Point Visagism Fallback Engine
