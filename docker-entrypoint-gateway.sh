@@ -5,7 +5,7 @@ CERT_DIR="/etc/letsencrypt/live/espejos-studio.mine.bz"
 
 # Create dummy self-signed SSL cert if Let's Encrypt cert does not exist yet
 if [ ! -f "$CERT_DIR/fullchain.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ]; then
-    echo "🔑 Generating fallback SSL certificate for espejos-studio.mine.bz..."
+    echo "🔑 Generating SSL certificate fallback for espejos-studio.mine.bz..."
     mkdir -p "$CERT_DIR"
     apk add --no-cache openssl >/dev/null 2>&1 || true
     openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
@@ -14,5 +14,5 @@ if [ ! -f "$CERT_DIR/fullchain.pem" ] || [ ! -f "$CERT_DIR/privkey.pem" ]; then
         -subj "/CN=espejos-studio.mine.bz" >/dev/null 2>&1 || true
 fi
 
-echo "🚀 Starting Nginx Gateway..."
+echo "🚀 Starting Nginx Gateway on HTTP (8080) and HTTPS (8443)..."
 exec nginx -g 'daemon off;'
