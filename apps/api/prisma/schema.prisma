@@ -24,6 +24,7 @@ model Professional {
   googleRefreshToken      String?        @map("google_refresh_token")
   googleCalendarId        String?        @map("google_calendar_id")
   googleApiKey            String?        @map("google_api_key")
+  visagismEnabled         Boolean        @default(true) @map("visagism_enabled")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 
@@ -32,6 +33,7 @@ model Professional {
   services                Service[]
   appointments            Appointment[]
   galleryImages           GalleryImage[]
+  visagismConsultations   VisagismConsultation[]
 
   @@map("professionals")
 }
@@ -131,4 +133,22 @@ model WebAuthnCredential {
   client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("webauthn_credentials")
+}
+
+model VisagismConsultation {
+  id                   String       @id @default(uuid())
+  professionalId       String       @map("professional_id")
+  ageGroup             String       @map("age_group")
+  occupation           String
+  maintenanceTime      String       @map("maintenance_time")
+  faceShape            String       @map("face_shape")
+  hairType             String       @map("hair_type")
+  skinTone             String       @map("skin_tone")
+  recommendationsJson  String       @map("recommendations_json")
+  editPrompt           String?      @map("edit_prompt")
+  createdAt            DateTime     @default(now()) @map("created_at")
+
+  professional         Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("visagism_consultations")
 }

@@ -11,6 +11,7 @@ import CalendarManager from '../components/admin/CalendarManager';
 import DashboardTab from '../components/DashboardTab';
 import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
+import VisagismWizardModal from '../components/visagism/VisagismWizardModal';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings' | 'pricing';
 
@@ -24,6 +25,7 @@ export default function Space() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoadingPublicServices, setIsLoadingPublicServices] = useState(true);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isVisagismOpen, setIsVisagismOpen] = useState(false);
 
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
   const isOwner = Boolean(user && user.slug === slug && !isPreviewMode);
@@ -278,12 +280,22 @@ export default function Space() {
           </span>
         </div>
 
-        <button
-          onClick={() => setIsBookingOpen(true)}
-          className="px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all mb-12"
-        >
-          Reservar Hora Ahora
-        </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+          <button
+            onClick={() => setIsBookingOpen(true)}
+            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all"
+          >
+            Reservar Hora Ahora
+          </button>
+
+          <button
+            onClick={() => setIsVisagismOpen(true)}
+            className="w-full sm:w-auto px-6 py-4 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 hover:border-purple-500/60 text-purple-300 font-extrabold text-sm rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all"
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>Asesoría de Visagismo IA</span>
+          </button>
+        </div>
 
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl mb-8 text-left shadow-2xl space-y-4">
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 block">
@@ -338,6 +350,17 @@ export default function Space() {
           businessName={slug!}
           services={services}
           onClose={() => setIsBookingOpen(false)}
+        />
+      )}
+
+      {/* Visagism Wizard Modal Overlay */}
+      {isVisagismOpen && (
+        <VisagismWizardModal
+          onClose={() => setIsVisagismOpen(false)}
+          onSelectHaircutForBooking={() => {
+            setIsVisagismOpen(false);
+            setIsBookingOpen(true);
+          }}
         />
       )}
     </div>
