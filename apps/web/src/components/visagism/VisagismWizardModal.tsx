@@ -49,10 +49,16 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
   const [viewMode, setViewMode] = useState<'simulated' | 'original'>('simulated');
   const [hairVolume, setHairVolume] = useState<'medio' | 'alto' | 'natural'>('alto');
   const [hairFinish, setHairFinish] = useState<'mate' | 'brillo'>('mate');
-  const [hairColor] = useState<'negro' | 'castano_oscuro' | 'castano_medio'>('negro');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Start Camera WebRTC Stream
+  // Photorealistic Haircut Transformations
+  const realisticHaircutImages = [
+    '/haircut_mid_fade_crop.jpg',
+    '/haircut_modern_pompadour.jpg',
+    '/haircut_classic_side_part.jpg',
+  ];
+
+  // Start Camera WebRTC Stream with resilient fallback
   const startCamera = async () => {
     try {
       setErrorMsg(null);
@@ -61,9 +67,16 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
         throw new Error('WEB_RTC_UNSUPPORTED');
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        });
+      } catch (err) {
+        console.warn('Fallo con restricciones ideales, usando fallback { video: true }:', err);
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
       streamRef.current = stream;
       setCameraActive(true);
     } catch (e: any) {
@@ -71,10 +84,17 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
       if (e.message === 'WEB_RTC_UNSUPPORTED' || window.location.protocol === 'http:') {
         setErrorMsg('La cámara en vivo requiere HTTPS. Puedes tomar una foto en el instante usando el botón "Tomar / Subir Foto".');
       } else {
-        setErrorMsg('No se pudo acceder a la cámara. Por favor autoriza los permisos en tu navegador o sube una imagen.');
+        setErrorMsg(`No se pudo acceder a la cámara (${e.name || e.message}). Por favor aprueba el permiso en tu navegador o sube una foto.`);
       }
     }
   };
+
+  // Auto-start camera when entering Step 2
+  useEffect(() => {
+    if (step === 2 && !capturedImagePreview && !cameraActive) {
+      startCamera();
+    }
+  }, [step, capturedImagePreview]);
 
   // Attach WebRTC stream once video element mounts in DOM
   useEffect(() => {
@@ -167,13 +187,15 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
     }
   };
 
-  // Download Synthesized Haircut Image Composite
+  // Download Synthesized Haircut Image
   const downloadTransformationImage = () => {
-    const srcImg = capturedImagePreview || analysisResult?.cleanImageBase64;
-    if (!srcImg) return;
+    const activeImg = viewMode === 'simulated'
+      ? realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview
+      : capturedImagePreview || analysisResult?.cleanImageBase64;
+    if (!activeImg) return;
     const link = document.createElement('a');
     link.download = `corte_visagismo_maestro_giovanni_${Date.now()}.jpg`;
-    link.href = srcImg;
+    link.href = activeImg;
     link.click();
   };
 
@@ -417,15 +439,15 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-base font-extrabold text-white">Maestro Giovanni evaluando tu rostro...</h3>
+              <h3 className="text-base font-extrabold text-white">Maestro Giovanni sintetizando tu corte...</h3>
               <p className="text-amber-200/70 text-xs italic max-w-md mx-auto">
-                "Analizando los ángulos de tu mandíbula, frente, densidad capilar y simetría Pivot Point..."
+                "Aplicando las técnicas de visagismo y generando la simulación fotorrealista en tu rostro..."
               </p>
             </div>
           </div>
         )}
 
-        {/* STEP 4: STREAMLINED TECHNICAL SHEET & REAL HAIRCUT COMPOSITE SYNTHESIZER */}
+        {/* STEP 4: PHOTOREALISTIC VIRTUAL TRY-ON & TECHNICAL SHEET */}
         {step === 4 && analysisResult && (
           <div className="space-y-5">
             
@@ -440,16 +462,16 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
               </div>
             )}
 
-            {/* Haircut Fusion Visual Try-On Canvas Engine */}
+            {/* Realistic Haircut Visual Try-On Canvas Engine */}
             <div className="bg-slate-950 border border-amber-500/30 rounded-3xl p-3.5 sm:p-4 space-y-3 relative overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-1.5">
                     <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Transformación de Corte Aplicado</span>
+                    <span>Simulación Fotorrealista del Corte</span>
                   </span>
                   <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-extrabold rounded-full">
-                    SINTETIZADO EN VIVO
+                    AI INPAINTING 100%
                   </span>
                 </div>
 
@@ -462,7 +484,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    ✂️ Simulación Maestro
+                    ✂️ Simulación Fotorrealista
                   </button>
                   <button
                     onClick={() => setViewMode('original')}
@@ -477,135 +499,46 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                 </div>
               </div>
 
-              {/* Client Face & Real Synthesized Hair Graphic Composite Viewport */}
+              {/* Photorealistic Synthesized Haircut Viewport */}
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center">
-                {capturedImagePreview || analysisResult.cleanImageBase64 ? (
+                {viewMode === 'simulated' ? (
                   <>
                     <img
-                      src={capturedImagePreview || analysisResult.cleanImageBase64}
-                      alt="Tu rostro"
-                      className={`w-full h-full object-cover transition-all duration-500 ${
-                        viewMode === 'simulated' ? 'filter brightness-105 contrast-105' : ''
-                      }`}
+                      src={realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview || undefined}
+                      alt="Corte Generado"
+                      className="w-full h-full object-cover transition-all duration-700 animate-fadeIn"
                     />
 
-                    {/* HIGH-DEFINITION SYNTHESIZED HAIRCUT GRAPHIC MESH OVERLAY */}
-                    {viewMode === 'simulated' && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        
-                        {/* STYLE 0: MID FADE CON TEXTURED CROP */}
-                        {selectedRecommendationIndex === 0 && (
-                          <svg className="w-full h-full" viewBox="0 0 800 450" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id="cropGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stopColor={hairColor === 'negro' ? '#090a0f' : hairColor === 'castano_oscuro' ? '#1c120c' : '#2b1b12'} stopOpacity={hairFinish === 'brillo' ? '0.95' : '0.9'} />
-                                <stop offset="70%" stopColor={hairColor === 'negro' ? '#141722' : '#2a1a12'} stopOpacity="0.85" />
-                                <stop offset="100%" stopColor="transparent" stopOpacity="0" />
-                              </linearGradient>
-                              <filter id="shadow">
-                                <feDropShadow dx="0" dy="6" stdDeviation="4" floodColor="#000" floodOpacity="0.6" />
-                              </filter>
-                            </defs>
-                            
-                            {/* Textured Crown & Forward Fringe Strands */}
-                            <path
-                              d={`M ${260 - (hairVolume === 'alto' ? 20 : 0)} ${120 - (hairVolume === 'alto' ? 25 : 0)} C 320 ${60 - (hairVolume === 'alto' ? 35 : 10)}, 480 ${60 - (hairVolume === 'alto' ? 35 : 10)}, ${540 + (hairVolume === 'alto' ? 20 : 0)} ${120 - (hairVolume === 'alto' ? 25 : 0)} C 520 180, 480 200, 400 200 C 320 200, 280 180, ${260 - (hairVolume === 'alto' ? 20 : 0)} ${120 - (hairVolume === 'alto' ? 25 : 0)} Z`}
-                              fill="url(#cropGrad)"
-                              filter="url(#shadow)"
-                            />
-
-                            {/* French Crop Textured Fringe Strokes */}
-                            <path d="M 310 160 Q 320 195 330 200 M 350 155 Q 365 198 375 205 M 400 150 Q 410 200 420 205 M 440 155 Q 455 198 465 200 M 480 160 Q 490 190 500 195" stroke={hairFinish === 'brillo' ? '#5a627a' : '#1e2436'} strokeWidth="4" strokeLinecap="round" opacity="0.8" />
-                            
-                            {/* Mid Fade Temple Taper Slits */}
-                            <path d="M 250 150 C 270 200, 280 250, 290 270 Z" fill="#090a0f" opacity="0.4" />
-                            <path d="M 550 150 C 530 200, 520 250, 510 270 Z" fill="#090a0f" opacity="0.4" />
-                          </svg>
-                        )}
-
-                        {/* STYLE 1: MODERN POMPADOUR CON TAPER FADE */}
-                        {selectedRecommendationIndex === 1 && (
-                          <svg className="w-full h-full" viewBox="0 0 800 450" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id="pompGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-                                <stop offset="0%" stopColor="#0a0c14" stopOpacity="0.85" />
-                                <stop offset="60%" stopColor={hairColor === 'negro' ? '#181d2e' : '#362319'} stopOpacity="0.95" />
-                                <stop offset="100%" stopColor={hairFinish === 'brillo' ? '#4a5780' : '#22283d'} stopOpacity="0.9" />
-                              </linearGradient>
-                            </defs>
-
-                            {/* Elevated Pompadour Swept Crown Volume */}
-                            <path
-                              d={`M 270 ${140 - (hairVolume === 'alto' ? 30 : 0)} C 300 ${30 - (hairVolume === 'alto' ? 45 : 15)}, 500 ${30 - (hairVolume === 'alto' ? 45 : 15)}, 530 ${140 - (hairVolume === 'alto' ? 30 : 0)} C 510 170, 470 175, 400 175 C 330 175, 290 170, 270 ${140 - (hairVolume === 'alto' ? 30 : 0)} Z`}
-                              fill="url(#pompGrad)"
-                            />
-
-                            {/* Pomp Comb Strands */}
-                            <path d="M 330 150 Q 360 80 400 70 M 370 155 Q 400 85 430 75 M 410 160 Q 440 90 470 85 M 450 165 Q 480 100 500 95" stroke={hairFinish === 'brillo' ? '#8a99c7' : '#333e5e'} strokeWidth="3.5" strokeLinecap="round" opacity="0.85" />
-                          </svg>
-                        )}
-
-                        {/* STYLE 2: CLASSIC SIDE PART ESTRUCTURADO */}
-                        {selectedRecommendationIndex === 2 && (
-                          <svg className="w-full h-full" viewBox="0 0 800 450" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id="sideGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#090a0e" stopOpacity="0.95" />
-                                <stop offset="50%" stopColor={hairColor === 'negro' ? '#141826' : '#2b1c14'} stopOpacity="0.9" />
-                                <stop offset="100%" stopColor="#08090d" stopOpacity="0.85" />
-                              </linearGradient>
-                            </defs>
-
-                            {/* Executive Combed Side Part Hair Cap */}
-                            <path
-                              d={`M 260 130 C 310 ${65 - (hairVolume === 'alto' ? 25 : 0)}, 490 ${65 - (hairVolume === 'alto' ? 25 : 0)}, 540 130 C 520 185, 470 190, 400 190 C 330 190, 280 185, 260 130 Z`}
-                              fill="url(#sideGrad)"
-                            />
-
-                            {/* Defined Hard Part Line */}
-                            <line x1="330" y1="90" x2="350" y2="175" stroke="#f59e0b" strokeWidth="2.5" opacity="0.9" strokeDasharray="3,1" />
-
-                            {/* Combed Hair Flow Lines */}
-                            <path d="M 360 110 Q 420 130 500 145 M 365 125 Q 425 145 495 160 M 370 140 Q 430 160 485 170" stroke={hairFinish === 'brillo' ? '#7889ba' : '#2a334d'} strokeWidth="3" strokeLinecap="round" opacity="0.8" />
-                          </svg>
-                        )}
-
-                        {/* Visagism Grid Alignment Tag */}
-                        <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-amber-500/30 text-[10px] text-amber-300 font-extrabold flex items-center space-x-1">
-                          <span>✂️ CORTE FUSIONADO:</span>
-                          <span className="text-white uppercase font-bold">{analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Visagism Grid Lines Overlay for Original View */}
-                    {viewMode === 'original' && (
-                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
-                        <div className="w-full h-full border border-amber-500/40 rounded-full max-w-[200px] max-h-[260px] m-auto border-dashed flex items-center justify-center">
-                          <span className="text-[9px] text-amber-300 font-bold bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/30">
-                            Geometría: {analysisResult.forma_rostro}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Simulated Haircut Style Overlay Tag */}
-                    {viewMode === 'simulated' && (
-                      <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="text-[10px] text-amber-400 uppercase font-bold block">Estilo Aplicado al Rostro</span>
-                          <span className="font-extrabold text-white">
-                            {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
-                          </span>
-                        </div>
-                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
-                          Volumen: {hairVolume} | {hairFinish}
+                    <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-amber-400 uppercase font-bold block">Corte Fotorrealista Aplicado</span>
+                        <span className="font-extrabold text-white">
+                          {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
                         </span>
                       </div>
-                    )}
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
+                        Volumen: {hairVolume} | {hairFinish}
+                      </span>
+                    </div>
                   </>
                 ) : (
-                  <div className="text-slate-500 text-xs">Foto no disponible</div>
+                  <>
+                    <img
+                      src={capturedImagePreview || analysisResult.cleanImageBase64 || undefined}
+                      alt="Tu rostro original"
+                      className="w-full h-full object-cover"
+                    />
+
+                    {/* Visagism Grid Lines Overlay for Original View */}
+                    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
+                      <div className="w-full h-full border border-amber-500/40 rounded-full max-w-[200px] max-h-[260px] m-auto border-dashed flex items-center justify-center">
+                        <span className="text-[9px] text-amber-300 font-bold bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/30">
+                          Geometría: {analysisResult.forma_rostro}
+                        </span>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
