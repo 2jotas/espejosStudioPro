@@ -49,6 +49,11 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
   const startCamera = async () => {
     try {
       setErrorMsg(null);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('WEB_RTC_UNSUPPORTED');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
       });
@@ -57,9 +62,13 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
         videoRef.current.srcObject = stream;
       }
       setCameraActive(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error al acceder a la cámara:', e);
-      setErrorMsg('No se pudo acceder a la cámara. Por favor permite los permisos o sube una foto.');
+      if (e.message === 'WEB_RTC_UNSUPPORTED' || window.location.protocol === 'http:') {
+        setErrorMsg('La cámara en vivo requiere HTTPS. Puedes tomar una foto en el instante usando el botón "Tomar / Subir Foto".');
+      } else {
+        setErrorMsg('No se pudo acceder a la cámara. Por favor autoriza los permisos en tu navegador o sube una imagen.');
+      }
     }
   };
 
@@ -294,12 +303,15 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                   </div>
                 </>
               ) : (
-                <div className="text-center space-y-3 p-6">
-                  <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl inline-block text-slate-400">
+                <label htmlFor="visagism-file-input" className="text-center space-y-3 p-6 cursor-pointer hover:opacity-80 transition-opacity w-full h-full flex flex-col items-center justify-center">
+                  <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl inline-block text-indigo-400 shadow-lg">
                     <Camera className="w-8 h-8" />
                   </div>
-                  <p className="text-slate-400 text-xs">Selecciona el método de captura preferido</p>
-                </div>
+                  <div>
+                    <p className="text-white text-xs font-bold">Haz clic aquí para Tomar o Subir Foto</p>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Abre la cámara frontal o la galería de tu dispositivo</p>
+                  </div>
+                </label>
               )}
             </div>
 
@@ -312,7 +324,7 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                     className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center space-x-2 transition-colors"
                   >
                     <Camera className="w-4 h-4" />
-                    <span>Activar Cámara</span>
+                    <span>Activar Cámara WebRTC</span>
                   </button>
                 )}
 
@@ -322,14 +334,21 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                     className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center space-x-2 shadow-lg shadow-emerald-500/20 transition-colors"
                   >
                     <Camera className="w-4 h-4" />
-                    <span>Tomar Foto</span>
+                    <span>Capturar Ahora</span>
                   </button>
                 )}
 
-                <label className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl cursor-pointer flex items-center space-x-2 transition-colors">
-                  <Upload className="w-4 h-4 text-slate-400" />
-                  <span>Subir Imagen</span>
-                  <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                <label className="px-4 py-2.5 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 font-bold text-xs rounded-xl cursor-pointer flex items-center space-x-2 transition-colors">
+                  <Upload className="w-4 h-4 text-purple-300" />
+                  <span>Tomar / Subir Foto</span>
+                  <input
+                    id="visagism-file-input"
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
                 </label>
               </div>
 
