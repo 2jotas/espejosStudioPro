@@ -18,6 +18,7 @@ const RecomendacionSchema = z.object({
 
 const AnalysisSchema = z.union([
   z.object({
+    saludo_maestro: z.string().optional(),
     forma_rostro: z.string().min(1).max(60),
     tipo_cabello: z.string().min(1).max(60),
     tono_piel: z.string().min(1).max(60),
@@ -61,7 +62,7 @@ async function sanitizeImage(buffer: Buffer): Promise<Buffer> {
 
 export const visagismRoutes: FastifyPluginAsync = async (fastify) => {
 
-  // POST /api/visagism/analyze - Recibe imagen + perfilado y devuelve Ficha de Visagismo
+  // POST /api/visagism/analyze - Recibe imagen + perfilado y devuelve Ficha de Visagismo Maestro Giovanni
   fastify.post('/visagism/analyze', async (req: FastifyRequest, reply: FastifyReply) => {
     if (isRateLimited(req.ip)) {
       return reply.code(429).send({ error: 'Demasiadas solicitudes. Intenta más tarde.' });
@@ -156,7 +157,7 @@ export const visagismRoutes: FastifyPluginAsync = async (fastify) => {
     });
   });
 
-  // POST /api/visagism/:id/apply - Genera / simula el corte transformado en el rostro
+  // POST /api/visagism/:id/apply - Aplica y genera la simulación del corte sobre el rostro del cliente
   fastify.post('/visagism/:id/apply', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     if (isRateLimited(req.ip)) {
       return reply.code(429).send({ error: 'Demasiadas solicitudes. Intenta más tarde.' });
@@ -173,8 +174,8 @@ export const visagismRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return reply.send({
-      message: 'Simulación visual de corte aplicada exitosamente',
-      nombreCorte: body.data.nombreCorte || 'Corte Sugerido Espejo AI',
+      message: 'Simulación visual de corte aplicada por Maestro Giovanni',
+      nombreCorte: body.data.nombreCorte || 'Corte Sugerido Maestro Giovanni',
       status: 'simulated',
     });
   });
@@ -222,24 +223,25 @@ async function callAnalysisAgent(
         if (textOutput) return textOutput;
       }
     } catch (e) {
-      console.warn('Error llamando a Gemini API, usando motor de respaldo de Visagismo:', e);
+      console.warn('Error llamando a Gemini API, usando motor de respaldo Maestro Giovanni:', e);
     }
   }
 
-  // Built-in Expert Pivot Point Visagism Intelligence Engine (Fallback)
+  // Built-in Expert Maestro Giovanni Pivot Point Visagism Intelligence Engine (Fallback)
   return JSON.stringify({
+    saludo_maestro: "Mio caro amico, permitaseme analizar la estructura de tu rostro con la finura y precisión de la barbería sartorial italiana de Firenze.",
     forma_rostro: 'Ovalado / Estructura Armónica',
     tipo_cabello: 'Ondulado Medio con Volumen',
     tono_piel: 'Neutro Oliva',
     recomendaciones: [
       {
         nombre_corte: 'Mid Fade con Textured Crop',
-        justificacion_visagista: `Para tu perfil (${occupation}) y edad (${ageGroup}), el Mid Fade proyecta una mandíbula definida y limpia, mientras que el Crop superior con textura desestructurada equilibra la frente y resalta la mirada.`,
+        justificacion_visagista: `Para tu perfil (${occupation}) y rango etario (${ageGroup}), el Mid Fade proyecta una mandíbula esculpida y limpia, mientras que el Crop superior con textura desestructurada equilibra la frente y resalta la mirada con distinción.`,
         mantenimiento: `Mantenimiento ${maintenanceTime}. Aplicar polvo de volumen o pomada mate de fijación media sobre cabello seco en menos de 3 minutos.`,
       },
       {
         nombre_corte: 'Modern Pompadour con Taper Fade',
-        justificacion_visagista: 'El volumen vertical elevado aporta estilismo y elegancia profesional, alargando la proporción facial y aportando firmeza y liderazgo visual.',
+        justificacion_visagista: 'El volumen vertical elevado aporta estilismo y elegancia profesional, alargando la proporción facial y aportando firmeza y liderazgo sartorial.',
         mantenimiento: 'Secar con secador hacia atrás guiando con cepillo esquelético. Fijar con cera con acabado brillo moderado.',
       },
       {
