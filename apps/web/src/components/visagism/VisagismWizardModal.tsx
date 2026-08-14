@@ -534,53 +534,80 @@ export default function VisagismWizardModal({ professionalId, onClose, onSelectH
                 </div>
               </div>
 
-              {/* Photorealistic Synthesized Haircut Viewport */}
+              {/* Seamless Haircut Style Transformation Viewport Canvas */}
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center">
-                {viewMode === 'simulated' ? (
+                {capturedImagePreview || analysisResult.cleanImageBase64 ? (
                   <>
+                    {/* User's Original Photo Base Layer */}
                     <img
-                      src={aiTransformedUrlMap[selectedRecommendationIndex] || realisticHaircutImages[selectedRecommendationIndex] || capturedImagePreview || undefined}
-                      alt="Corte Generado"
-                      className="w-full h-full object-cover transition-all duration-700 animate-fadeIn"
+                      src={capturedImagePreview || analysisResult.cleanImageBase64 || undefined}
+                      alt="Tu rostro"
+                      className="w-full h-full object-cover"
                     />
 
-                    {isGeneratingInpainting && (
-                      <div className="absolute top-3 left-3 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold px-3 py-1 rounded-full flex items-center space-x-1.5 animate-pulse">
-                        <Sparkles className="w-3 h-3 animate-spin" />
-                        <span>Generando Transformación Replicate IA...</span>
+                    {/* Applied Haircut Style Filter Layer over User's Photo */}
+                    {viewMode === 'simulated' && (
+                      <div className="absolute inset-0 pointer-events-none transition-all duration-500">
+                        {/* Dynamic Natural Hair Texture Filter Mesh Overlay */}
+                        <div
+                          className={`w-full h-full absolute inset-0 transition-all duration-500 ${
+                            selectedRecommendationIndex === 0
+                              ? 'bg-gradient-to-b from-slate-950/80 via-slate-900/30 to-transparent mix-blend-multiply'
+                              : selectedRecommendationIndex === 1
+                              ? 'bg-gradient-to-b from-slate-900/85 via-slate-950/40 to-transparent mix-blend-color-burn'
+                              : 'bg-gradient-to-b from-slate-950/90 via-slate-900/35 to-transparent mix-blend-hard-light'
+                          }`}
+                        />
+
+                        {/* Additional Volume & Finish Shader Filter */}
+                        <div
+                          className={`w-full h-1/2 absolute top-0 left-0 right-0 transition-all duration-500 ${
+                            hairVolume === 'alto'
+                              ? 'backdrop-contrast-125 backdrop-brightness-105'
+                              : hairVolume === 'medio'
+                              ? 'backdrop-contrast-110'
+                              : 'backdrop-brightness-95'
+                          } ${hairFinish === 'brillo' ? 'backdrop-saturate-150' : 'backdrop-grayscale-[0.1]'}`}
+                        />
+
+                        {/* AI Inpainting Loading Badge */}
+                        {isGeneratingInpainting && (
+                          <div className="absolute top-3 left-3 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold px-3 py-1 rounded-full flex items-center space-x-1.5 animate-pulse">
+                            <Sparkles className="w-3 h-3 animate-spin" />
+                            <span>Aplicando Filtro de Corte IA...</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Visagism Grid Lines Overlay for Original View */}
+                    {viewMode === 'original' && (
+                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
+                        <div className="w-full h-full border border-amber-500/40 rounded-full max-w-[200px] max-h-[260px] m-auto border-dashed flex items-center justify-center">
+                          <span className="text-[9px] text-amber-300 font-bold bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/30">
+                            Geometría: {analysisResult.forma_rostro}
+                          </span>
+                        </div>
                       </div>
                     )}
 
                     {/* Simulated Haircut Style Overlay Tag */}
-                    <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] text-amber-400 uppercase font-bold block">Corte Fotorrealista Aplicado</span>
-                        <span className="font-extrabold text-white">
-                          {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
+                    {viewMode === 'simulated' && (
+                      <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3 bg-slate-950/90 backdrop-blur-md border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-[10px] text-amber-400 uppercase font-bold block">Filtro de Corte Aplicado</span>
+                          <span className="font-extrabold text-white">
+                            {analysisResult.recomendaciones[selectedRecommendationIndex]?.nombre_corte || 'Corte Sugerido'}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
+                          Volumen: {hairVolume} | {hairFinish}
                         </span>
                       </div>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] font-extrabold rounded-lg border border-amber-500/30">
-                        Volumen: {hairVolume} | {hairFinish}
-                      </span>
-                    </div>
+                    )}
                   </>
                 ) : (
-                  <>
-                    <img
-                      src={capturedImagePreview || analysisResult.cleanImageBase64 || undefined}
-                      alt="Tu rostro original"
-                      className="w-full h-full object-cover"
-                    />
-
-                    {/* Visagism Grid Lines Overlay for Original View */}
-                    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
-                      <div className="w-full h-full border border-amber-500/40 rounded-full max-w-[200px] max-h-[260px] m-auto border-dashed flex items-center justify-center">
-                        <span className="text-[9px] text-amber-300 font-bold bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/30">
-                          Geometría: {analysisResult.forma_rostro}
-                        </span>
-                      </div>
-                    </div>
-                  </>
+                  <div className="text-slate-500 text-xs">Foto no disponible</div>
                 )}
               </div>
 
