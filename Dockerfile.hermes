@@ -2,6 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system network utilities (ping, curl, iproute2)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    iputils-ping \
+    curl \
+    iproute2 \
+    && rm -rf /var/lib/apt-get/lists/*
+
 # Install python dependencies
 COPY apps/hermes/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
