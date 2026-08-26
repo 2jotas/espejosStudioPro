@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   GraduationCap, 
-  BookOpen, 
   Folder, 
   FolderOpen, 
   FileText, 
@@ -9,18 +8,12 @@ import {
   Terminal, 
   Play, 
   Plus, 
-  ExternalLink, 
   Check, 
   Copy, 
-  Sparkles, 
   ChevronRight, 
   ChevronDown,
   Layers,
   Code2,
-  Database,
-  Cpu,
-  TrendingUp,
-  BrainCircuit,
   X
 } from 'lucide-react';
 import { CURRICULUM_DATA, AnoCurricular, Modulo, Apunte } from './data/curriculum';
