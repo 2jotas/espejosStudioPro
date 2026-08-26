@@ -19,17 +19,16 @@ Principio de 3 capas aisladas:
 
 ---
 
-## 🏛️ 2. Estado de Infraestructura & Ciberseguridad
+## 🛡️ 2. Reglas Inmutables de Infraestructura (Golden Guardrails)
 
-- **VPS IP**: `161.97.76.187`
-- **Tailscale IP Privada**: `100.93.160.96` (VPS) / `100.93.43.122` (Laptop Dynabook).
-- **Firewall UFW**:
-  - `80/tcp` y `443/tcp`: Abiertos con Rate Limiting y Cloudflare SSL.
-  - `22/tcp` (SSH): **100% Bloqueado al internet público**. Exclusivo por Tailscale VPN (`tailscale0`).
-- **Hermes Daemon (`espejos-hermes`)**:
-  - Auto-Tuning en caliente activo (`self_tuner.py`).
-  - Cerebro Multi-Modelo: Gemini 2.0 Flash / Pro con Thinking + Fallback a GPT-OSS-120B / Groq Compound.
-  - Memoria Compartida viva en `/app/PROJECT_BRAIN.md`.
+1. **Puertos Web Obligatorios**:
+   - `espejos-gateway` DEBE mapear SIEMPRE `80:80` y `443:443` hacia Cloudflare. Prohibido usar 8080/8443 en `docker-compose.yml`.
+2. **Acceso SSH & Administración**:
+   - Puerto `22/tcp` (SSH) 100% bloqueado a internet público. Acceso exclusivo por Tailscale (`100.93.160.96`).
+3. **Protocolo Dry-Run (Pensar antes de actuar)**:
+   - Todo cambio en configuraciones de servidor debe formular primero un Plan de Impacto y validar con `docker compose config`.
+4. **Protección de Secretos**:
+   - Nunca incluir tokens ni API Keys en texto plano en commits ni prompts. Usar variables de entorno en `.env`.
 
 ---
 
