@@ -19,7 +19,7 @@ OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+LLM_MODEL = os.getenv("LLM_MODEL", "groq/compound")
 
 AGENTS = {
     "universidad": AGENTS_DIR / "agente_universidad.md",
