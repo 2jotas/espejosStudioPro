@@ -43,6 +43,7 @@ Principio de 3 capas aisladas:
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Implementación de `self_tuner.py` (Auto-reparación e instalación de herramientas en caliente). |
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Creación de `gemini_engine.py` con Thinking Mode y `PROJECT_BRAIN.md`. |
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Fix anti-truncado de Telegram (Auto-chunking >4000 caracteres). |
+| **2026-08-26** | Antigravity 2.0 | GitHub / Web | Creación de Vault Web `apps/formacion/` (React + Tailwind + KaTeX) y enrutamiento en Nginx para `formacion.espejosstudio.cl`. |
 
 ---
 

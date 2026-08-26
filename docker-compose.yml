@@ -45,6 +45,13 @@ services:
     depends_on:
       - espejos-api
 
+  espejos-formacion:
+    build:
+      context: .
+      dockerfile: Dockerfile.formacion
+    container_name: espejos-formacion
+    restart: always
+
   espejos-gateway:
     image: nginx:alpine
     container_name: espejos-gateway
@@ -61,4 +68,5 @@ services:
     depends_on:
       - espejos-api
       - espejos-web
+      - espejos-formacion
       - espejos-hermes
