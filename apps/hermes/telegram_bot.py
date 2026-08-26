@@ -9,10 +9,15 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 
 async def send_safe_reply(update: Update, text: str):
-    try:
-        await update.message.reply_text(text, parse_mode="Markdown")
-    except Exception:
-        await update.message.reply_text(text)
+    CHUNK_SIZE = 4000
+    if not text:
+        return
+    for i in range(0, len(text), CHUNK_SIZE):
+        chunk = text[i:i + CHUNK_SIZE]
+        try:
+            await update.message.reply_text(chunk, parse_mode="Markdown")
+        except Exception:
+            await update.message.reply_text(chunk)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
