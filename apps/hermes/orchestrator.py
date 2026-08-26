@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -32,7 +33,7 @@ KEYWORDS = {
     "devops": [
         "vps", "docker", "deploy", "despliegue", "ssh", "tailscale",
         "ufw", "firewall", "nginx", "servidor", "github", "pr", "commit",
-        "merge", "producción", "status", "logs", "puerto", "ssl"
+        "merge", "producción", "status", "logs", "puerto", "ssl", "nodo", "laptop"
     ],
     "espejos": [
         "crm", "gravity", "clientes", "agenda", "citas", "servicios",
@@ -67,7 +68,7 @@ def classify(text: str) -> str:
             if re.search(rf"\b{re.escape(w)}\b", lower):
                 scores[name] += 1
 
-    if any(token in lower for token in ["vps", "docker", "deploy", "despliegue", "ssh", "tailscale", "ufw", "nginx", "github"]):
+    if any(token in lower for token in ["vps", "docker", "deploy", "despliegue", "ssh", "tailscale", "ufw", "nginx", "github", "nodo", "laptop"]):
         scores["devops"] += 2
 
     if any(token in lower for token in ["crm", "gravity", "agenda", "citas", "barberos", "estilistas", "dashboard"]):
@@ -128,21 +129,63 @@ def save_output_md(categoria: str, content: str) -> Path:
     return path
 
 
+def get_system_context(request: str) -> str:
+    lower = request.lower()
+    context_info = ""
+    if any(k in lower for k in ["tailscale", "ping", "nodo", "laptop", "100.93.43.122"]):
+        try:
+            ping_res = subprocess.run(["ping", "-c", "2", "100.93.43.122"], capture_output=True, text=True, timeout=5)
+            context_info += f"\n[DATOS REALES DE RED TAILSCALE (PING A LAPTOP 100.93.43.122)]:\n{ping_res.stdout}\n"
+        except Exception as e:
+            context_info += f"\n[DATOS REALES DE RED TAILSCALE]: Error pinging laptop: {e}\n"
+
+    if any(k in lower for k in ["docker", "vps", "servidor", "status", "infraestructura"]):
+        try:
+            ps_res = subprocess.run(["docker", "ps"], capture_output=True, text=True, timeout=5)
+            context_info += f"\n[DATOS REALES DE CONTENEDORES DOCKER EN VPS]:\n{ps_res.stdout}\n"
+        except Exception as e:
+            context_info += f"\n[DATOS REALES DOCKER]: Error querying docker: {e}\n"
+
+    return context_info
+
+
+def call_llm_with_fallback(system_prompt: str, user_request: str) -> str:
+    extra_context = get_system_context(user_request)
+    if extra_context:
+        full_user_request = f"{user_request}\n\n{extra_context}"
+    else:
+        full_user_request = user_request
+
+    candidate_models = [LLM_MODEL, "openai/gpt-oss-120b", "groq/compound", "qwen/qwen3.8-27b"]
+    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
+
+    last_err = None
+    for model_id in candidate_models:
+        if not model_id:
+            continue
+        try:
+            completion = client.chat.completions.create(
+                model=model_id,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": full_user_request},
+                ],
+                max_tokens=2048,
+            )
+            return completion.choices[0].message.content or ""
+        except Exception as e:
+            last_err = e
+            continue
+    raise RuntimeError(f"Error procesando la solicitud con LLM: {last_err}")
+
+
 def orchestrate(request: str) -> dict:
     agent_name = classify(request)
     system_prompt = load_prompt(agent_name)
     if not system_prompt:
         system_prompt = f"Eres el agente especializado {agent_name}."
 
-    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
-    completion = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": request},
-        ],
-    )
-    resultado = completion.choices[0].message.content or ""
+    resultado = call_llm_with_fallback(system_prompt, request)
 
     conn = ensure_db()
     save_task(
@@ -175,14 +218,6 @@ def run_specific_agent(agent_name: str, request: str) -> str:
     if not system_prompt:
         system_prompt = f"Eres el agente especializado {agent_name}."
 
-    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
-    completion = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": request},
-        ],
-    )
-    resultado = completion.choices[0].message.content or ""
+    resultado = call_llm_with_fallback(system_prompt, request)
     save_output_md(agent_name, resultado)
     return resultado
