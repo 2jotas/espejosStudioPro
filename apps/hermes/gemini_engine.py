@@ -75,13 +75,12 @@ def run_gemini_agent(user_prompt: str, model_name: str = "gemini-2.5-pro") -> st
 
     try:
         import urllib.request
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
         system_instruction = (
             "Eres el Agente Autónomo de Ingeniería de Software de Hermes en el VPS.\n"
             "Tienes la misma capacidad de análisis, diseño y arquitectura que Antigravity 2.0.\n"
             "Usa la memoria viva del proyecto para entender el contexto.\n\n"
-            f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3000]}\n"
+            f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3500]}\n"
         )
 
         payload = {
@@ -97,17 +96,27 @@ def run_gemini_agent(user_prompt: str, model_name: str = "gemini-2.5-pro") -> st
             }
         }
 
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
+        models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+        last_err = None
+        for m_name in models_to_try:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
 
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-            return text_response
+                with urllib.request.urlopen(req, timeout=45) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text_response = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return text_response
+            except Exception as e:
+                last_err = e
+                continue
+
+        return f"❌ Error ejecutando Gemini Engine: {last_err}"
 
     except Exception as e:
         return f"❌ Error ejecutando Gemini Engine: {e}"
