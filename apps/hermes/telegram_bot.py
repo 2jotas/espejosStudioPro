@@ -123,6 +123,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error procesando la solicitud: {e}")
 
 
+async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt_text = " ".join(context.args) if context.args else ""
+    if not prompt_text:
+        await send_safe_reply(update, "⚠️ Escribe tu instrucción de ingeniería después del comando. Ej: `/gemini revisa el estado del proyecto`")
+        return
+    await send_safe_reply(update, "🧠 *Gemini Engine analizando con memoria viva de PROJECT_BRAIN.md...*")
+    try:
+        import gemini_engine as gemini
+        res = gemini.run_gemini_agent(prompt_text)
+        await send_safe_reply(update, f"🧠 *Respuesta de Gemini Pro (VPS)*:\n\n{res}")
+    except Exception as e:
+        await send_safe_reply(update, f"❌ Error: {e}")
+
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
@@ -132,6 +146,8 @@ def main():
     app.add_handler(CommandHandler("espejos", cmd_espejos))
     app.add_handler(CommandHandler("contenido", cmd_contenido))
     app.add_handler(CommandHandler("devops", cmd_devops))
+    app.add_handler(CommandHandler("gemini", cmd_gemini))
+    app.add_handler(CommandHandler("code", cmd_gemini))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot Maestro corriendo activamente en Docker VPS 24/7...", flush=True)
