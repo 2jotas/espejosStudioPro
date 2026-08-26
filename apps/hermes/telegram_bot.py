@@ -8,6 +8,13 @@ import orchestrator as orch
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 
+async def send_safe_reply(update: Update, text: str):
+    try:
+        await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text(text)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print("Command /start received", flush=True)
     welcome = (
@@ -22,7 +29,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👉 `/ayuda` - Ver instrucciones y ejemplos de uso.\n\n"
         "Escribe cualquier mensaje directamente y seleccionaré el agente ideal para responderte."
     )
-    await update.message.reply_text(welcome, parse_mode="Markdown")
+    await send_safe_reply(update, welcome)
 
 
 async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,7 +49,7 @@ async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   • *Especialización*: Auditoría GitHub, Estado del VPS (`100.93.160.96`), UFW y Despliegues.\n"
         "   • *Comando*: `/devops <tu orden>`"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    await send_safe_reply(update, text)
 
 
 async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,24 +63,24 @@ async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "  - `/contenido Dame el guión del Reel de hoy`\n"
         "  - `/devops Revisa el estado de la infraestructura`"
     )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    await send_safe_reply(update, text)
 
 
 async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt_text = " ".join(context.args) if context.args else ""
     print(f"Command /{agent_key} received: {prompt_text}", flush=True)
     if not prompt_text:
-        await update.message.reply_text(f"⚠️ Escribe tu consulta después del comando. Ej: `/{agent_key} tu pregunta`", parse_mode="Markdown")
+        await send_safe_reply(update, f"⚠️ Escribe tu consulta después del comando. Ej: `/{agent_key} tu pregunta`")
         return
 
-    await update.message.reply_text(f"⚡ *Ejecutando agente `{agent_key.upper()}`...*", parse_mode="Markdown")
+    await send_safe_reply(update, f"⚡ *Ejecutando agente `{agent_key.upper()}`...*")
     try:
         resultado = orch.run_specific_agent(agent_key, prompt_text)
         respuesta = (
             f"🤖 *Respuesta del Agente `{agent_key.upper()}`:*\n\n"
             f"{resultado}"
         )
-        await update.message.reply_text(respuesta, parse_mode="Markdown")
+        await send_safe_reply(update, respuesta)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
@@ -97,7 +104,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
-    await update.message.reply_text("⚡ *Orquestando solicitud con Hermes...*", parse_mode="Markdown")
+    await send_safe_reply(update, "⚡ *Orquestando solicitud con Hermes...*")
 
     try:
         data = orch.orchestrate(text)
@@ -111,7 +118,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"*Respuesta:*\n{resultado}\n\n"
             f"📂 *Registro guardado:* `{archivo}`"
         )
-        await update.message.reply_text(respuesta, parse_mode="Markdown")
+        await send_safe_reply(update, respuesta)
     except Exception as e:
         await update.message.reply_text(f"❌ Error procesando la solicitud: {e}")
 
@@ -127,7 +134,7 @@ def main():
     app.add_handler(CommandHandler("devops", cmd_devops))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot Maestro @hermejon corriendo activamente en Docker VPS 24/7...", flush=True)
+    print("Bot Maestro corriendo activamente en Docker VPS 24/7...", flush=True)
     app.run_polling()
 
 
