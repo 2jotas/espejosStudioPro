@@ -9,6 +9,7 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("Command /start received", flush=True)
     welcome = (
         "🤖 *¡Hola! Soy Hermes, tu Bot Maestro Orquestador 24/7.*\n\n"
         "Derivo tus solicitudes al agente adecuado en tiempo real:\n"
@@ -25,6 +26,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("Command /agentes received", flush=True)
     text = (
         "👥 *Lista de Agentes Especializados Activos en Hermes:*\n\n"
         "1️⃣ 🎓 *Agente Universidad* (`agente_universidad.md`)\n"
@@ -44,6 +46,7 @@ async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print("Command /ayuda received", flush=True)
     text = (
         "💡 *Guía de Uso de Hermes:* \n\n"
         "• Puedes escribir cualquier mensaje natural (ej: *'Crea una idea de Reel para barbería'*) y Hermes elegirá automáticamente el agente adecuado.\n"
@@ -58,6 +61,7 @@ async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt_text = " ".join(context.args) if context.args else ""
+    print(f"Command /{agent_key} received: {prompt_text}", flush=True)
     if not prompt_text:
         await update.message.reply_text(f"⚠️ Escribe tu consulta después del comando. Ej: `/{agent_key} tu pregunta`", parse_mode="Markdown")
         return
@@ -74,8 +78,22 @@ async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes
         await update.message.reply_text(f"❌ Error: {e}")
 
 
+async def cmd_universidad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("universidad", update, context)
+
+async def cmd_espejos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("espejos", update, context)
+
+async def cmd_contenido(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("contenido", update, context)
+
+async def cmd_devops(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("devops", update, context)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
+    print(f"Message received: {text}", flush=True)
     if not text:
         return
 
@@ -103,13 +121,13 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("agentes", list_agents))
     app.add_handler(CommandHandler("ayuda", ayuda))
-    app.add_handler(CommandHandler("universidad", lambda u, c: run_forced_agent("universidad", u, c)))
-    app.add_handler(CommandHandler("espejos", lambda u, c: run_forced_agent("espejos", u, c)))
-    app.add_handler(CommandHandler("contenido", lambda u, c: run_forced_agent("contenido", u, c)))
-    app.add_handler(CommandHandler("devops", lambda u, c: run_forced_agent("devops", u, c)))
+    app.add_handler(CommandHandler("universidad", cmd_universidad))
+    app.add_handler(CommandHandler("espejos", cmd_espejos))
+    app.add_handler(CommandHandler("contenido", cmd_contenido))
+    app.add_handler(CommandHandler("devops", cmd_devops))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot Maestro @hermejon corriendo activamente en Docker VPS 24/7...")
+    print("Bot Maestro @hermejon corriendo activamente en Docker VPS 24/7...", flush=True)
     app.run_polling()
 
 
