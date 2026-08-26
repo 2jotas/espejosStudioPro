@@ -3,6 +3,7 @@ import json
 import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
@@ -10,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 BRAIN_PATH = PROJECT_ROOT / "PROJECT_BRAIN.md"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("LLM_API_KEY", "")
 
 
 def load_project_brain() -> str:
@@ -44,7 +46,6 @@ def execute_tool(tool_name: str, args: dict) -> str:
 
         elif tool_name == "run_safe_command":
             cmd = args.get("command", "")
-            # Security guard for destructive commands
             destructive_keywords = ["rm -rf", "drop table", "mkfs", "dd if=", "prune -f"]
             if any(k in cmd.lower() for k in destructive_keywords):
                 return f"⚠️ COMANDO BLOQUEADO POR SEGURIDAD: '{cmd}' requiere confirmación explícita en Telegram."
@@ -58,65 +59,58 @@ def execute_tool(tool_name: str, args: dict) -> str:
         return f"Error ejecutando {tool_name}: {e}"
 
 
-def run_gemini_agent(user_prompt: str, model_name: str = "gemini-2.5-pro") -> str:
+def run_gemini_agent(user_prompt: str) -> str:
     """
-    Ejecuta el agente con Gemini pensando, planeando y resolviendo la tarea
-    con la memoria viva de PROJECT_BRAIN.md.
+    Ejecuta el agente con Gemini / Groq pensando y planeando con la memoria viva de PROJECT_BRAIN.md.
     """
     brain_context = load_project_brain()
 
-    # Si hay API Key de Gemini, usamos Google GenAI SDK / REST
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key:
-        return (
-            "⚠️ *Gemini Engine*: Falta configurar `GEMINI_API_KEY` en el archivo `.env` del VPS.\n"
-            "Por favor agrega tu clave de Gemini para activar el razonamiento profundo (Thinking Mode)."
+    system_instruction = (
+        "Eres el Agente Autónomo de Ingeniería de Software de Hermes en el VPS.\n"
+        "Tienes la misma capacidad de análisis, diseño y arquitectura que Antigravity 2.0.\n"
+        "Usa la memoria viva del proyecto para entender el contexto.\n\n"
+        f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3500]}\n"
+    )
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+    # 1. Si hay clave de Gemini, intentar endpoint oficial OpenAI-compatible de Google
+    if api_key:
+        candidate_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+        client = OpenAI(
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            api_key=api_key,
         )
-
-    try:
-        import urllib.request
-
-        system_instruction = (
-            "Eres el Agente Autónomo de Ingeniería de Software de Hermes en el VPS.\n"
-            "Tienes la misma capacidad de análisis, diseño y arquitectura que Antigravity 2.0.\n"
-            "Usa la memoria viva del proyecto para entender el contexto.\n\n"
-            f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3500]}\n"
-        )
-
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": f"{system_instruction}\n\nSolicitud del usuario:\n{user_prompt}"}]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 2048
-            }
-        }
-
-        models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-        last_err = None
-        for m_name in models_to_try:
+        for m_name in candidate_models:
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={api_key}"
-                req = urllib.request.Request(
-                    url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST"
+                completion = client.chat.completions.create(
+                    model=m_name,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_tokens=2048,
                 )
-
-                with urllib.request.urlopen(req, timeout=45) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    text_response = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return text_response
-            except Exception as e:
-                last_err = e
+                return f"🧠 *[Google Gemini: {m_name}]*\n\n" + (completion.choices[0].message.content or "")
+            except Exception:
                 continue
 
-        return f"❌ Error ejecutando Gemini Engine: {last_err}"
+    # 2. Fallback de alta velocidad con Groq + PROJECT_BRAIN.md si Gemini no tiene clave o falla
+    groq_key = os.getenv("LLM_API_KEY", GROQ_API_KEY)
+    if groq_key:
+        client_groq = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=groq_key)
+        for m_name in ["openai/gpt-oss-120b", "groq/compound", "qwen/qwen3.8-27b"]:
+            try:
+                completion = client_groq.chat.completions.create(
+                    model=m_name,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_tokens=2048,
+                )
+                return f"🧠 *[Brain Engine: {m_name}]*\n\n" + (completion.choices[0].message.content or "")
+            except Exception:
+                continue
 
-    except Exception as e:
-        return f"❌ Error ejecutando Gemini Engine: {e}"
+    return "❌ No se pudo procesar la solicitud con ninguno de los motores disponibles."
