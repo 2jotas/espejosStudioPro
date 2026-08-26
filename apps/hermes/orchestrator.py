@@ -8,6 +8,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from openai import OpenAI
+import self_tuner as tuner
 
 load_dotenv()
 
@@ -137,13 +138,22 @@ def get_system_context(request: str) -> str:
             ping_res = subprocess.run(["ping", "-c", "2", "100.93.43.122"], capture_output=True, text=True, timeout=5)
             context_info += f"\n[DATOS REALES DE RED TAILSCALE (PING A LAPTOP 100.93.43.122)]:\n{ping_res.stdout}\n"
         except Exception as e:
-            context_info += f"\n[DATOS REALES DE RED TAILSCALE]: Error pinging laptop: {e}\n"
+            tune_msg = tuner.auto_tune_missing_tool(str(e))
+            if tune_msg:
+                try:
+                    retry_ping = subprocess.run(["ping", "-c", "2", "100.93.43.122"], capture_output=True, text=True, timeout=5)
+                    context_info += f"\n{tune_msg}\n[DATOS REALES DE RED TAILSCALE RE-INTENTO]:\n{retry_ping.stdout}\n"
+                except Exception as e2:
+                    context_info += f"\n[DATOS REALES DE RED TAILSCALE]: Error pinging laptop: {e2}\n"
+            else:
+                context_info += f"\n[DATOS REALES DE RED TAILSCALE]: Error pinging laptop: {e}\n"
 
     if any(k in lower for k in ["docker", "vps", "servidor", "status", "infraestructura"]):
         try:
             ps_res = subprocess.run(["docker", "ps"], capture_output=True, text=True, timeout=5)
             context_info += f"\n[DATOS REALES DE CONTENEDORES DOCKER EN VPS]:\n{ps_res.stdout}\n"
         except Exception as e:
+            tune_msg = tuner.auto_tune_missing_tool(str(e))
             context_info += f"\n[DATOS REALES DOCKER]: Error querying docker: {e}\n"
 
     return context_info
