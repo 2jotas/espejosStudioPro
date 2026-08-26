@@ -61,20 +61,25 @@ def execute_tool(tool_name: str, args: dict) -> str:
 
 def run_gemini_agent(user_prompt: str) -> str:
     """
-    Ejecuta el agente con Gemini / Groq pensando y planeando con la memoria viva de PROJECT_BRAIN.md.
+    Ejecuta el agente con Gemini / Groq pensando, planeando y resolviendo
+    con la memoria viva de PROJECT_BRAIN.md.
     """
     brain_context = load_project_brain()
 
     system_instruction = (
         "Eres el Agente Autónomo de Ingeniería de Software de Hermes en el VPS.\n"
-        "Tienes la misma capacidad de análisis, diseño y arquitectura que Antigravity 2.0.\n"
-        "Usa la memoria viva del proyecto para entender el contexto.\n\n"
-        f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3500]}\n"
+        "Tienes la misma capacidad de análisis, diseño, arquitectura y auto-corrección que Antigravity 2.0.\n"
+        "Conoces la visión estratégica de Grok y el estado del proyecto a través de PROJECT_BRAIN.md.\n"
+        "Instrucciones de respuesta:\n"
+        "1. Resume el diagnóstico o plan de acción técnico.\n"
+        "2. Identifica con precisión qué archivos y comandos se deben ejecutar.\n"
+        "3. Estructura la respuesta con pasos claros, código limpio y validaciones de seguridad.\n\n"
+        f"--- MEMORIA VIVA (PROJECT_BRAIN.md) ---\n{brain_context[:3800]}\n"
     )
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
-    # 1. Si hay clave de Gemini, intentar endpoint oficial OpenAI-compatible de Google
+    # 1. Intentar endpoint oficial OpenAI-compatible de Google Gemini
     if api_key:
         candidate_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
         client = OpenAI(
@@ -95,7 +100,7 @@ def run_gemini_agent(user_prompt: str) -> str:
             except Exception:
                 continue
 
-    # 2. Fallback de alta velocidad con Groq + PROJECT_BRAIN.md si Gemini no tiene clave o falla
+    # 2. Fallback de alta velocidad con Groq + PROJECT_BRAIN.md
     groq_key = os.getenv("LLM_API_KEY", GROQ_API_KEY)
     if groq_key:
         client_groq = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=groq_key)

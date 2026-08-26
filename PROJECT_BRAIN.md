@@ -1,63 +1,56 @@
 # 🧠 PROJECT BRAIN & LIVING MEMORY (Memoria Viva Multi-Agente)
 
-Este archivo es la **fuente única de verdad (Single Source of Truth)** compartida en tiempo real entre **Antigravity 2.0 (Laptop Local)** y **Hermes Agent (VPS Contabo)**.
+Este documento es la **fuente única de verdad compartida (Single Source of Truth)** entre **Grok AI (Arquitectura Estratégica)**, **Antigravity 2.0 (Laptop Local)** y **Hermes Maestro (VPS Contabo 24/7)**.
 
 ---
 
-## 🏛️ 1. Arquitectura General del Ecosistema
+## 🎯 1. Visión y Filosofía Estratégica (Acordada con Grok AI)
 
-- **Repositorio Principal**: `2jotas/espejosStudioPro` (Barbería CRM + Visagismo IA + Gateway Nginx).
-- **Repositorio Universitario**: `2jotas/formacion-ciencia-datos` (Vault 4 Años Ciencia de Datos + Python RAG).
-- **Infraestructura VPS**: Contabo (`161.97.76.187` / Tailscale `100.93.160.96`).
-- **Dominio Oficial**: `espejosstudio.cl` (Gestionado en NIC Chile + Cloudflare SSL).
-- **Subdominios Activos**:
-  - `espejosstudio.cl` / `www.espejosstudio.cl` ➡️ Landing Page y Reserva Online Barbería.
-  - `app.espejosstudio.cl` ➡️ CRM Barbero, Asistente Maestro Giovanni (Visagismo e Inpainting IA), Passkeys WebAuthn.
-  - `formacion.espejosstudio.cl` ➡️ Vault interactivo de Ciencia de Datos y Python.
+Principio de 3 capas aisladas:
+- **Taller (Dynabook Local - 32GB RAM / i7)**: Antigravity 2.0, desarrollo, pruebas locales y Vault de apuntes.
+- **Fuente de Verdad (GitHub Privado)**: `2jotas/espejosStudioPro` y `2jotas/formacion-ciencia-datos`.
+- **Fábrica 24/7 (VPS Contabo)**: Servicios en Docker, subdominios HTTPS y Hermes Daemon.
+
+### Los 4 Pilares del Ecosistema:
+1. 💈 **Web Barbería & Visagismo (`espejosstudio.cl`)**: Landing comercial, catálogo de cortes morfológicos y agendamiento online.
+2. ✂️ **CRM & Asistente Giovanni (`app.espejosstudio.cl`)**: Gestión de citas, visagismo con inpainting IA, retención de clientes y Passkeys.
+3. 🎓 **Vault 4 Años Ciencia de Datos (`formacion.espejosstudio.cl`)**: Visualizador interactivo de los 4 años de carrera (Estadística, Python, SQL, Machine Learning, RAG y playground de código).
+4. 🎬 **Fábrica de Contenido & Monetización (1 Reel/Short diario)**: Automatización de hooks, guiones virales y copywriting gestionado por `agente_contenido`.
 
 ---
 
-## ⚙️ 2. Stack Tecnológico & Componentes
+## 🏛️ 2. Estado de Infraestructura & Ciberseguridad
 
-| Componente | Tecnología | Puerto Interno | Función |
+- **VPS IP**: `161.97.76.187`
+- **Tailscale IP Privada**: `100.93.160.96` (VPS) / `100.93.43.122` (Laptop Dynabook).
+- **Firewall UFW**:
+  - `80/tcp` y `443/tcp`: Abiertos con Rate Limiting y Cloudflare SSL.
+  - `22/tcp` (SSH): **100% Bloqueado al internet público**. Exclusivo por Tailscale VPN (`tailscale0`).
+- **Hermes Daemon (`espejos-hermes`)**:
+  - Auto-Tuning en caliente activo (`self_tuner.py`).
+  - Cerebro Multi-Modelo: Gemini 2.0 Flash / Pro con Thinking + Fallback a GPT-OSS-120B / Groq Compound.
+  - Memoria Compartida viva en `/app/PROJECT_BRAIN.md`.
+
+---
+
+## 📝 3. Registro Histórico de Cambios (Agent Changelog)
+
+| Fecha | Agente | Entorno | Resumen del Cambio |
 |---|---|---|---|
-| **Gateway** | Nginx Alpine + SSL Certbot | `8080` (HTTP) / `8443` (HTTPS) | Enrutador de subdominios y proxy reverso. |
-| **Backend API** | Fastify + TypeScript + Prisma ORM | `3000` | Endpoints REST, autenticación JWT/Passkey, base de datos. |
-| **Frontend Web** | React 18 + Vite + TailwindCSS | `80` (en Nginx) | Interfaz de usuario para clientes y barberos. |
-| **Hermes Agent** | Python 3.11 + Telegram + Gemini Pro/Flash | Autónomo (Daemon) | Asistente orquestador 24/7, DevOps, Contenido y Universidad. |
+| **2026-08-25** | Antigravity 2.0 | VPS | Configuración de Gateway Nginx, SSL Certbot y subdominios. |
+| **2026-08-25** | Antigravity 2.0 | VPS | Blindaje UFW: SSH cerrado al público y enrutado por Tailscale. |
+| **2026-08-26** | Antigravity 2.0 | GitHub | Creación del repositorio `2jotas/formacion-ciencia-datos`. |
+| **2026-08-26** | Antigravity 2.0 | VPS Docker | Despliegue de servicio 24/7 `espejos-hermes` con bot `@hermejon`. |
+| **2026-08-26** | Antigravity 2.0 | VPS Docker | Implementación de `self_tuner.py` (Auto-reparación e instalación de herramientas en caliente). |
+| **2026-08-26** | Antigravity 2.0 | VPS Docker | Creación de `gemini_engine.py` con Thinking Mode y `PROJECT_BRAIN.md`. |
+| **2026-08-26** | Antigravity 2.0 | VPS Docker | Fix anti-truncado de Telegram (Auto-chunking >4000 caracteres). |
 
 ---
 
-## 🛡️ 3. Reglas de Ciberseguridad & Buenas Prácticas
+## 📍 4. Punto Exacto de Continuación (Fase Actual)
 
-1. **Firewall UFW**:
-   - Puertos públicos permitidos: `80/tcp` y `443/tcp` (con Rate Limiting).
-   - Puerto `22/tcp` (SSH) permitido **únicamente a través de la interfaz privada de Tailscale (`tailscale0`)**.
-2. **Gestión de Secretos**:
-   - Nunca incluir API Keys ni contraseñas en commits de Git ni en prompts.
-   - Usar siempre variables de entorno en el archivo `.env`.
-3. **Flujo de Modificación Multi-Agente**:
-   - Todo cambio de código debe compilar (`npm run build`) sin errores antes de hacer commit.
-   - Cada agente debe registrar sus cambios en la sección 4 de este archivo.
+Estamos en el **Sprint 2: Desarrollo de Aplicaciones y Plataformas**:
 
----
-
-## 📝 4. Registro Vivo de Cambios (Agent Changelog)
-
-| Fecha | Agente Responsable | Entorno | Resumen del Cambio / Función Agregada |
-|---|---|---|---|
-| **2026-08-25** | Antigravity 2.0 | Laptop Local | Configuración inicial de subdominios `espejosstudio.cl`, `app` y `formacion` en `nginx.gateway.conf`. |
-| **2026-08-25** | Antigravity 2.0 | VPS Remote | Hardening de UFW: Bloqueo de SSH público y habilitación de acceso exclusivo por Tailscale `100.93.160.96`. |
-| **2026-08-26** | Antigravity 2.0 | Laptop / GitHub | Creación del repositorio oficial `2jotas/formacion-ciencia-datos`. |
-| **2026-08-26** | Antigravity 2.0 | VPS Docker | Despliegue de servicio 24/7 `espejos-hermes` con bot `@hermejon` y agentes especializados. |
-| **2026-08-26** | Antigravity 2.0 | VPS Docker | Integración de módulo `self_tuner.py` (Auto-Tuning y auto-instalación en caliente de herramientas). |
-| **2026-08-26** | Antigravity 2.0 | Laptop / VPS | Creación de `PROJECT_BRAIN.md` para sincronización de contexto y memoria viva entre agentes. |
-
----
-
-## 🎯 5. Tareas Pendientes & Roadmap
-
-- [ ] Integrar motor Gemini 2.5 Pro con Thinking y Context Caching en `apps/hermes/gemini_engine.py`.
-- [ ] Estructurar la interfaz web del Vault universitario en `formacion.espejosstudio.cl`.
-- [ ] Diseñar el sitio web personal profesional del usuario.
-- [ ] Automatizar pipeline de generación de 1 Reel/Short diario con publicación programada.
+1. **Objetivo Inmediato 1**: Conectar la plataforma web de `https://formacion.espejosstudio.cl` al repositorio `2jotas/formacion-ciencia-datos` y desplegar el visor jerárquico de 4 años de carrera.
+2. **Objetivo Inmediato 2**: Activar la fábrica de guiones diarios en `agente_contenido.md` para recibir 1 propuesta de Reel/Short cada mañana en Telegram con botón de aprobación.
+3. **Objetivo Inmediato 3**: Diseñar la Landing de marca personal profesional conectada al CRM.
