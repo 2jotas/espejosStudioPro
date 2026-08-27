@@ -44,6 +44,7 @@ Principio de 3 capas aisladas:
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Creación de `gemini_engine.py` con Thinking Mode y `PROJECT_BRAIN.md`. |
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Fix anti-truncado de Telegram (Auto-chunking >4000 caracteres). |
 | **2026-08-26** | Antigravity 2.0 | GitHub / Web | Creación de Vault Web `apps/formacion/` (React + Tailwind + KaTeX) y enrutamiento en Nginx para `formacion.espejosstudio.cl`. |
+| **2026-08-27** | Antigravity 2.0 | VPS | Implementación de `vault_watcher.py` (auto-escáner continuo de carpetas) y despliegue de **Syncthing v2.1.3** 24/7 sobre Tailscale. |
 
 ---
 

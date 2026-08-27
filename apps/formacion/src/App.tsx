@@ -14,18 +14,32 @@ import {
   ChevronDown,
   Layers,
   Code2,
-  X
+  X,
+  FileImage,
+  FileSpreadsheet,
+  Film,
+  Eye,
+  Download
 } from 'lucide-react';
 import { CURRICULUM_DATA, AnoCurricular, Modulo, Apunte } from './data/curriculum';
+
+interface SelectedFilePreview {
+  name: string;
+  url: string;
+  type: 'pdf' | 'image' | 'video' | 'text' | 'excel' | 'code';
+}
 
 export default function App() {
   const [curriculum, setCurriculum] = useState<AnoCurricular[]>(CURRICULUM_DATA);
   const [selectedAno, setSelectedAno] = useState<number>(1);
-  const [selectedModulo, setSelectedModulo] = useState<Modulo>(CURRICULUM_DATA[0].modulos[0]);
-  const [selectedApunte, setSelectedApunte] = useState<Apunte>(CURRICULUM_DATA[0].modulos[0].apuntes[0]);
+  const [selectedModulo, setSelectedModulo] = useState<Modulo>(CURRICULUM_DATA[0]?.modulos[0] || ({} as Modulo));
+  const [selectedApunte, setSelectedApunte] = useState<Apunte>(CURRICULUM_DATA[0]?.modulos[0]?.apuntes[0] || ({} as Apunte));
   const [expandedAnos, setExpandedAnos] = useState<Record<number, boolean>>({ 1: true, 2: false, 3: false, 4: false });
   const [searchQuery, setSearchQuery] = useState<string>('');
   
+  // File Preview State
+  const [activeFilePreview, setActiveFilePreview] = useState<SelectedFilePreview | null>(null);
+
   // Playground state
   const [showPlayground, setShowPlayground] = useState<boolean>(false);
   const [pythonCode, setPythonCode] = useState<string>(
@@ -110,6 +124,40 @@ x= 2 -> densidad = 0.0540
     setNewNoteTitle('');
   };
 
+  const getFileType = (fileName: string): 'pdf' | 'image' | 'video' | 'text' | 'excel' | 'code' => {
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    if (ext === 'pdf') return 'pdf';
+    if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return 'image';
+    if (['mp4', 'mkv', 'webm', 'mov'].includes(ext)) return 'video';
+    if (['xlsx', 'xls', 'csv'].includes(ext)) return 'excel';
+    if (['py', 'sql', 'r', 'js', 'ts', 'html', 'css', 'json'].includes(ext)) return 'code';
+    return 'text';
+  };
+
+  const handleOpenFile = (fileName: string) => {
+    const weekName = selectedApunte?.archivo ? selectedApunte.archivo.replace('.md', '') : 'semana_1';
+    const fileUrl = `/vault/ano_${selectedAno}/${selectedModulo.id}/${weekName}/${fileName}`;
+    const type = getFileType(fileName);
+    setActiveFilePreview({
+      name: fileName,
+      url: fileUrl,
+      type: type
+    });
+  };
+
+  const parseFilesFromContent = (content?: string): string[] => {
+    if (!content) return [];
+    const regex = /- 📄 `([^`]+)`/g;
+    const matches: string[] = [];
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      matches.push(match[1]);
+    }
+    return matches;
+  };
+
+  const filesInCurrentWeek = parseFilesFromContent(selectedApunte?.contenido);
+
   const filteredCurriculum = searchQuery.trim() === '' 
     ? curriculum 
     : curriculum.map(ano => ({
@@ -134,7 +182,7 @@ x= 2 -> densidad = 0.0540
               <span className="font-bold text-lg text-white tracking-tight">Vault Universitario</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Ciencia de Datos</span>
             </div>
-            <p className="text-xs text-slate-400">formacion.espejosstudio.cl · Sincronizado con GitHub</p>
+            <p className="text-xs text-slate-400">formacion.espejosstudio.cl · Visor Multimedia Interactivo</p>
           </div>
         </div>
 
@@ -176,7 +224,7 @@ x= 2 -> densidad = 0.0540
         <aside className="w-80 lg:w-96 border-r border-slate-800/80 bg-slate-950/60 flex flex-col overflow-y-auto">
           <div className="p-4 border-b border-slate-800/60 flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5 text-blue-400" /> Malla Curricular (4 Años)
+              <Layers className="w-3.5 h-3.5 text-blue-400" /> Malla Curricular & Semanas
             </span>
             <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">16 Módulos</span>
           </div>
@@ -216,6 +264,7 @@ x= 2 -> densidad = 0.0540
                             setSelectedAno(ano.ano);
                             setSelectedModulo(mod);
                             if (mod.apuntes.length > 0) setSelectedApunte(mod.apuntes[0]);
+                            setActiveFilePreview(null);
                           }}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition ${
                             selectedModulo.id === mod.id 
@@ -230,15 +279,18 @@ x= 2 -> densidad = 0.0540
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/80 text-slate-400 font-mono ml-2 flex-shrink-0">Sem {mod.semestre}</span>
                         </button>
 
-                        {/* Notes Sub-tree when module is selected */}
+                        {/* Weeks Sub-tree when module is selected */}
                         {selectedModulo.id === mod.id && (
                           <div className="pl-6 pr-1 py-1 space-y-1 border-l-2 border-blue-500/30 ml-3">
                             {mod.apuntes.map((apunte) => (
                               <button
                                 key={apunte.archivo}
-                                onClick={() => setSelectedApunte(apunte)}
+                                onClick={() => {
+                                  setSelectedApunte(apunte);
+                                  setActiveFilePreview(null);
+                                }}
                                 className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] flex items-center gap-2 transition ${
-                                  selectedApunte.archivo === apunte.archivo 
+                                  selectedApunte?.archivo === apunte.archivo 
                                     ? 'bg-blue-500/30 text-white font-medium' 
                                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
                                 }`}
@@ -258,42 +310,152 @@ x= 2 -> densidad = 0.0540
           </div>
         </aside>
 
-        {/* Main Content: Rich Markdown Note Viewer */}
+        {/* Main Content: Interactive Multimedia Viewer */}
         <main className="flex-1 flex flex-col bg-[#0B0F19] overflow-y-auto">
           {/* Note Header Banner */}
           <div className="p-6 lg:p-8 border-b border-slate-800/80 bg-gradient-to-b from-slate-900/40 to-transparent">
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-semibold">
-                Año {selectedAno} · Semestre {selectedModulo.semestre}
+                Año {selectedAno} · Semestre {selectedModulo?.semestre || 1}
               </span>
               <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 text-xs font-mono">
-                {selectedModulo.creditos} Créditos Académicos
+                {selectedModulo?.creditos || 6} Créditos Académicos
               </span>
-              <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-medium">
-                Dificultad: {selectedApunte?.dificultad || 'Media'}
+              <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
+                {filesInCurrentWeek.length} Archivos Disponibles
               </span>
             </div>
 
             <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight mb-2">
-              {selectedApunte?.titulo || selectedModulo.nombre}
+              {selectedApunte?.titulo || selectedModulo?.nombre}
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-              <span>Archivo: <code className="text-slate-300 font-mono">{selectedModulo.id}/{selectedApunte?.archivo || 'README.md'}</code></span>
-              <span>·</span>
-              <div className="flex items-center gap-1.5">
-                {selectedApunte?.tags.map(tag => (
-                  <span key={tag} className="px-2 py-0.5 rounded bg-slate-800/80 text-blue-400 border border-slate-700/50 font-mono text-[11px]">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
+              <span>Ruta: <code className="text-slate-300 font-mono">ano_{selectedAno}/{selectedModulo?.id}/{selectedApunte?.archivo || 'README.md'}</code></span>
             </div>
           </div>
 
+          {/* Interactive File Explorer Grid for Current Week */}
+          {filesInCurrentWeek.length > 0 && (
+            <div className="px-6 lg:px-8 pt-6">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                <Eye className="w-4 h-4 text-blue-400" /> Galería de Archivos Interactivos (Haz clic en cualquier archivo para abrirlo):
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {filesInCurrentWeek.map((fileName) => {
+                  const type = getFileType(fileName);
+                  const isSelected = activeFilePreview?.name === fileName;
+                  return (
+                    <button
+                      key={fileName}
+                      onClick={() => handleOpenFile(fileName)}
+                      className={`p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition shadow-sm ${
+                        isSelected 
+                          ? 'bg-blue-600/20 border-blue-500 text-white shadow-blue-500/20' 
+                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        {type === 'pdf' && <div className="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0"><FileText className="w-4 h-4" /></div>}
+                        {type === 'image' && <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0"><FileImage className="w-4 h-4" /></div>}
+                        {type === 'video' && <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0"><Film className="w-4 h-4" /></div>}
+                        {type === 'excel' && <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0"><FileSpreadsheet className="w-4 h-4" /></div>}
+                        {['code', 'text'].includes(type) && <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center flex-shrink-0"><Code2 className="w-4 h-4" /></div>}
+
+                        <div className="truncate">
+                          <p className="text-xs font-semibold truncate">{fileName}</p>
+                          <p className="text-[10px] text-slate-400 uppercase font-mono">{type}</p>
+                        </div>
+                      </div>
+                      <Eye className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Active File Live Preview Section (PDF / Image / Video / Code) */}
+          {activeFilePreview && (
+            <div className="m-6 lg:m-8 p-4 rounded-2xl border border-blue-500/30 bg-slate-900/90 shadow-2xl space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-400 uppercase font-mono">[{activeFilePreview.type}]</span>
+                  <h3 className="text-sm font-bold text-white truncate">{activeFilePreview.name}</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a 
+                    href={activeFilePreview.url} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition"
+                  >
+                    <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Descargar / Abrir</span>
+                  </a>
+                  <button 
+                    onClick={() => setActiveFilePreview(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Render by File Type */}
+              <div className="w-full flex items-center justify-center min-h-[400px] bg-black/40 rounded-xl overflow-hidden">
+                {activeFilePreview.type === 'pdf' && (
+                  <iframe 
+                    src={activeFilePreview.url} 
+                    className="w-full h-[600px] rounded-xl border-0"
+                    title={activeFilePreview.name}
+                  />
+                )}
+
+                {activeFilePreview.type === 'image' && (
+                  <img 
+                    src={activeFilePreview.url} 
+                    alt={activeFilePreview.name}
+                    className="max-h-[600px] w-auto object-contain rounded-xl shadow-lg"
+                  />
+                )}
+
+                {activeFilePreview.type === 'video' && (
+                  <video 
+                    src={activeFilePreview.url} 
+                    controls 
+                    className="w-full max-h-[500px] rounded-xl"
+                  />
+                )}
+
+                {activeFilePreview.type === 'excel' && (
+                  <div className="text-center p-8 space-y-3">
+                    <FileSpreadsheet className="w-16 h-16 text-emerald-400 mx-auto" />
+                    <h4 className="text-sm font-bold text-white">Hoja de Cálculo / Excel: {activeFilePreview.name}</h4>
+                    <p className="text-xs text-slate-400">Puedes descargar el archivo o abrirlo con Excel / Google Sheets.</p>
+                    <a 
+                      href={activeFilePreview.url} 
+                      download 
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/30 transition"
+                    >
+                      <Download className="w-4 h-4" /> Descargar {activeFilePreview.name}
+                    </a>
+                  </div>
+                )}
+
+                {['text', 'code'].includes(activeFilePreview.type) && (
+                  <div className="w-full p-4">
+                    <iframe 
+                      src={activeFilePreview.url} 
+                      className="w-full h-[400px] bg-slate-950 text-slate-200 font-mono text-xs p-4 rounded-xl border border-slate-800"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Note Content Body */}
           <div className="p-6 lg:p-8 max-w-4xl space-y-6">
-            {/* Render formatted Markdown content with code styling */}
             <div className="prose prose-invert prose-blue max-w-none space-y-4 text-slate-300 leading-relaxed">
               <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
                 {selectedApunte?.contenido}
@@ -412,7 +574,7 @@ x= 2 -> densidad = 0.0540
                 <input 
                   type="text"
                   disabled
-                  value={`${selectedModulo.nombre} (Año ${selectedAno})`}
+                  value={`${selectedModulo?.nombre} (Año ${selectedAno})`}
                   className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800/60 rounded-lg text-xs text-slate-400 font-mono"
                 />
               </div>
