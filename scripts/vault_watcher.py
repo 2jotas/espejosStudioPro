@@ -6,47 +6,103 @@ Monitors /home/deploy/proyectos/formacion-ciencia-datos and continuously updates
 import os
 import time
 import json
+import re
 from pathlib import Path
 
 VAULT_DIR = Path("/home/deploy/proyectos/formacion-ciencia-datos")
 TREE_FILE = VAULT_DIR / "tree.json"
 
-RAMO_TITLES = {
-    "01_introduccion_al_analisis_de_datos": "Introducción al Análisis de Datos",
-    "02_analisis_de_datos": "Análisis de Datos",
-    "03_estadistica": "Estadística y Probabilidad",
-    "04_etica_y_proteccion_de_datos": "Ética y Protección de Datos",
-    "09_p1": "Fundamentos y Conceptos Básicos",
+RAMO_MAP = {
+    "introduccion-analisis-de-datos": ("01_introduccion_al_analisis_de_datos", "Introducción al Análisis de Datos"),
+    "analisis de datos": ("02_analisis_de_datos", "Análisis de Datos"),
+    "estadistica": ("03_estadistica", "Estadística y Probabilidad"),
+    "etica-y-proteccion-de-datos": ("04_etica_y_proteccion_de_datos", "Ética y Protección de Datos"),
+    "p1": ("09_p1", "Fundamentos y Conceptos Básicos"),
 }
+
+def parse_week_num(folder_name: str) -> int:
+    clean = folder_name.lower().replace(" ", "").replace("_", "").replace("-", "")
+    match = re.search(r'\d+', clean)
+    if match:
+        return int(match.group(0))
+    return 1
 
 def scan_vault():
     anos_data = []
 
-    # Escanear Año 1
-    ano1_modulos = []
-    ano1_dir = VAULT_DIR / "ano_1"
+    # 1. Detectar Ramos en year1 o ano_1
+    ramo_data_map = {}
 
-    if ano1_dir.exists():
-        for ramo_dir in sorted(ano1_dir.iterdir()):
-            if not ramo_dir.is_dir():
+    search_dirs = [VAULT_DIR / "year1", VAULT_DIR / "ano_1"]
+    for base_dir in search_dirs:
+        if not base_dir.exists():
+            continue
+        for folder in base_dir.iterdir():
+            if not folder.is_dir():
                 continue
 
-            ramo_name = RAMO_TITLES.get(ramo_dir.name, ramo_dir.name.replace("_", " ").title())
-            apuntes = []
+            folder_key = folder.name.lower().replace("_", " ").strip()
+            # Encontrar el ramo correspondiente
+            target_id = folder.name.lower().replace(" ", "_")
+            target_name = folder.name.title()
 
-            # Escanear semanas (semana_1 a semana_7 o cualquier subcarpeta)
-            for week_dir in sorted(ramo_dir.iterdir()):
-                if not week_dir.is_dir():
-                    continue
+            for k, (rid, rname) in RAMO_MAP.items():
+                if k in folder_key or rid in folder_key:
+                    target_id = rid
+                    target_name = rname
+                    break
 
-                week_label = week_dir.name.replace("_", " ").title()
-                files_in_week = [f.name for f in sorted(week_dir.iterdir()) if f.is_file() and not f.name.startswith('.')]
+            if target_id not in ramo_data_map:
+                ramo_data_map[target_id] = {
+                    "id": target_id,
+                    "nombre": target_name,
+                    "semestre": 1 if "introduccion" in target_id or "02_" in target_id else 2,
+                    "creditos": 6,
+                    "weeks": {w: [] for w in range(1, 8)}
+                }
 
-                files_list_md = "\n".join([f"- 📄 `{f}`" for f in files_in_week]) if files_in_week else "- *Semana lista para agregar contenido desde el móvil o laptop.*"
+            # Escanear subcarpetas (semanas)
+            for sub in folder.iterdir():
+                if sub.is_dir() and not sub.name.startswith('.'):
+                    wnum = parse_week_num(sub.name)
+                    if wnum < 1: wnum = 1
+                    if wnum > 7: wnum = 7
+                    
+                    files = []
+                    for f in sorted(sub.iterdir()):
+                        if f.is_file() and not f.name.startswith('.') and not f.name.endswith('.tmp'):
+                            rel_path = f.relative_to(VAULT_DIR).as_posix()
+                            files.append({
+                                "name": f.name,
+                                "path": rel_path
+                            })
+                    ramo_data_map[target_id]["weeks"][wnum].extend(files)
+                elif sub.is_file() and not sub.name.startswith('.') and not sub.name.endswith('.tmp'):
+                    rel_path = sub.relative_to(VAULT_DIR).as_posix()
+                    ramo_data_map[target_id]["weeks"][1].append({
+                        "name": sub.name,
+                        "path": rel_path
+                    })
 
-                apunte_text = f"""# 📚 {ramo_name} · {week_label}
+    # Construir módulos para Año 1
+    ano1_modulos = []
+    for rid, rinfo in sorted(ramo_data_map.items()):
+        apuntes = []
+        for wnum in range(1, 8):
+            files = rinfo["weeks"][wnum]
+            # Eliminar duplicados si los hay
+            seen = set()
+            unique_files = []
+            for f in files:
+                if f["name"] not in seen:
+                    seen.add(f["name"])
+                    unique_files.append(f)
 
-Bienvenido a los apuntes y material de estudio correspondiente a la **{week_label}**.
+            files_list_md = "\n".join([f"- 📄 `{f['name']}`" for f in unique_files]) if unique_files else "- *Semana lista para agregar contenido desde el móvil o laptop.*"
+            
+            apunte_text = f"""# 📚 {rinfo['nombre']} · Semana {wnum}
+
+Bienvenido al material de estudio correspondiente a la **Semana {wnum}**.
 
 ---
 
@@ -55,33 +111,32 @@ Bienvenido a los apuntes y material de estudio correspondiente a la **{week_labe
 
 ---
 
-### 💡 Resumen y Objetivos:
-- Conceptos clave y material de lectura oficial de la universidad.
-- Ejercicios prácticos, scripts en Python y recursos de apoyo.
-
-*Puedes interactuar con este módulo, ejecutar código en el Playground o subir nuevos apuntes.*
+### 💡 Resumen y Recursos:
+- Consulta tus guías oficiales en PDF, diapositivas y ejercicios.
+- Ejecuta código de prueba en el Playground interactivo.
 """
-                apuntes.append({
-                    "archivo": f"{week_dir.name}.md",
-                    "titulo": f"{week_label}: {ramo_name}",
-                    "tags": [ramo_dir.name.split("_")[-1], week_dir.name, "universidad"],
-                    "dificultad": "Media",
-                    "contenido": apunte_text
-                })
-
-            ano1_modulos.append({
-                "id": ramo_dir.name,
-                "nombre": ramo_name,
-                "semestre": 1 if "introduccion" in ramo_dir.name or "analisis" in ramo_dir.name else 2,
-                "creditos": 6,
-                "temas": [f"Semana {w}" for w in range(1, len(apuntes) + 1)],
-                "apuntes": apuntes
+            apuntes.append({
+                "archivo": f"semana_{wnum}.md",
+                "titulo": f"Semana {wnum}: {rinfo['nombre']}",
+                "tags": [rinfo['id'].split('_')[-1], f"semana_{wnum}", "universidad"],
+                "dificultad": "Media",
+                "contenido": apunte_text,
+                "archivos": unique_files
             })
+
+        ano1_modulos.append({
+            "id": rinfo["id"],
+            "nombre": rinfo["nombre"],
+            "semestre": rinfo["semestre"],
+            "creditos": rinfo["creditos"],
+            "temas": [f"Semana {w}" for w in range(1, 8)],
+            "apuntes": apuntes
+        })
 
     anos_data.append({
         "ano": 1,
         "nombre": "Año 1: Fundamentos y Ramos Cursados (Marzo 2026 a la fecha)",
-        "descripcion": "Ramos con sus semanas estructuradas, guías oficiales, notas y ejercicios.",
+        "descripcion": "Ramos con sus 7 semanas estructuradas, guías oficiales, notas y ejercicios.",
         "modulos": ano1_modulos
     })
 
@@ -119,7 +174,8 @@ Bienvenido a los apuntes y material de estudio correspondiente a la **{week_labe
                     "titulo": f"Semana 1: {mod_name}",
                     "tags": [mod_id, "proyeccion", "carrera"],
                     "dificultad": "Avanzada" if ano_num >= 3 else "Media-Alta",
-                    "contenido": f"# {mod_name}\n\nContenido proyectado para el Año {ano_num} de la carrera."
+                    "contenido": f"# {mod_name}\n\nContenido proyectado para el Año {ano_num} de la carrera.",
+                    "archivos": []
                 }]
             })
         anos_data.append({
@@ -134,7 +190,7 @@ Bienvenido a los apuntes y material de estudio correspondiente a la **{week_labe
     with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(anos_data, f, indent=2, ensure_ascii=False)
     temp_file.replace(TREE_FILE)
-    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] tree.json actualizado exitosamente ({len(anos_data)} años procesados)")
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] tree.json actualizado exitosamente ({len(ano1_modulos)} ramos en Año 1)")
 
 def run_loop():
     print("Iniciando escáner continuo de Vault en", VAULT_DIR)
@@ -144,9 +200,8 @@ def run_loop():
     while True:
         try:
             time.sleep(3)
-            # Verificar si hubo algún cambio en la estructura de carpetas
             current_mtime = max(
-                (p.stat().st_mtime for p in VAULT_DIR.rglob("*") if p.is_file() and p.name != "tree.json" and p.name != "tree.json.tmp"),
+                (p.stat().st_mtime for p in VAULT_DIR.rglob("*") if p.is_file() and p.name != "tree.json" and not p.name.endswith(".tmp")),
                 default=0
             )
             if current_mtime > last_mtime:

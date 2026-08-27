@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
   Folder, 
@@ -19,9 +19,19 @@ import {
   FileSpreadsheet,
   Film,
   Eye,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
 import { CURRICULUM_DATA, AnoCurricular, Modulo, Apunte } from './data/curriculum';
+
+interface FileItem {
+  name: string;
+  path?: string;
+}
+
+interface ExtendedApunte extends Apunte {
+  archivos?: FileItem[];
+}
 
 interface SelectedFilePreview {
   name: string;
@@ -33,9 +43,10 @@ export default function App() {
   const [curriculum, setCurriculum] = useState<AnoCurricular[]>(CURRICULUM_DATA);
   const [selectedAno, setSelectedAno] = useState<number>(1);
   const [selectedModulo, setSelectedModulo] = useState<Modulo>(CURRICULUM_DATA[0]?.modulos[0] || ({} as Modulo));
-  const [selectedApunte, setSelectedApunte] = useState<Apunte>(CURRICULUM_DATA[0]?.modulos[0]?.apuntes[0] || ({} as Apunte));
+  const [selectedApunte, setSelectedApunte] = useState<ExtendedApunte>((CURRICULUM_DATA[0]?.modulos[0]?.apuntes[0] || {}) as ExtendedApunte);
   const [expandedAnos, setExpandedAnos] = useState<Record<number, boolean>>({ 1: true, 2: false, 3: false, 4: false });
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isLiveSync, setIsLiveSync] = useState<boolean>(true);
   
   // File Preview State
   const [activeFilePreview, setActiveFilePreview] = useState<SelectedFilePreview | null>(null);
@@ -66,6 +77,28 @@ for val in [-2, -1, 0, 1, 2]:
   const [newNoteTags, setNewNoteTags] = useState<string>('python, ml, estadistica');
   const [newNoteContent, setNewNoteContent] = useState<string>('# Mi Nuevo Apunte\n\nEscribe aquí tus fórmulas y código...');
 
+  // Live Tree Dynamic Loader
+  const loadDynamicTree = async () => {
+    try {
+      const res = await fetch('/vault/tree.json?t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setCurriculum(data);
+          setIsLiveSync(true);
+        }
+      }
+    } catch {
+      setIsLiveSync(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDynamicTree();
+    const interval = setInterval(loadDynamicTree, 10000); // Live poll every 10s
+    return () => clearInterval(interval);
+  }, []);
+
   const toggleAno = (ano: number) => {
     setExpandedAnos(prev => ({ ...prev, [ano]: !prev[ano] }));
   };
@@ -95,12 +128,13 @@ x= 2 -> densidad = 0.0540
 
   const handleSaveNewNote = () => {
     if (!newNoteTitle) return;
-    const nuevo: Apunte = {
+    const nuevo: ExtendedApunte = {
       archivo: `${newNoteTitle.toLowerCase().replace(/\\s+/g, '_')}.md`,
       titulo: newNoteTitle,
       tags: newNoteTags.split(',').map(t => t.trim()),
       dificultad: 'Media',
-      contenido: newNoteContent
+      contenido: newNoteContent,
+      archivos: []
     };
 
     const updated = curriculum.map(ano => {
@@ -134,9 +168,18 @@ x= 2 -> densidad = 0.0540
     return 'text';
   };
 
-  const handleOpenFile = (fileName: string) => {
-    const weekName = selectedApunte?.archivo ? selectedApunte.archivo.replace('.md', '') : 'semana_1';
-    const fileUrl = `/vault/ano_${selectedAno}/${selectedModulo.id}/${weekName}/${fileName}`;
+  const handleOpenFile = (fileItem: FileItem | string) => {
+    const fileName = typeof fileItem === 'string' ? fileItem : fileItem.name;
+    const specificPath = typeof fileItem === 'object' ? fileItem.path : undefined;
+
+    let fileUrl = '';
+    if (specificPath) {
+      fileUrl = `/vault/${specificPath}`;
+    } else {
+      const weekName = selectedApunte?.archivo ? selectedApunte.archivo.replace('.md', '') : 'semana_1';
+      fileUrl = `/vault/ano_${selectedAno}/${selectedModulo.id}/${weekName}/${fileName}`;
+    }
+
     const type = getFileType(fileName);
     setActiveFilePreview({
       name: fileName,
@@ -145,18 +188,20 @@ x= 2 -> densidad = 0.0540
     });
   };
 
-  const parseFilesFromContent = (content?: string): string[] => {
+  const parseFilesFromContent = (content?: string): FileItem[] => {
     if (!content) return [];
     const regex = /- 📄 `([^`]+)`/g;
-    const matches: string[] = [];
+    const matches: FileItem[] = [];
     let match;
     while ((match = regex.exec(content)) !== null) {
-      matches.push(match[1]);
+      matches.push({ name: match[1] });
     }
     return matches;
   };
 
-  const filesInCurrentWeek = parseFilesFromContent(selectedApunte?.contenido);
+  const activeFilesList: FileItem[] = (selectedApunte?.archivos && selectedApunte.archivos.length > 0)
+    ? selectedApunte.archivos
+    : parseFilesFromContent(selectedApunte?.contenido);
 
   const filteredCurriculum = searchQuery.trim() === '' 
     ? curriculum 
@@ -181,8 +226,13 @@ x= 2 -> densidad = 0.0540
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg text-white tracking-tight">Vault Universitario</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Ciencia de Datos</span>
+              {isLiveSync && (
+                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live Sync
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-400">formacion.espejosstudio.cl · Visor Multimedia Interactivo</p>
+            <p className="text-xs text-slate-400">formacion.espejosstudio.cl · Sincronizado en Vivo con Syncthing</p>
           </div>
         </div>
 
@@ -200,6 +250,14 @@ x= 2 -> densidad = 0.0540
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
+          <button 
+            onClick={loadDynamicTree}
+            title="Recargar árbol en vivo"
+            className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+
           <button 
             onClick={() => setShowPlayground(!showPlayground)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
@@ -226,7 +284,7 @@ x= 2 -> densidad = 0.0540
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
               <Layers className="w-3.5 h-3.5 text-blue-400" /> Malla Curricular & Semanas
             </span>
-            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">16 Módulos</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">En Vivo</span>
           </div>
 
           <div className="p-3 space-y-2">
@@ -263,7 +321,7 @@ x= 2 -> densidad = 0.0540
                           onClick={() => {
                             setSelectedAno(ano.ano);
                             setSelectedModulo(mod);
-                            if (mod.apuntes.length > 0) setSelectedApunte(mod.apuntes[0]);
+                            if (mod.apuntes.length > 0) setSelectedApunte(mod.apuntes[0] as ExtendedApunte);
                             setActiveFilePreview(null);
                           }}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between transition ${
@@ -286,7 +344,7 @@ x= 2 -> densidad = 0.0540
                               <button
                                 key={apunte.archivo}
                                 onClick={() => {
-                                  setSelectedApunte(apunte);
+                                  setSelectedApunte(apunte as ExtendedApunte);
                                   setActiveFilePreview(null);
                                 }}
                                 className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] flex items-center gap-2 transition ${
@@ -322,7 +380,7 @@ x= 2 -> densidad = 0.0540
                 {selectedModulo?.creditos || 6} Créditos Académicos
               </span>
               <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
-                {filesInCurrentWeek.length} Archivos Disponibles
+                {activeFilesList.length} Archivos Disponibles
               </span>
             </div>
 
@@ -331,24 +389,25 @@ x= 2 -> densidad = 0.0540
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-              <span>Ruta: <code className="text-slate-300 font-mono">ano_{selectedAno}/{selectedModulo?.id}/{selectedApunte?.archivo || 'README.md'}</code></span>
+              <span>Módulo: <code className="text-slate-300 font-mono">{selectedModulo?.id}/{selectedApunte?.archivo || 'semana_1.md'}</code></span>
             </div>
           </div>
 
           {/* Interactive File Explorer Grid for Current Week */}
-          {filesInCurrentWeek.length > 0 && (
+          {activeFilesList.length > 0 && (
             <div className="px-6 lg:px-8 pt-6">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                <Eye className="w-4 h-4 text-blue-400" /> Galería de Archivos Interactivos (Haz clic en cualquier archivo para abrirlo):
+                <Eye className="w-4 h-4 text-blue-400" /> Galería de Archivos Interactivos (Haz clic para abrir):
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {filesInCurrentWeek.map((fileName) => {
+                {activeFilesList.map((fileItem) => {
+                  const fileName = fileItem.name;
                   const type = getFileType(fileName);
                   const isSelected = activeFilePreview?.name === fileName;
                   return (
                     <button
                       key={fileName}
-                      onClick={() => handleOpenFile(fileName)}
+                      onClick={() => handleOpenFile(fileItem)}
                       className={`p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition shadow-sm ${
                         isSelected 
                           ? 'bg-blue-600/20 border-blue-500 text-white shadow-blue-500/20' 
