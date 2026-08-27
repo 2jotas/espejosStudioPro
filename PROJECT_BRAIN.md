@@ -45,6 +45,7 @@ Principio de 3 capas aisladas:
 | **2026-08-26** | Antigravity 2.0 | VPS Docker | Fix anti-truncado de Telegram (Auto-chunking >4000 caracteres). |
 | **2026-08-26** | Antigravity 2.0 | GitHub / Web | Creación de Vault Web `apps/formacion/` (React + Tailwind + KaTeX) y enrutamiento en Nginx para `formacion.espejosstudio.cl`. |
 | **2026-08-27** | Antigravity 2.0 | VPS | Implementación de `vault_watcher.py` (auto-escáner continuo de carpetas) y despliegue de **Syncthing v2.1.3** 24/7 sobre Tailscale. |
+| **2026-08-27** | Antigravity 2.0 | VPS / GitHub | Validación de `formacion.espejosstudio.cl`, indexación de ramos del Año 1 y respaldo completo en rama `main` de `2jotas/formacion-ciencia-datos`. |
 
 ---
 
@@ -52,6 +53,6 @@ Principio de 3 capas aisladas:
 
 Estamos en el **Sprint 2: Desarrollo de Aplicaciones y Plataformas**:
 
-1. **Objetivo Inmediato 1**: Conectar la plataforma web de `https://formacion.espejosstudio.cl` al repositorio `2jotas/formacion-ciencia-datos` y desplegar el visor jerárquico de 4 años de carrera.
-2. **Objetivo Inmediato 2**: Activar la fábrica de guiones diarios en `agente_contenido.md` para recibir 1 propuesta de Reel/Short cada mañana en Telegram con botón de aprobación.
+1. ✅ **Objetivo Inmediato 1 (COMPLETADO)**: Plataforma web `https://formacion.espejosstudio.cl` conectada al repositorio `2jotas/formacion-ciencia-datos`, Syncthing activo y respaldo en GitHub al día.
+2. **Objetivo Inmediato 2 (SIGUIENTE)**: Activar la fábrica de guiones diarios en `agente_contenido.md` para recibir 1 propuesta de Reel/Short cada mañana en Telegram con botón de aprobación.
 3. **Objetivo Inmediato 3**: Diseñar la Landing de marca personal profesional conectada al CRM.
