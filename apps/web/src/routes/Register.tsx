@@ -138,7 +138,7 @@ export default function Register() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Tu Dirección Web (`espejos.cl/{'{slug}'}`)
+                Tu Dirección Web (espejosstudio.cl/{slug})
               </label>
               <div className="relative">
                 <Globe className="w-5 h-5 text-slate-500 absolute left-4 top-3.5" />
@@ -159,7 +159,7 @@ export default function Register() {
 
               {slug && (
                 <div className="mt-2 text-xs flex items-center justify-between">
-                  <span className="text-slate-400 font-mono">https://espejos.cl/{slug}</span>
+                  <span className="text-slate-400 font-mono">https://espejosstudio.cl/{slug}</span>
                   {slugStatus.message && (
                     <span className={slugStatus.available ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
                       {slugStatus.message}

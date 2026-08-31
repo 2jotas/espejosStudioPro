@@ -74,7 +74,7 @@ export default function Space() {
               </div>
               <div>
                 <h2 className="font-bold text-white text-sm truncate">{user.businessName}</h2>
-                <span className="text-[11px] text-slate-400 font-mono">espejos.cl/{user.slug}</span>
+                <span className="text-[11px] text-slate-400 font-mono">espejosstudio.cl/{user.slug}</span>
               </div>
             </div>
 

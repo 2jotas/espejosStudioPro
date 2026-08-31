@@ -83,7 +83,7 @@ export default function Landing() {
             to="/registro"
             className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center space-x-3 group"
           >
-            <span>Crear mi espacio `espejos.cl/tu-nombre`</span>
+            <span>Crear mi espacio `espejosstudio.cl/tu-nombre`</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
@@ -96,7 +96,7 @@ export default function Landing() {
             <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
             <div className="ml-4 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-400 font-mono flex items-center space-x-2">
               <span className="text-emerald-400">https://</span>
-              <span>espejos.cl/estudio-demo</span>
+              <span>espejosstudio.cl/estudio-demo</span>
             </div>
           </div>
           <div className="bg-slate-950 rounded-2xl p-6 md:p-8 text-left border border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -200,7 +200,7 @@ export default function Landing() {
               <ul className="space-y-3 text-sm text-slate-300 mb-8">
                 <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Hasta 50 clientes en base de datos</span></li>
                 <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Hasta 5 servicios publicados</span></li>
-                <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Página de reserva `espejos.cl/{'{slug}'}`</span></li>
+                <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Página de reserva `espejosstudio.cl/{'{slug}'}`</span></li>
                 <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Galería con límite de 10 fotos</span></li>
               </ul>
             </div>

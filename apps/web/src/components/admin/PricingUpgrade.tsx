@@ -183,7 +183,7 @@ export default function PricingUpgrade() {
               <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Hasta 5 servicios publicados</span></li>
               <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Hasta 50 clientes en CRM</span></li>
               <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Galería de 10 fotos</span></li>
-              <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Página `espejos.cl/{'{slug}'}`</span></li>
+              <li className="flex items-center space-x-3"><CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /><span>Página `espejosstudio.cl/{'{slug}'}`</span></li>
             </ul>
           </div>
 
