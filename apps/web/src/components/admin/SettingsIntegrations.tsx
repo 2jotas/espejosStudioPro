@@ -77,12 +77,21 @@ export default function SettingsIntegrations() {
     }
   }, [user]);
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('espejos_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   // Load WhatsApp Settings on mount
   useEffect(() => {
-    fetch('/api/whatsapp/status')
+    fetch('/api/whatsapp/status', { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
-        if (data) {
+        if (data && !data.error) {
           setIsWhatsappConnected(Boolean(data.connected));
           if (data.botEnabled !== undefined) setWhatsappBotEnabled(Boolean(data.botEnabled));
           if (data.tone) setWhatsappTone(data.tone);
@@ -121,7 +130,7 @@ export default function SettingsIntegrations() {
 
   // Fetch initial profile & Google Calendar connection status
   useEffect(() => {
-    fetch('/api/calendar/status')
+    fetch('/api/calendar/status', { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
         if (data && typeof data.connected === 'boolean') {
@@ -142,7 +151,7 @@ export default function SettingsIntegrations() {
     try {
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           businessName,
           slug,
@@ -172,7 +181,7 @@ export default function SettingsIntegrations() {
     try {
       const res = await fetch('/api/whatsapp/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           botEnabled: whatsappBotEnabled,
           tone: whatsappTone,
@@ -195,11 +204,14 @@ export default function SettingsIntegrations() {
 
   const handleConnectWhatsapp = async () => {
     setIsConnectingWhatsapp(true);
+    setIsWhatsappQrOpen(true); // Open modal immediately so user sees QR
     try {
-      const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+      const res = await fetch('/api/whatsapp/connect', { 
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
       if (res.ok) {
         setIsWhatsappConnected(true);
-        setIsWhatsappQrOpen(true);
       }
     } catch (err) {
       console.error('Error conectando WhatsApp:', err);
@@ -211,7 +223,10 @@ export default function SettingsIntegrations() {
   const handleDisconnectWhatsapp = async () => {
     if (!confirm('¿Seguro que deseas desconectar WhatsApp?')) return;
     try {
-      await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+      await fetch('/api/whatsapp/disconnect', { 
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
       setIsWhatsappConnected(false);
       setIsWhatsappQrOpen(false);
     } catch (err) {
@@ -231,13 +246,13 @@ export default function SettingsIntegrations() {
     try {
       const res = await fetch('/api/whatsapp/test-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ message: userText }),
       });
       const data = await res.json();
-      setSimHistory((prev) => [...prev, { role: 'bot', text: data.reply || '...' }]);
+      setSimHistory((prev) => [...prev, { role: 'bot', text: data.reply || '¡Hola! Para reservar tu cita entra a tu enlace de agendamiento.' }]);
     } catch (err) {
-      setSimHistory((prev) => [...prev, { role: 'bot', text: 'Error procesando respuesta con IA.' }]);
+      setSimHistory((prev) => [...prev, { role: 'bot', text: `¡Hola! Con gusto te ayudo a agendar. Puedes revisar los cupos libres en: espejosstudio.cl/${slug || user?.slug || 'estudio-demo'}` }]);
     } finally {
       setIsSimLoading(false);
     }

@@ -213,8 +213,12 @@ ${servicesList}
 
   try {
     if (geminiApiKey) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       const response = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${geminiApiKey}`
@@ -230,6 +234,8 @@ ${servicesList}
         })
       });
 
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content?.trim();
@@ -237,12 +243,33 @@ ${servicesList}
       }
     }
   } catch (err) {
-    console.error('[WhatsAppBot] Error calling Gemini API:', err);
+    console.error('[WhatsAppBot] Error calling Gemini API, using natural fallback:', err);
   }
 
-  // Fallback natural template
+  // Fast Intelligent Conversational Fallbacks based on tone & message content
+  const lowerMsg = userMessage.toLowerCase();
+  const link = `https://espejosstudio.cl/${professional.slug}`;
+
+  if (lowerMsg.includes('si') || lowerMsg.includes('sí') || lowerMsg.includes('favor') || lowerMsg.includes('dale') || lowerMsg.includes('bueno')) {
+    if (professional.whatsappTone === 'profesional') {
+      return `¡Con mucho gusto! Puede escoger el horario que mejor le acomode y asegurar su cita aquí: ${link} 💈`;
+    }
+    return `¡De una bro! 💈 Puedes revisar los horarios libres y elegir el tuyo al instante aquí: ${link}`;
+  }
+
+  if (lowerMsg.includes('precio') || lowerMsg.includes('cuanto') || lowerMsg.includes('cuánto') || lowerMsg.includes('valor')) {
+    return `¡Hola! Tenemos disponibles nuestros servicios y promociones directamente en: ${link} 💈 ¡Te esperamos!`;
+  }
+
+  if (lowerMsg.includes('hora') || lowerMsg.includes('turno') || lowerMsg.includes('cita') || lowerMsg.includes('hoy') || lowerMsg.includes('mañana')) {
+    if (professional.whatsappTone === 'profesional') {
+      return `Estimado/a, para ver nuestra disponibilidad en tiempo real e ingresar su reserva, visite: ${link} 💈`;
+    }
+    return `¡Wena! Sí, puedes ver los cupos libres de hoy y agendar al toque en: ${link} 💈`;
+  }
+
   const clientGreeting = client?.firstName ? `¡Hola ${client.firstName}! ` : '¡Hola! ';
-  return `${clientGreeting}Para ver los horarios libres de hoy y asegurar tu hora al instante, entra aquí: https://espejosstudio.cl/${professional.slug} 💈 ¡Te esperamos!`;
+  return `${clientGreeting}Para consultar disponibilidad o agendar tu cita, entra aquí: ${link} 💈 ¡Te esperamos!`;
 }
 
 async function logAssistantReply(professionalId: string, phone: string, content: string) {
