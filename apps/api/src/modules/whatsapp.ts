@@ -3,6 +3,12 @@ import { PrismaClient } from '@prisma/client';
 import { authenticateProfessional } from '../plugins/authHook.js';
 import { classifyAndProcessMessage } from '../services/whatsappBotService.js';
 import { runAppointmentRemindersCheck } from '../services/appointmentReminderCron.js';
+import { 
+  startWhatsAppSession, 
+  getWhatsAppSessionState, 
+  stopWhatsAppSession, 
+  sendDirectWhatsAppMessage 
+} from '../services/whatsappSessionService.js';
 
 const prisma = new PrismaClient();
 
@@ -31,14 +37,18 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: 'Profesional no encontrado' });
     }
 
+    const { status, qrCode } = getWhatsAppSessionState(professionalId);
+
     return reply.send({
-      connected: professional.whatsappConnected,
+      connected: professional.whatsappConnected || status === 'open',
       botEnabled: professional.whatsappBotEnabled,
       tone: professional.whatsappTone,
       customPrompt: professional.whatsappCustomPrompt || '',
       fewShotExamples: professional.whatsappFewShotExamples || '',
       reminderHours: professional.whatsappReminderHours,
-      phone: professional.phone
+      phone: professional.phone,
+      qrCode: qrCode || null,
+      sessionStatus: status
     });
   });
 
@@ -48,21 +58,21 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   }, async (request: any, reply) => {
     const professionalId = request.user.id;
 
-    const mockQrCode = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220" viewBox="0 0 220 220"><rect width="220" height="220" fill="white"/><text x="50%" y="50%" font-size="14" font-family="sans-serif" font-weight="bold" fill="%2325D366" text-anchor="middle" dominant-baseline="middle">Vincular WhatsApp Web</text></svg>`;
+    try {
+      const result = await startWhatsAppSession(professionalId);
 
-    await prisma.professional.update({
-      where: { id: professionalId },
-      data: {
-        whatsappConnected: true,
-        whatsappSessionId: `session_${professionalId.slice(0, 8)}`
-      }
-    });
-
-    return reply.send({
-      success: true,
-      qrCode: mockQrCode,
-      message: 'Escanea el código QR desde Dispositivos Vinculados en tu WhatsApp'
-    });
+      return reply.send({
+        success: true,
+        qrCode: result.qrCode || null,
+        connected: result.connected,
+        message: result.connected 
+          ? 'WhatsApp ya está conectado' 
+          : 'Escanea el código QR desde Dispositivos Vinculados en tu WhatsApp'
+      });
+    } catch (err: any) {
+      console.error('[WhatsApp Route] Error starting session:', err);
+      return reply.code(500).send({ error: 'No se pudo iniciar la sesión de WhatsApp' });
+    }
   });
 
   // 3. Disconnect WhatsApp
@@ -71,13 +81,7 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   }, async (request: any, reply) => {
     const professionalId = request.user.id;
 
-    await prisma.professional.update({
-      where: { id: professionalId },
-      data: {
-        whatsappConnected: false,
-        whatsappSessionId: null
-      }
-    });
+    await stopWhatsAppSession(professionalId);
 
     return reply.send({ success: true, message: 'WhatsApp desconectado correctamente' });
   });
@@ -180,6 +184,9 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
 
     const timeStr = new Date(appointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
     const reminderText = `¡Hola ${appointment.client.firstName}! 👋 Te recordamos tu cita de *${appointment.service.name}* hoy a las *${timeStr}* con *${appointment.professional.businessName}*.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`;
+
+    // Try direct sending via connected WhatsApp socket
+    await sendDirectWhatsAppMessage(appointment.professionalId, appointment.client.phone, reminderText);
 
     await prisma.appointment.update({
       where: { id: appointment.id },

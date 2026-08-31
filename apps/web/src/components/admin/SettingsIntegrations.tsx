@@ -53,6 +53,7 @@ export default function SettingsIntegrations() {
   const [whatsappFewShotExamples, setWhatsappFewShotExamples] = useState('');
   const [whatsappReminderHours, setWhatsappReminderHours] = useState(2);
   const [isWhatsappQrOpen, setIsWhatsappQrOpen] = useState(false);
+  const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
   const [isConnectingWhatsapp, setIsConnectingWhatsapp] = useState(false);
   const [isSavingWhatsappSettings, setIsSavingWhatsappSettings] = useState(false);
   const [whatsappSaveMessage, setWhatsappSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -202,16 +203,46 @@ export default function SettingsIntegrations() {
     }
   };
 
+  // Polling for WhatsApp connection status when QR modal is open
+  useEffect(() => {
+    let interval: any;
+    if (isWhatsappQrOpen && !isWhatsappConnected) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/whatsapp/status', { headers: getAuthHeaders() });
+          const data = await res.json();
+          if (data?.qrCode) {
+            setWhatsappQrCode(data.qrCode);
+          }
+          if (data?.connected) {
+            setIsWhatsappConnected(true);
+            setIsWhatsappQrOpen(false);
+            setWhatsappQrCode(null);
+          }
+        } catch (e) {}
+      }, 2000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isWhatsappQrOpen, isWhatsappConnected]);
+
   const handleConnectWhatsapp = async () => {
     setIsConnectingWhatsapp(true);
-    setIsWhatsappQrOpen(true); // Open modal immediately so user sees QR
+    setIsWhatsappQrOpen(true);
+    setWhatsappQrCode(null);
     try {
       const res = await fetch('/api/whatsapp/connect', { 
         method: 'POST',
         headers: getAuthHeaders()
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (data?.qrCode) {
+        setWhatsappQrCode(data.qrCode);
+      }
+      if (data?.connected) {
         setIsWhatsappConnected(true);
+        setIsWhatsappQrOpen(false);
       }
     } catch (err) {
       console.error('Error conectando WhatsApp:', err);
@@ -675,10 +706,19 @@ export default function SettingsIntegrations() {
             </div>
 
             <div className="bg-white p-4 rounded-2xl shadow-inner inline-block mx-auto">
-              <div className="w-48 h-48 bg-slate-100 flex flex-col items-center justify-center text-center p-2">
-                <QrCode className="w-24 h-24 text-slate-800 mb-2" />
-                <span className="text-[10px] text-slate-600 font-mono font-bold">Escanea con tu WhatsApp</span>
-              </div>
+              {whatsappQrCode ? (
+                <img 
+                  src={whatsappQrCode} 
+                  alt="Código QR WhatsApp Web" 
+                  className="w-56 h-56 object-contain mx-auto rounded-xl"
+                />
+              ) : (
+                <div className="w-56 h-56 bg-slate-100 flex flex-col items-center justify-center text-center p-4 rounded-xl">
+                  <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mb-2" />
+                  <span className="text-xs text-slate-800 font-bold">Generando Código QR Seguro...</span>
+                  <span className="text-[10px] text-slate-500 mt-1">Conectando sesión con WhatsApp</span>
+                </div>
+              )}
             </div>
 
             <div className="text-xs text-slate-400 space-y-1 text-left bg-slate-950 p-3.5 rounded-xl border border-slate-800">
@@ -690,9 +730,9 @@ export default function SettingsIntegrations() {
 
             <button
               onClick={() => setIsWhatsappQrOpen(false)}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl transition-colors"
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition-colors"
             >
-              Listo, Ya lo Escaneé
+              Cerrar
             </button>
           </div>
         </div>
