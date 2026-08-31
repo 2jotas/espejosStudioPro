@@ -47,6 +47,7 @@ Principio de 3 capas aisladas:
 | **2026-08-27** | Antigravity 2.0 | VPS | Implementación de `vault_watcher.py` (auto-escáner continuo de carpetas) y despliegue de **Syncthing v2.1.3** 24/7 sobre Tailscale. |
 | **2026-08-27** | Antigravity 2.0 | VPS / GitHub | Validación de `formacion.espejosstudio.cl`, indexación de ramos del Año 1 y respaldo completo en rama `main` de `2jotas/formacion-ciencia-datos`. |
 | **2026-08-31** | Antigravity 2.0 | VPS / Web | Corrección de timezone offset en `CalendarManager` y `DashboardManager`; creación de `GEMINI.md` para auto-contexto multi-entorno. |
+| **2026-08-31** | Antigravity 2.0 | Web | Corrección integral de URLs de reserva a `espejosstudio.cl/{slug}` en Landing, Registro, Ajustes y Pricing. |
 
 ---
 
