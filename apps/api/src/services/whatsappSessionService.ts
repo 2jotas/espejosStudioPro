@@ -7,6 +7,8 @@ const prisma = new PrismaClient();
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'espejos_evolution_key_2026';
 
+const activeQrs = new Map<string, string>();
+
 /**
  * Initiates WhatsApp Session and fetches live QR Code from Evolution API or generates a cryptographic pairing QR
  */
@@ -33,6 +35,7 @@ export async function startWhatsAppSession(professionalId: string): Promise<{ qr
     if (createRes && createRes.ok) {
       const data = await createRes.json();
       if (data?.qrcode?.base64) {
+        activeQrs.set(professionalId, data.qrcode.base64);
         return { qrCode: data.qrcode.base64, connected: false };
       }
     }
@@ -47,6 +50,7 @@ export async function startWhatsAppSession(professionalId: string): Promise<{ qr
     if (connectRes && connectRes.ok) {
       const data = await connectRes.json();
       if (data?.base64) {
+        activeQrs.set(professionalId, data.base64);
         return { qrCode: data.base64, connected: false };
       }
       if (data?.instance?.state === 'open') {
@@ -72,14 +76,18 @@ export async function startWhatsAppSession(professionalId: string): Promise<{ qr
     }
   });
 
+  activeQrs.set(professionalId, qrDataUrl);
   return { qrCode: qrDataUrl, connected: false };
 }
 
 /**
  * Gets session state for a professional
  */
-export function getWhatsAppSessionState(_professionalId: string): { status: string; qrCode?: string } {
-  return { status: 'qr_ready' };
+export function getWhatsAppSessionState(professionalId: string): { status: string; qrCode?: string } {
+  return { 
+    status: 'qr_ready', 
+    qrCode: activeQrs.get(professionalId) 
+  };
 }
 
 /**
