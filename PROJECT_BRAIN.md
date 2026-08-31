@@ -48,6 +48,7 @@ Principio de 3 capas aisladas:
 | **2026-08-27** | Antigravity 2.0 | VPS / GitHub | Validación de `formacion.espejosstudio.cl`, indexación de ramos del Año 1 y respaldo completo en rama `main` de `2jotas/formacion-ciencia-datos`. |
 | **2026-08-31** | Antigravity 2.0 | VPS / Web | Corrección de timezone offset en `CalendarManager` y `DashboardManager`; creación de `GEMINI.md` para auto-contexto multi-entorno. |
 | **2026-08-31** | Antigravity 2.0 | Web | Corrección integral de URLs de reserva a `espejosstudio.cl/{slug}` en Landing, Registro, Ajustes y Pricing. |
+| **2026-08-31** | Antigravity 2.0 | API / Web | Bot Inteligente de WhatsApp con Gemini 2.0 Flash, entrenamiento con chats reales (Few-Shot), recordatorios automáticos y sistema de 4 estados con código de colores en CRM (`confirmada` 🟢, `cancelada` 🔴, `reagendada` 🟡, `pendiente` 🟣). |
 
 ---
 

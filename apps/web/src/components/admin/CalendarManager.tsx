@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, AlertCircle, MessageSquare } from 'lucide-react';
 import { ServiceItem } from './ServicesManager';
 
 export interface AppointmentItem {
   id: string;
   startsAt: string;
   endsAt: string;
-  status: 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  whatsappStatus?: 'pendiente' | 'confirmada' | 'cancelada' | 'reagendada';
+  whatsappReminderSentAt?: string | null;
   clientNote?: string;
   googleCalendarEventId?: string | null;
   client: {
@@ -273,6 +275,28 @@ export default function CalendarManager() {
       }
     } catch (e) {
       console.error('Error eliminando cita:', e);
+    }
+  };
+
+  const handleSendWhatsAppReminder = async (app: AppointmentItem) => {
+    try {
+      const res = await fetch(`/api/whatsapp/send-reminder/${app.id}`, { method: 'POST' });
+      if (res.ok) {
+        setAppointments((prev) =>
+          prev.map((item) =>
+            item.id === app.id ? { ...item, whatsappStatus: 'pendiente' } : item
+          )
+        );
+        alert(`¡Recordatorio de WhatsApp enviado con éxito a ${app.client.firstName} (${app.client.phone})!`);
+      } else {
+        // Fallback: Open WhatsApp Web directly with prefilled reminder message
+        const timeStr = new Date(app.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const text = encodeURIComponent(`¡Hola ${app.client.firstName}! 👋 Te recordamos tu cita de *${app.service.name}* hoy a las *${timeStr}* en Espejos Studio.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`);
+        const cleanPhone = app.client.phone.replace(/\D/g, '');
+        window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+      }
+    } catch (e) {
+      console.error('Error enviando recordatorio:', e);
     }
   };
 
@@ -668,15 +692,27 @@ export default function CalendarManager() {
                             {app.client.firstName} {app.client.lastName}
                           </h4>
                           <span
-                            className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
-                              app.status === 'confirmed'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            className={`px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
+                              (app.status === 'cancelled' || app.whatsappStatus === 'cancelada')
+                                ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                                : (app.whatsappStatus === 'confirmada' || (app.status === 'confirmed' && app.whatsappStatus !== 'reagendada'))
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : (app.whatsappStatus === 'reagendada')
+                                ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                                 : app.status === 'completed'
-                                ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
                             }`}
                           >
-                            {app.status === 'confirmed' ? 'Confirmada' : app.status === 'completed' ? 'Completada' : 'Cancelada'}
+                            {(app.status === 'cancelled' || app.whatsappStatus === 'cancelada')
+                              ? '🔴 Cancelada'
+                              : (app.whatsappStatus === 'confirmada' || (app.status === 'confirmed' && app.whatsappStatus !== 'reagendada'))
+                              ? '🟢 Confirmada'
+                              : (app.whatsappStatus === 'reagendada')
+                              ? '🟡 Reagendada'
+                              : app.status === 'completed'
+                              ? '🔵 Completada'
+                              : '🟣 Pendiente'}
                           </span>
                         </div>
 
@@ -701,6 +737,15 @@ export default function CalendarManager() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleSendWhatsAppReminder(app)}
+                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 shadow-sm"
+                        title="Enviar Recordatorio por WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp</span>
+                      </button>
+
                       <button
                         onClick={() => openClientProfileModal(app)}
                         className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 text-indigo-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 shadow-sm"

@@ -25,6 +25,13 @@ model Professional {
   googleCalendarId        String?        @map("google_calendar_id")
   googleApiKey            String?        @map("google_api_key")
   visagismEnabled         Boolean        @default(true) @map("visagism_enabled")
+  whatsappConnected       Boolean        @default(false) @map("whatsapp_connected")
+  whatsappSessionId       String?        @map("whatsapp_session_id")
+  whatsappBotEnabled      Boolean        @default(true) @map("whatsapp_bot_enabled")
+  whatsappTone            String         @default("cercano") @map("whatsapp_tone")
+  whatsappCustomPrompt    String?        @map("whatsapp_custom_prompt")
+  whatsappFewShotExamples String?        @map("whatsapp_few_shot_examples")
+  whatsappReminderHours   Int            @default(2) @map("whatsapp_reminder_hours")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 
@@ -34,6 +41,7 @@ model Professional {
   appointments            Appointment[]
   galleryImages           GalleryImage[]
   visagismConsultations   VisagismConsultation[]
+  whatsappMessageLogs     WhatsAppMessageLog[]
 
   @@map("professionals")
 }
@@ -90,23 +98,39 @@ model Service {
 }
 
 model Appointment {
-  id                   String       @id @default(uuid())
-  professionalId       String       @map("professional_id")
-  clientId             String       @map("client_id")
-  serviceId            String       @map("service_id")
-  startsAt             DateTime     @map("starts_at")
-  endsAt               DateTime     @map("ends_at")
-  status               String       @default("pending") // "pending" | "confirmed" | "cancelled" | "completed" | "no_show"
-  clientNote           String?      @map("client_note")
-  clientPhotoUrl       String?      @map("client_photo_url")
-  googleCalendarEventId String?     @map("google_calendar_event_id")
-  createdAt            DateTime     @default(now()) @map("created_at")
+  id                    String       @id @default(uuid())
+  professionalId        String       @map("professional_id")
+  clientId              String       @map("client_id")
+  serviceId             String       @map("service_id")
+  startsAt              DateTime     @map("starts_at")
+  endsAt                DateTime     @map("ends_at")
+  status                String       @default("pending") // "pending" | "confirmed" | "cancelled" | "completed" | "no_show"
+  whatsappStatus        String       @default("pendiente") @map("whatsapp_status") // "pendiente" | "confirmada" | "cancelada" | "reagendada"
+  whatsappReminderSentAt DateTime?   @map("whatsapp_reminder_sent_at")
+  clientNote            String?      @map("client_note")
+  clientPhotoUrl        String?      @map("client_photo_url")
+  googleCalendarEventId String?      @map("google_calendar_event_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
 
-  professional         Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  client               Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  service              Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  professional          Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  client                Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service               Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@map("appointments")
+}
+
+model WhatsAppMessageLog {
+  id             String       @id @default(uuid())
+  professionalId String       @map("professional_id")
+  phone          String
+  role           String       // "user" | "assistant" | "system"
+  content        String
+  timestamp      DateTime     @default(now())
+
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, phone])
+  @@map("whatsapp_message_logs")
 }
 
 model GalleryImage {

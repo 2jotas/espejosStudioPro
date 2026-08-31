@@ -20,6 +20,7 @@ import { planRoutes } from './modules/plans.js';
 import { superAdminRoutes } from './modules/superAdmin.js';
 import { dashboardRoutes } from './modules/dashboard.js';
 import { visagismRoutes } from './modules/visagism.js';
+import whatsappRoutes from './modules/whatsapp.js';
 import { initializeGalleryWatcher } from './lib/galleryWatcher.js';
 
 dotenv.config();
@@ -67,6 +68,7 @@ async function main() {
   await server.register(superAdminRoutes, { prefix: '/api' });
   await server.register(dashboardRoutes, { prefix: '/api' });
   await server.register(visagismRoutes, { prefix: '/api' });
+  await server.register(whatsappRoutes, { prefix: '/api/whatsapp' });
 
   // Initialize file watcher for auto-publishing photos
   initializeGalleryWatcher(server.prisma);
