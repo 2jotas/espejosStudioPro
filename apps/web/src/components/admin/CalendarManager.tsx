@@ -25,12 +25,35 @@ export interface AppointmentItem {
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
 
+// Local date/time formatting helpers (avoids UTC offset skew in forms and filters)
+export const formatLocalDate = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const formatLocalTime = (d: Date): string => {
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+};
+
+export const parseLocalDateTimeToIso = (dateStr: string, timeStr: string): string => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const parts = timeStr.trim().split(':');
+  const h = parseInt(parts[0] || '0', 10);
+  const min = parseInt(parts[1] || '0', 10);
+  const localDate = new Date(y, m - 1, d, h, min, 0);
+  return localDate.toISOString();
+};
+
 export default function CalendarManager() {
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<CalendarViewMode>('day');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(formatLocalDate(new Date()));
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Business Schedule State (Default: 10:00 - 20:00, Tuesday & Wednesday OFF)
@@ -267,19 +290,21 @@ export default function CalendarManager() {
 
   // Date Navigation Handlers
   const handlePrevDay = () => {
-    const current = new Date(`${selectedDate}T12:00:00Z`);
-    current.setUTCDate(current.getUTCDate() - (viewMode === 'week' ? 7 : 1));
-    setSelectedDate(current.toISOString().split('T')[0]);
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const current = new Date(y, m - 1, d);
+    current.setDate(current.getDate() - (viewMode === 'week' ? 7 : 1));
+    setSelectedDate(formatLocalDate(current));
   };
 
   const handleNextDay = () => {
-    const current = new Date(`${selectedDate}T12:00:00Z`);
-    current.setUTCDate(current.getUTCDate() + (viewMode === 'week' ? 7 : 1));
-    setSelectedDate(current.toISOString().split('T')[0]);
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const current = new Date(y, m - 1, d);
+    current.setDate(current.getDate() + (viewMode === 'week' ? 7 : 1));
+    setSelectedDate(formatLocalDate(current));
   };
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(formatLocalDate(new Date()));
   };
 
   // Open Modal for New Appointment
@@ -305,9 +330,9 @@ export default function CalendarManager() {
 
     const start = new Date(app.startsAt);
     const end = new Date(app.endsAt);
-    setFormDate(start.toISOString().split('T')[0]);
-    setFormStartTime(start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
-    setFormEndTime(end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+    setFormDate(formatLocalDate(start));
+    setFormStartTime(formatLocalTime(start));
+    setFormEndTime(formatLocalTime(end));
     setFormNote(app.clientNote || '');
     setIsModalOpen(true);
   };
@@ -322,8 +347,8 @@ export default function CalendarManager() {
 
     try {
       setIsSavingAppointment(true);
-      const startsAtIso = new Date(`${formDate}T${formStartTime}:00Z`).toISOString();
-      const endsAtIso = new Date(`${formDate}T${formEndTime || formStartTime}:00Z`).toISOString();
+      const startsAtIso = parseLocalDateTimeToIso(formDate, formStartTime);
+      const endsAtIso = parseLocalDateTimeToIso(formDate, formEndTime || formStartTime);
 
       if (editingAppointment) {
         // Edit existing
@@ -375,25 +400,25 @@ export default function CalendarManager() {
 
   // Filter appointments for selected date (Day View)
   const dayAppointments = appointments.filter((app) => {
-    const appDate = new Date(app.startsAt).toISOString().split('T')[0];
+    const appDate = formatLocalDate(new Date(app.startsAt));
     return appDate === selectedDate;
   });
 
   const getRelativeDayLabel = (targetDateStr: string) => {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalDate(today);
 
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowStr = formatLocalDate(tomorrow);
 
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = formatLocalDate(yesterday);
 
     const dayAfterTomorrow = new Date(today);
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-    const dayAfterTomorrowStr = dayAfterTomorrow.toISOString().split('T')[0];
+    const dayAfterTomorrowStr = formatLocalDate(dayAfterTomorrow);
 
     if (targetDateStr === todayStr) return { text: 'HOY', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
     if (targetDateStr === tomorrowStr) return { text: 'MAÑANA', color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' };
@@ -410,46 +435,47 @@ export default function CalendarManager() {
 
   const relativeBadge = getRelativeDayLabel(selectedDate);
 
-  const formattedSelectedDate = new Date(`${selectedDate}T12:00:00Z`).toLocaleDateString('es-ES', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const formattedSelectedDate = (() => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  })();
 
   // Calculate week dates (Monday to Sunday)
-  const currentSelectedObj = new Date(`${selectedDate}T12:00:00Z`);
-  const currentDayOfWeek = currentSelectedObj.getUTCDay(); // 0 is Sun
+  const [sy, sm, sd] = selectedDate.split('-').map(Number);
+  const currentSelectedObj = new Date(sy, sm - 1, sd);
+  const currentDayOfWeek = currentSelectedObj.getDay(); // 0 is Sun
   const mondayOffset = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
 
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(currentSelectedObj);
-    d.setUTCDate(d.getUTCDate() + mondayOffset + i);
-    const dateStr = d.toISOString().split('T')[0];
-    const dayNum = d.getUTCDay();
+    const d = new Date(sy, sm - 1, sd + mondayOffset + i);
+    const dateStr = formatLocalDate(d);
+    const dayNum = d.getDay();
     return {
       dateStr,
       dayNum,
       dayName: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayNum],
-      formattedShort: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`,
+      formattedShort: `${d.getDate()}/${d.getMonth() + 1}`,
     };
   });
 
   // Calculate month days grid
-  const year = currentSelectedObj.getUTCFullYear();
-  const month = currentSelectedObj.getUTCMonth();
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const firstDayOfMonthOfWeek = new Date(Date.UTC(year, month, 1)).getUTCDay();
+  const year = currentSelectedObj.getFullYear();
+  const month = currentSelectedObj.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonthOfWeek = new Date(year, month, 1).getDay();
   const monthPadOffset = firstDayOfMonthOfWeek === 0 ? 6 : firstDayOfMonthOfWeek - 1;
 
   const monthGridDays = Array.from({ length: daysInMonth + monthPadOffset }, (_, i) => {
     if (i < monthPadOffset) return null;
     const dayNumber = i - monthPadOffset + 1;
-    const monthStr = String(month + 1).padStart(2, '0');
-    const dayStr = String(dayNumber).padStart(2, '0');
-    const dateStr = `${year}-${monthStr}-${dayStr}`;
-    const dObj = new Date(Date.UTC(year, month, dayNumber));
-    const dayNum = dObj.getUTCDay();
+    const dObj = new Date(year, month, dayNumber);
+    const dateStr = formatLocalDate(dObj);
+    const dayNum = dObj.getDay();
     return {
       dateStr,
       dayNumber,
@@ -734,7 +760,7 @@ export default function CalendarManager() {
           <div className="min-w-[700px] grid grid-cols-7 gap-3">
             {weekDays.map((wDay) => {
               const isDisabled = disabledDays.includes(wDay.dayNum);
-              const dayApps = appointments.filter((a) => new Date(a.startsAt).toISOString().split('T')[0] === wDay.dateStr);
+              const dayApps = appointments.filter((a) => formatLocalDate(new Date(a.startsAt)) === wDay.dateStr);
 
               return (
                 <div key={wDay.dateStr} className={`space-y-3 rounded-2xl p-3 border transition-colors ${wDay.dateStr === selectedDate ? 'bg-indigo-950/30 border-indigo-500/40' : 'bg-slate-950/60 border-slate-800/80'}`}>
@@ -794,7 +820,7 @@ export default function CalendarManager() {
               if (!mDay) return <div key={idx} className="h-20 bg-slate-950/20 rounded-2xl border border-slate-900" />;
 
               const isDisabled = disabledDays.includes(mDay.dayNum) || disabledSpecificDates.includes(mDay.dateStr);
-              const mApps = appointments.filter((a) => new Date(a.startsAt).toISOString().split('T')[0] === mDay.dateStr);
+              const mApps = appointments.filter((a) => formatLocalDate(new Date(a.startsAt)) === mDay.dateStr);
               const isSelected = mDay.dateStr === selectedDate;
 
               return (

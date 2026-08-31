@@ -44,10 +44,12 @@ export default function DashboardManager() {
     fetchDashboardData();
   }, []);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const todayAppointments = appointments.filter((app) => {
-    const appDate = new Date(app.startsAt).toISOString().split('T')[0];
+    const d = new Date(app.startsAt);
+    const appDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     return appDate === todayStr && app.status !== 'cancelled';
   });
 
