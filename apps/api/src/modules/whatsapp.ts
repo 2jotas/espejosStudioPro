@@ -35,6 +35,7 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
         whatsappCustomPrompt: true,
         whatsappFewShotExamples: true,
         whatsappReminderHours: true,
+        whatsappClientTagKeyword: true,
         phone: true
       }
     });
@@ -52,6 +53,7 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
       customPrompt: professional.whatsappCustomPrompt || '',
       fewShotExamples: professional.whatsappFewShotExamples || '',
       reminderHours: professional.whatsappReminderHours,
+      clientTagKeyword: professional.whatsappClientTagKeyword || 'cliente',
       phone: professional.phone,
       qrCode: qrCode || null,
       sessionStatus: status
@@ -106,7 +108,7 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
     if (!professionalId) {
       return reply.code(401).send({ error: 'No autenticado' });
     }
-    const { botEnabled, tone, customPrompt, fewShotExamples, reminderHours } = request.body || {};
+    const { botEnabled, tone, customPrompt, fewShotExamples, reminderHours, clientTagKeyword } = request.body || {};
 
     const updated = await prisma.professional.update({
       where: { id: professionalId },
@@ -115,7 +117,8 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
         whatsappTone: tone || undefined,
         whatsappCustomPrompt: customPrompt !== undefined ? customPrompt : undefined,
         whatsappFewShotExamples: fewShotExamples !== undefined ? fewShotExamples : undefined,
-        whatsappReminderHours: reminderHours ? Number(reminderHours) : undefined
+        whatsappReminderHours: reminderHours ? Number(reminderHours) : undefined,
+        whatsappClientTagKeyword: clientTagKeyword !== undefined ? clientTagKeyword : undefined
       },
       select: {
         whatsappConnected: true,
@@ -123,7 +126,8 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
         whatsappTone: true,
         whatsappCustomPrompt: true,
         whatsappFewShotExamples: true,
-        whatsappReminderHours: true
+        whatsappReminderHours: true,
+        whatsappClientTagKeyword: true
       }
     });
 
@@ -131,6 +135,98 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
       success: true,
       settings: updated,
       message: 'Configuración y entrenamiento del bot guardados con éxito'
+    });
+  });
+
+  // 4.1 Import / Sync Contacts with Keyword Filter
+  fastify.post('/import-contacts', {
+    preHandler: [authenticateProfessional]
+  }, async (request: any, reply) => {
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
+
+    const { contacts, filterKeyword = 'cliente' } = request.body || {};
+
+    if (!Array.isArray(contacts)) {
+      return reply.code(400).send({ error: 'Formato inválido. Se espera una lista de contactos.' });
+    }
+
+    const keyword = filterKeyword.trim().toLowerCase();
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    for (const item of contacts) {
+      const rawName = (item.name || '').trim();
+      const rawPhone = (item.phone || '').replace(/\D/g, '');
+
+      if (!rawPhone || rawPhone.length < 8) {
+        skippedCount++;
+        continue;
+      }
+
+      // If filter keyword provided, ensure name contains it
+      if (keyword && !rawName.toLowerCase().includes(keyword)) {
+        skippedCount++;
+        continue;
+      }
+
+      // Clean keyword from name (e.g. "Carlos Gomez [cliente]" -> "Carlos Gomez")
+      const cleanName = rawName.replace(new RegExp(keyword, 'gi'), '').replace(/[\[\]\(\)\-\_]/g, '').trim();
+      const parts = cleanName.split(/\s+/);
+      const firstName = parts[0] || 'Cliente';
+      const lastName = parts.slice(1).join(' ') || '';
+
+      // Normalize Chilean phone
+      let formattedPhone = rawPhone;
+      if (formattedPhone.startsWith('9') && formattedPhone.length === 9) {
+        formattedPhone = `56${formattedPhone}`;
+      } else if (!formattedPhone.startsWith('56') && formattedPhone.length === 8) {
+        formattedPhone = `569${formattedPhone}`;
+      }
+
+      try {
+        const client = await prisma.client.upsert({
+          where: {
+            professionalId_phone: {
+              professionalId,
+              phone: formattedPhone
+            }
+          },
+          update: {
+            firstName,
+            lastName
+          },
+          create: {
+            professionalId,
+            phone: formattedPhone,
+            firstName,
+            lastName
+          }
+        });
+
+        await prisma.clientProfile.upsert({
+          where: { clientId: client.id },
+          update: {},
+          create: {
+            clientId: client.id,
+            professionalId,
+            tags: '["whatsapp_import"]'
+          }
+        });
+
+        importedCount++;
+      } catch (err) {
+        skippedCount++;
+      }
+    }
+
+    return reply.send({
+      success: true,
+      importedCount,
+      skippedCount,
+      message: `Se importaron ${importedCount} contactos exitosamente.`
     });
   });
 

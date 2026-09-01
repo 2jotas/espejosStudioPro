@@ -34,11 +34,13 @@ export interface OfferedSlot {
 }
 
 export interface BotConversationState {
-  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE' | 'AWAITING_SLOT';
+  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE_CHOICE' | 'AWAITING_HABITUAL_CHOICE' | 'AWAITING_SLOT';
   clientName?: string;
   clientId?: string;
   selectedServiceId?: string;
+  habitualServiceId?: string;
   offeredSlots?: OfferedSlot[];
+  offeredServices?: Array<{ index: number; id: string; name: string; price: number; durationMinutes: number }>;
   isRescheduling?: boolean;
   rescheduleAppointmentId?: string;
   lastInteractionTime: number;
@@ -90,7 +92,14 @@ function getConversationState(professionalId: string, phone: string): BotConvers
 }
 
 /**
- * Calculates top 4-5 available slots across today and upcoming working days
+ * Formats price in Chilean Pesos (CLP)
+ */
+export function formatCLP(amount: number): string {
+  return `$${Math.round(amount).toLocaleString('es-CL')}`;
+}
+
+/**
+ * Calculates top 4 available slots across today and upcoming working days for a specific duration
  */
 export async function getTopAvailableSlotsForBot(
   professional: any,
@@ -99,7 +108,7 @@ export async function getTopAvailableSlotsForBot(
   const offeredSlots: OfferedSlot[] = [];
   const now = new Date();
 
-  // Determine dates for today, tomorrow, and day after tomorrow in America/Santiago
+  // Determine dates for today, tomorrow, and subsequent 3 days
   const dateOptions: Date[] = [];
   for (let i = 0; i < 4; i++) {
     const d = new Date();
@@ -196,6 +205,29 @@ export async function getTopAvailableSlotsForBot(
 }
 
 /**
+ * Builds the Service Selection Menu text
+ */
+function buildServiceMenu(services: any[], businessName: string): { menuText: string; offeredServices: any[] } {
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
+  const offeredServices = services.slice(0, 7).map((s, idx) => ({
+    index: idx + 1,
+    id: s.id,
+    name: s.name,
+    price: s.price,
+    durationMinutes: s.durationMinutes
+  }));
+
+  const itemsText = offeredServices.map((s) => {
+    const emoji = emojis[s.index - 1] || `${s.index}.`;
+    return `${emoji} *${s.name}* — ${formatCLP(s.price)} _(${s.durationMinutes} min)_`;
+  }).join('\n');
+
+  const menuText = `✂️ *SERVICIOS DISPONIBLES EN ${businessName.toUpperCase()}:*\n\n${itemsText}\n\n👉 *Responde con el número de tu servicio preferido (ej: 1).*`;
+
+  return { menuText, offeredServices };
+}
+
+/**
  * Main entry point: Classifies and processes incoming WhatsApp messages with state machine
  */
 export async function classifyAndProcessMessage(
@@ -259,7 +291,19 @@ export async function classifyAndProcessMessage(
 
   const nextAppointment = client?.appointments[0];
 
-  // 4. Fast Affirmative / Negative / Reschedule Intent Check for Existing Active Appointments
+  // 4. Client Tag / Keyword Filter & Intent Check
+  const clientTagKeyword = (professional as any).whatsappClientTagKeyword?.trim().toLowerCase() || 'cliente';
+  const senderNameLower = (msg.senderName || '').toLowerCase();
+  const isTaggedClient = senderNameLower.includes(clientTagKeyword) || !!client;
+
+  const isBookingQuery = lowerText.includes('hora') || lowerText.includes('turno') || lowerText.includes('cita') || 
+    lowerText.includes('corte') || lowerText.includes('agendar') || lowerText.includes('reservar') || 
+    lowerText.includes('disponible') || lowerText.includes('hueco') || lowerText.includes('barba') ||
+    lowerText.includes('hoy') || lowerText.includes('mañana') || lowerText.includes('agenda') ||
+    lowerText.includes('precio') || lowerText.includes('cuanto') || lowerText.includes('servicio') ||
+    lowerText.includes('visagismo');
+
+  // Fast Affirmative / Negative / Reschedule Check for Active Appointments
   const isAffirmative = /^(si|sí|confirmo|voy|confirmado|allá nos vemos|oka|ok|de acuerdo|dale|voy para allá|listo)$/i.test(lowerText) ||
     lowerText.includes('confirmo') || lowerText.includes('si voy') || lowerText.includes('sí voy') || lowerText.includes('alla nos vemos');
 
@@ -279,7 +323,7 @@ export async function classifyAndProcessMessage(
     });
 
     const clientName = client?.firstName || msg.senderName || 'estimado';
-    const timeStr = new Date(nextAppointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const timeStr = new Date(nextAppointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
     const reply = `¡Excelente, ${clientName}! 💈 Tu cita de *${nextAppointment.service.name}* para hoy a las *${timeStr} hrs* quedó confirmada al 100%. Te esperamos en ${professional.address || professional.businessName}. ¡Nos vemos pronto! ✨`;
 
     await logAssistantReply(professional.id, cleanPhone, reply);
@@ -331,7 +375,7 @@ export async function classifyAndProcessMessage(
       state.rescheduleAppointmentId = nextAppointment.id;
 
       const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const reply = `¡Sin problema! Vamos a reagendar tu cita 💈.\n\nEstos son los próximos horarios disponibles con *${professional.businessName}*:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
+      const reply = `¡Sin problema! Vamos a reagendar tu *${nextAppointment.service.name}* 💈.\n\nPróximos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
 
       await logAssistantReply(professional.id, cleanPhone, reply);
       return {
@@ -349,7 +393,7 @@ export async function classifyAndProcessMessage(
   if (state.step === 'AWAITING_NAME') {
     const extractedName = extractClientName(text);
     if (!extractedName) {
-      const reply = `Por favor, indícanos tu nombre y apellido para poder reservar tu turno 💈. (Ej: *Carlos Gómez*)`;
+      const reply = `Por favor, indícanos tu nombre y apellido para continuar 💈. (Ej: *Carlos Gómez*)`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     }
@@ -377,24 +421,97 @@ export async function classifyAndProcessMessage(
     state.clientId = newClient.id;
     state.clientName = firstName;
 
-    // Calculate slots for primary service
-    const primaryService = professional.services[0];
-    const duration = primaryService?.durationMinutes || 30;
-    const slots = await getTopAvailableSlotsForBot(professional, duration);
+    // If professional has multiple services, present Service Menu
+    if (professional.services && professional.services.length > 1) {
+      state.step = 'AWAITING_SERVICE_CHOICE';
+      const { menuText, offeredServices } = buildServiceMenu(professional.services, professional.businessName);
+      state.offeredServices = offeredServices;
+
+      const reply = `¡Mucho gusto, *${firstName}*! 👋 Bienvenido a *${professional.businessName}*.\n\n${menuText}`;
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+    } else {
+      // Single service fallback -> directly offer slots
+      const primaryService = professional.services[0];
+      const duration = primaryService?.durationMinutes || 30;
+      const slots = await getTopAvailableSlotsForBot(professional, duration);
+
+      if (slots.length > 0) {
+        state.step = 'AWAITING_SLOT';
+        state.selectedServiceId = primaryService?.id;
+        state.offeredSlots = slots;
+
+        const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
+        const reply = `¡Mucho gusto, *${firstName}*! Tenemos estos horarios disponibles para tu *${primaryService?.name || 'Corte de Autor'}* (${duration} min):\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Elige una opción (ej: 1).*`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      } else {
+        state.step = 'IDLE';
+        const reply = `¡Mucho gusto, *${firstName}*! Por ahora no nos quedan cupos libres hoy ni mañana. Puedes ver los próximos días aquí: https://espejosstudio.cl/${professional.slug} 💈`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      }
+    }
+  }
+
+  // STEP: AWAITING_HABITUAL_CHOICE (Returning client: Keep habitual service or change?)
+  if (state.step === 'AWAITING_HABITUAL_CHOICE') {
+    const choice = parseChoiceNumber(lowerText);
+
+    if (choice === 1 && state.habitualServiceId) {
+      // Confirmed habitual service -> compute slots
+      const service = professional.services.find(s => s.id === state.habitualServiceId) || professional.services[0];
+      state.selectedServiceId = service?.id;
+      const slots = await getTopAvailableSlotsForBot(professional, service?.durationMinutes || 30);
+
+      if (slots.length > 0) {
+        state.step = 'AWAITING_SLOT';
+        state.offeredSlots = slots;
+        const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
+        const reply = `Excelente elección. Estos son los horarios disponibles para tu *${service?.name}* (${service?.durationMinutes} min):\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Responde con el número de tu horario preferido (ej: 1).*`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      } else {
+        state.step = 'IDLE';
+        const reply = `Por el momento no nos quedan cupos disponibles para hoy ni mañana. Puedes revisar las próximas fechas en https://espejosstudio.cl/${professional.slug} 💈`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      }
+    } else {
+      // Choice 2 or other text -> Display full service menu
+      state.step = 'AWAITING_SERVICE_CHOICE';
+      const { menuText, offeredServices } = buildServiceMenu(professional.services, professional.businessName);
+      state.offeredServices = offeredServices;
+      await logAssistantReply(professional.id, cleanPhone, menuText);
+      return { intent: 'BOOKING_INQUIRY', responseMessage: menuText, shouldIgnore: false };
+    }
+  }
+
+  // STEP: AWAITING_SERVICE_CHOICE (User chooses service 1, 2, 3...)
+  if (state.step === 'AWAITING_SERVICE_CHOICE' && state.offeredServices && state.offeredServices.length > 0) {
+    const serviceIndex = parseChoiceNumber(lowerText);
+    const selectedOffered = state.offeredServices.find(s => s.index === serviceIndex);
+
+    if (!selectedOffered) {
+      const { menuText } = buildServiceMenu(professional.services, professional.businessName);
+      const reply = `Por favor responde con el número del servicio que deseas reservar:\n\n${menuText}`;
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+    }
+
+    state.selectedServiceId = selectedOffered.id;
+    const slots = await getTopAvailableSlotsForBot(professional, selectedOffered.durationMinutes);
 
     if (slots.length > 0) {
       state.step = 'AWAITING_SLOT';
-      state.selectedServiceId = primaryService?.id;
       state.offeredSlots = slots;
-
       const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const reply = `¡Mucho gusto, *${firstName}*! 👋 Bienvenido a *${professional.businessName}* 💈.\n\nTenemos estos horarios disponibles para tu corte:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción preferida (ej: 1).*`;
-
+      const reply = `Has seleccionado *${selectedOffered.name}* (${formatCLP(selectedOffered.price)} — ${selectedOffered.durationMinutes} min) 💈.\n\nHorarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1).*`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     } else {
       state.step = 'IDLE';
-      const reply = `¡Mucho gusto, *${firstName}*! Por ahora no nos quedan cupos disponibles para hoy ni mañana. Puedes revisar los próximos días aquí: https://espejosstudio.cl/${professional.slug} 💈`;
+      const reply = `Para *${selectedOffered.name}* no nos quedan cupos libres hoy ni mañana. Puedes ver las próximas fechas en https://espejosstudio.cl/${professional.slug} 💈`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     }
@@ -422,9 +539,12 @@ export async function classifyAndProcessMessage(
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       }
 
+      const serviceToBook = professional.services.find((s: any) => s.id === state.selectedServiceId) || professional.services[0];
+      const duration = serviceToBook?.durationMinutes || 30;
+
       // Check slot availability atomically
       const slotStart = new Date(chosenSlot.startIso);
-      const slotEnd = new Date(chosenSlot.endIso);
+      const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
 
       const conflict = await prisma.appointment.findFirst({
         where: {
@@ -437,7 +557,7 @@ export async function classifyAndProcessMessage(
 
       if (conflict) {
         // Slot taken in the meantime -> recalculate
-        const freshSlots = await getTopAvailableSlotsForBot(professional, 30);
+        const freshSlots = await getTopAvailableSlotsForBot(professional, duration);
         state.offeredSlots = freshSlots;
         const slotsMenu = freshSlots.map(s => s.formattedChoice).join('\n');
         const reply = `⚠️ El horario de las *${chosenSlot.timeLabel}* acaba de ser reservado. Tengo estas nuevas opciones disponibles para ti:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Elige una opción (ej: 1):*`;
@@ -454,7 +574,6 @@ export async function classifyAndProcessMessage(
       }
 
       // Create appointment
-      const serviceToBook = professional.services.find((s: any) => s.id === state.selectedServiceId) || professional.services[0];
       const newAppointment = await prisma.appointment.create({
         data: {
           professionalId: professional.id,
@@ -485,11 +604,11 @@ export async function classifyAndProcessMessage(
         }
       }).catch(() => {});
 
-      // Sincronizar con Google Calendar si está habilitado
+      // Sincronizar con Google Calendar si está conectado
       if (professional.googleCalendarConnected && professional.googleRefreshToken) {
         createGoogleCalendarEvent(professional.googleRefreshToken, {
-          summary: `Corte: ${targetClient.firstName} ${targetClient.lastName}`,
-          description: `Cliente: ${targetClient.firstName} ${targetClient.lastName}\nTeléfono: +${cleanPhone}\nServicio: ${serviceToBook?.name || 'Corte de Autor'}\nAgendado vía WhatsApp Bot`,
+          summary: `${serviceToBook?.name || 'Corte'}: ${targetClient.firstName} ${targetClient.lastName}`,
+          description: `Cliente: ${targetClient.firstName} ${targetClient.lastName}\nTeléfono: +${cleanPhone}\nServicio: ${serviceToBook?.name}\nValor: ${formatCLP(serviceToBook?.price || 0)}\nAgendado vía WhatsApp Bot`,
           startIso: slotStart.toISOString(),
           endIso: slotEnd.toISOString()
         }).catch((err) => console.error('[WhatsAppBot] Error sync Google Calendar:', err));
@@ -508,14 +627,21 @@ export async function classifyAndProcessMessage(
         timeZone: 'America/Santiago'
       });
 
+      const addressText = professional.address || 'Providencia, Santiago';
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
+      const phoneText = professional.phone || professional.whatsapp || '';
+
       const confirmationTicket = `✅ *¡CITA AGENDADA CON ÉXITO!* 💈
 ━━━━━━━━━━━━━━━━━━━
 👤 *Cliente:* ${targetClient.firstName} ${targetClient.lastName}
 ✂️ *Servicio:* ${serviceToBook?.name || 'Corte de Autor'}
+⏱️ *Duración:* ${duration} minutos
+💰 *Valor:* ${formatCLP(serviceToBook?.price || 0)}
 📅 *Fecha:* ${capitalize(dateReadable)}
 ⏰ *Hora:* ${chosenSlot.timeLabel}
-💈 *Profesional:* ${professional.businessName}
-📍 *Dirección:* ${professional.address || 'Espejos Studio Pro'}
+💈 *Barbería:* ${professional.businessName}
+📍 *Dirección:* ${addressText}
+${phoneText ? `📞 *Teléfono:* ${phoneText}\n` : ''}🗺️ *Cómo llegar:* ${mapsUrl}
 ━━━━━━━━━━━━━━━━━━━
 Te esperamos 5 minutos antes. ¡Nos vemos pronto! ✨
 _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
@@ -530,37 +656,49 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
     }
   }
 
-  // 6. IDLE STATE: Parse new booking requests or general questions
-  const isBookingQuery = lowerText.includes('hora') || lowerText.includes('turno') || lowerText.includes('cita') || 
-    lowerText.includes('corte') || lowerText.includes('agendar') || lowerText.includes('reservar') || 
-    lowerText.includes('disponible') || lowerText.includes('hueco') || lowerText.includes('barba') ||
-    lowerText.includes('hoy') || lowerText.includes('mañana') || lowerText.includes('agenda');
+  // 6. IDLE STATE: Handling New Inquiries
 
-  if (isBookingQuery) {
-    // A. EXISTING CLIENT
+  if (isBookingQuery || isTaggedClient) {
+    // A. RETURNING CLIENT (Detect habitual service memory)
     if (client) {
-      const primaryService = client.appointments[0]?.service || professional.services[0];
-      const slots = await getTopAvailableSlotsForBot(professional, primaryService?.durationMinutes || 30);
+      // Find past completed/confirmed appointments to determine habitual service
+      const pastAppointment = await prisma.appointment.findFirst({
+        where: { clientId: client.id, status: { in: ['confirmed', 'completed'] } },
+        orderBy: { startsAt: 'desc' },
+        include: { service: true }
+      });
 
-      if (slots.length > 0) {
-        state.step = 'AWAITING_SLOT';
+      const habitualService = pastAppointment?.service || professional.services[0];
+
+      if (habitualService && professional.services.length > 1) {
+        state.step = 'AWAITING_HABITUAL_CHOICE';
         state.clientId = client.id;
-        state.selectedServiceId = primaryService?.id;
-        state.offeredSlots = slots;
+        state.clientName = client.firstName;
+        state.habitualServiceId = habitualService.id;
 
-        const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-        const reply = `¡Hola ${client.firstName}! Qué gusto saludarte 💈.\n\nEstos son los horarios disponibles para tu *${primaryService?.name || 'Corte de Autor'}*:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
-
+        const reply = `¡Hola ${client.firstName}! Qué gusto saludarte 💈.\n\n¿Agendamos tu servicio habitual: *${habitualService.name}* (${formatCLP(habitualService.price)} — ${habitualService.durationMinutes} min)?\n\n1️⃣ *Sí, ver horarios para ${habitualService.name}*\n2️⃣ *Ver otros servicios de la carta*\n\n👉 *Elige 1 o 2:*`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       } else {
-        const reply = `¡Hola ${client.firstName}! Por el momento los cupos de hoy y mañana están completos 💈. Puedes revisar los próximos días disponibles aquí: https://espejosstudio.cl/${professional.slug}`;
-        await logAssistantReply(professional.id, cleanPhone, reply);
-        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+        // Single service or direct slot display
+        const duration = habitualService?.durationMinutes || 30;
+        const slots = await getTopAvailableSlotsForBot(professional, duration);
+
+        if (slots.length > 0) {
+          state.step = 'AWAITING_SLOT';
+          state.clientId = client.id;
+          state.selectedServiceId = habitualService?.id;
+          state.offeredSlots = slots;
+
+          const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
+          const reply = `¡Hola ${client.firstName}! Horarios disponibles para tu *${habitualService?.name || 'Corte'}*:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Elige una opción (ej: 1).*`;
+          await logAssistantReply(professional.id, cleanPhone, reply);
+          return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+        }
       }
     }
 
-    // B. NEW CLIENT (Detect if they already gave their name)
+    // B. NEW CLIENT (Detect if name already provided in message)
     const possibleName = extractClientName(text);
     if (possibleName && (lowerText.includes('soy') || lowerText.includes('me llamo') || lowerText.includes('mi nombre es'))) {
       const { firstName, lastName } = splitName(possibleName);
@@ -579,20 +717,18 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
       state.clientId = newClient.id;
       state.clientName = firstName;
 
-      const slots = await getTopAvailableSlotsForBot(professional, 30);
-      if (slots.length > 0) {
-        state.step = 'AWAITING_SLOT';
-        state.selectedServiceId = professional.services[0]?.id;
-        state.offeredSlots = slots;
+      if (professional.services && professional.services.length > 1) {
+        state.step = 'AWAITING_SERVICE_CHOICE';
+        const { menuText, offeredServices } = buildServiceMenu(professional.services, professional.businessName);
+        state.offeredServices = offeredServices;
 
-        const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-        const reply = `¡Mucho gusto, *${firstName}*! Bienvenido a *${professional.businessName}* 💈.\n\nTenemos estos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Responde con el número de tu opción (ej: 1).*`;
+        const reply = `¡Mucho gusto, *${firstName}*! Bienvenido a *${professional.businessName}* 💈.\n\n${menuText}`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       }
     }
 
-    // Ask for new client's name
+    // If new client and asking for appointment -> Ask for Name
     state.step = 'AWAITING_NAME';
     const reply = `¡Hola! Bienvenido a *${professional.businessName}* 💈. Con mucho gusto te ayudamos a coordinar tu cita.\n\nPara comenzar, ¿cuál es tu nombre y apellido?`;
     await logAssistantReply(professional.id, cleanPhone, reply);
@@ -610,7 +746,7 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
     };
   }
 
-  // Unknown non-booking message -> Personal chat, ignore
+  // 8. Unknown Non-Booking Message -> Personal Chat, IGNORE completely
   return {
     intent: 'PERSONAL',
     shouldIgnore: true
@@ -626,7 +762,7 @@ async function generateGeminiBotReply(
   userMessage: string
 ): Promise<string> {
   const geminiApiKey = process.env.GEMINI_API_KEY || '';
-  const servicesList = professional.services?.map((s: any) => `- ${s.name}: $${s.price.toLocaleString('es-CL')} (${s.durationMinutes} min)`).join('\n') || 'Corte Signature, Perfilado de Barba';
+  const servicesList = professional.services?.map((s: any) => `- ${s.name}: ${formatCLP(s.price)} (${s.durationMinutes} min)`).join('\n') || 'Corte Signature, Perfilado de Barba';
 
   const toneInstructions = {
     cercano: 'Habla como un barbero chileno/latino cercano, relajado, buena onda, usando lenguaje natural ("hola bro", "cómo estás", "te tinca a las 5?", "nos vemos en el local"). Sé conciso y amigable.',
@@ -647,7 +783,7 @@ ${servicesList}
 4. DIRECCIÓN DEL LOCAL: ${professional.address || 'Providencia, Santiago'}
 5. ENLACE DIRECTO DE RESERVAS: https://espejosstudio.cl/${professional.slug}
 6. Respuestas CORTAS (máximo 2 a 3 líneas).
-7. Si el cliente quiere agendar, dile que puede escribir "Quiero agendar" o ver los cupos en https://espejosstudio.cl/${professional.slug}.`;
+7. Si el cliente desea agendar, invítalo a escribir "Quiero agendar" o entrar al enlace directo.`;
 
   try {
     if (geminiApiKey) {
@@ -705,7 +841,7 @@ async function logAssistantReply(professionalId: string, phone: string, content:
 }
 
 function parseChoiceNumber(text: string): number | null {
-  const digitMatch = text.match(/\b([1-5])\b/);
+  const digitMatch = text.match(/\b([1-9])\b/);
   if (digitMatch) return parseInt(digitMatch[1], 10);
 
   if (text.includes('primera') || text.includes('primero') || text.includes('uno') || text.includes('la 1')) return 1;
@@ -723,7 +859,6 @@ function extractClientName(text: string): string | null {
     .replace(/^(soy|me llamo|mi nombre es|por aca|por acá)\s+/gi, '')
     .trim();
 
-  // If text is too long or contains punctuation, keep first 2-3 words
   const words = cleaned.split(/\s+/).filter(w => w.length > 1 && !w.includes('http') && !w.includes('.cl'));
   if (words.length === 0) return null;
 

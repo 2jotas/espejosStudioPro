@@ -52,6 +52,7 @@ export default function SettingsIntegrations() {
   const [whatsappCustomPrompt, setWhatsappCustomPrompt] = useState('');
   const [whatsappFewShotExamples, setWhatsappFewShotExamples] = useState('');
   const [whatsappReminderHours, setWhatsappReminderHours] = useState(2);
+  const [whatsappClientTagKeyword, setWhatsappClientTagKeyword] = useState('cliente');
   const [isWhatsappQrOpen, setIsWhatsappQrOpen] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
   const [isConnectingWhatsapp, setIsConnectingWhatsapp] = useState(false);
@@ -99,6 +100,7 @@ export default function SettingsIntegrations() {
           if (data.customPrompt) setWhatsappCustomPrompt(data.customPrompt);
           if (data.fewShotExamples) setWhatsappFewShotExamples(data.fewShotExamples);
           if (data.reminderHours) setWhatsappReminderHours(data.reminderHours);
+          if (data.clientTagKeyword !== undefined) setWhatsappClientTagKeyword(data.clientTagKeyword);
         }
       })
       .catch(() => {});
@@ -189,6 +191,7 @@ export default function SettingsIntegrations() {
           customPrompt: whatsappCustomPrompt,
           fewShotExamples: whatsappFewShotExamples,
           reminderHours: whatsappReminderHours,
+          clientTagKeyword: whatsappClientTagKeyword,
         }),
       });
 
@@ -600,6 +603,25 @@ export default function SettingsIntegrations() {
                 <option value={2}>2 horas antes de la cita (Recomendado)</option>
                 <option value={3}>3 horas antes de la cita</option>
               </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Palabra Clave para Identificar Clientes en Contactos:
+                </label>
+                <span className="text-[11px] text-emerald-400 font-mono">Filtro Anti-Personal</span>
+              </div>
+              <input
+                type="text"
+                value={whatsappClientTagKeyword}
+                onChange={(e) => setWhatsappClientTagKeyword(e.target.value)}
+                placeholder="cliente (ej: 'Juan Pérez cliente' o '[CLI]')"
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Si tus clientes tienen una palabra distintiva en el nombre en tu WhatsApp (ej: "cliente"), el bot los atenderá automáticamente y evitará responder a tus chats personales.
+              </p>
             </div>
 
             <div>

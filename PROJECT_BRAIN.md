@@ -51,6 +51,7 @@ Principio de 3 capas aisladas:
 | **2026-08-31** | Antigravity 2.0 | API / Web | Bot Inteligente de WhatsApp con Gemini 2.0 Flash, entrenamiento con chats reales (Few-Shot), recordatorios automáticos y sistema de 4 estados con código de colores en CRM (`confirmada` 🟢, `cancelada` 🔴, `reagendada` 🟡, `pendiente` 🟣). |
 | **2026-09-01** | Antigravity 2.0 | API / Web | Implementación completa de motor **Baileys Multi-Device WhatsApp Web**, generación de QR real criptográfico en backend, persistencia de sesiones en volumen Docker y auto-reconexión 24/7. |
 | **2026-09-01** | Antigravity 2.0 | API | Arquitectura conversacional completa con **Máquina de Estados (FSM)** para WhatsApp Bot: verificación de cliente existente vs nuevo, consulta de disponibilidad en tiempo real, menús numerados `1️⃣, 2️⃣, 3️⃣`, reserva atómica, tickets de confirmación, sincronización de Google Calendar y guardrails anti-spam. |
+| **2026-09-01** | Antigravity 2.0 | API / Web | Perfeccionamiento UX de WhatsApp Bot: Menú de selección de servicios con precios y duraciones exactas, memoria inteligente de servicio habitual para clientes recurrentes, ticket con datos reales del profesional + link de Google Maps, filtro de contactos por palabra clave (`whatsappClientTagKeyword`) e importador de contactos. |
 
 ---
 

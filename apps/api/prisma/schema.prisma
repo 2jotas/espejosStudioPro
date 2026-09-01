@@ -32,6 +32,7 @@ model Professional {
   whatsappCustomPrompt    String?        @map("whatsapp_custom_prompt")
   whatsappFewShotExamples String?        @map("whatsapp_few_shot_examples")
   whatsappReminderHours   Int            @default(2) @map("whatsapp_reminder_hours")
+  whatsappClientTagKeyword String?       @default("cliente") @map("whatsapp_client_tag_keyword")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 
