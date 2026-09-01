@@ -41,6 +41,19 @@ async function main() {
     credentials: true,
   });
 
+  // Handle empty JSON bodies gracefully without throwing 400
+  server.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body: string, done) => {
+    if (!body || body.trim().length === 0) {
+      return done(null, {});
+    }
+    try {
+      const parsed = JSON.parse(body);
+      done(null, parsed);
+    } catch (err: any) {
+      done(err, undefined);
+    }
+  });
+
   await server.register(cookie);
 
   await server.register(jwt, {

@@ -235,7 +235,8 @@ export default function SettingsIntegrations() {
     try {
       const res = await fetch('/api/whatsapp/connect', { 
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({})
       });
       const data = await res.json();
       if (data?.qrCode) {
@@ -257,7 +258,8 @@ export default function SettingsIntegrations() {
     try {
       await fetch('/api/whatsapp/disconnect', { 
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        body: JSON.stringify({})
       });
       setIsWhatsappConnected(false);
       setIsWhatsappQrOpen(false);

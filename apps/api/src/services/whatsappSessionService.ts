@@ -40,6 +40,19 @@ export async function startWhatsAppSession(professionalId: string): Promise<{ qr
     return { connected: true };
   }
 
+  // If already active with a valid QR code ready, return it immediately
+  if (existingSocket && activeQrs.has(professionalId)) {
+    return { qrCode: activeQrs.get(professionalId), connected: false };
+  }
+
+  // If previous socket exists but is closed, clean it up
+  if (existingSocket) {
+    try {
+      existingSocket.end(undefined);
+    } catch (e) {}
+    activeSockets.delete(professionalId);
+  }
+
   // If a start operation is currently in-flight, return the existing promise
   if (startingPromises.has(professionalId)) {
     return startingPromises.get(professionalId)!;
@@ -47,12 +60,15 @@ export async function startWhatsAppSession(professionalId: string): Promise<{ qr
 
   const startPromise = (async () => {
     try {
+      console.log(`[WhatsApp] Initializing new Baileys session for professional ${professionalId}...`);
       const sessionPath = path.join(SESSIONS_DIR, `auth_${professionalId}`);
       const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
       
       let version: [number, number, number] = [2, 3000, 1015901307];
       try {
-        const versionInfo = await fetchLatestBaileysVersion();
+        const versionPromise = fetchLatestBaileysVersion();
+        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500));
+        const versionInfo: any = await Promise.race([versionPromise, timeoutPromise]);
         if (versionInfo?.version) {
           version = versionInfo.version;
         }
