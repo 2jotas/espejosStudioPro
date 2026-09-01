@@ -27,27 +27,38 @@ export interface AppointmentItem {
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
 
-// Local date/time formatting helpers (avoids UTC offset skew in forms and filters)
-export const formatLocalDate = (d: Date): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+// Local date/time formatting helpers in Chile timezone (America/Santiago)
+export const formatLocalDate = (d: Date | string): string => {
+  const dateObj = typeof d === 'string' ? new Date(d) : d;
+  return dateObj.toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
 };
 
-export const formatLocalTime = (d: Date): string => {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+export const formatLocalTime = (d: Date | string): string => {
+  const dateObj = typeof d === 'string' ? new Date(d) : d;
+  return dateObj.toLocaleTimeString('es-CL', {
+    timeZone: 'America/Santiago',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 };
 
 export const parseLocalDateTimeToIso = (dateStr: string, timeStr: string): string => {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const parts = timeStr.trim().split(':');
-  const h = parseInt(parts[0] || '0', 10);
-  const min = parseInt(parts[1] || '0', 10);
-  const localDate = new Date(y, m - 1, d, h, min, 0);
-  return localDate.toISOString();
+  const dummy = new Date(`${dateStr}T${timeStr.trim()}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(dummy);
+  const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const santiagoDateStr = `${m.year}-${m.month}-${m.day}T${m.hour}:${m.minute}:${m.second}Z`;
+  const offsetMs = dummy.getTime() - new Date(santiagoDateStr).getTime();
+  return new Date(dummy.getTime() + offsetMs).toISOString();
 };
 
 export default function CalendarManager() {
@@ -290,7 +301,7 @@ export default function CalendarManager() {
         alert(`¡Recordatorio de WhatsApp enviado con éxito a ${app.client.firstName} (${app.client.phone})!`);
       } else {
         // Fallback: Open WhatsApp Web directly with prefilled reminder message
-        const timeStr = new Date(app.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const timeStr = new Date(app.startsAt).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false });
         const text = encodeURIComponent(`¡Hola ${app.client.firstName}! 👋 Te recordamos tu cita de *${app.service.name}* hoy a las *${timeStr}* en Espejos Studio.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`);
         const cleanPhone = app.client.phone.replace(/\D/g, '');
         window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
@@ -674,7 +685,7 @@ export default function CalendarManager() {
               {dayAppointments.map((app) => {
                 const start = new Date(app.startsAt);
                 const end = new Date(app.endsAt);
-                const timeStr = `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                const timeStr = `${start.toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })}`;
 
                 return (
                   <div
@@ -831,7 +842,7 @@ export default function CalendarManager() {
                           {app.client.firstName} {app.client.lastName}
                         </div>
                         <div className="text-[10px] text-indigo-300 font-mono">
-                          {new Date(app.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(app.startsAt).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
                     ))}

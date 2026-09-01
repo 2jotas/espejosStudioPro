@@ -639,7 +639,6 @@ export async function classifyAndProcessMessage(
 👤 *Cliente:* ${targetClient.firstName} ${targetClient.lastName}
 ✂️ *Servicio:* ${serviceToBook?.name || 'Corte de Autor'}
 ⏱️ *Duración:* ${duration} minutos
-💰 *Valor:* ${formatCLP(serviceToBook?.price || 0)}
 📅 *Fecha:* ${capitalize(dateReadable)}
 ⏰ *Hora:* ${chosenSlot.timeLabel}
 💈 *Barbería:* ${professional.businessName}

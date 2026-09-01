@@ -45,11 +45,11 @@ export default function DashboardManager() {
   }, []);
 
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = now.toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
 
   const todayAppointments = appointments.filter((app) => {
     const d = new Date(app.startsAt);
-    const appDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const appDate = d.toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
     return appDate === todayStr && app.status !== 'cancelled';
   });
 
@@ -141,7 +141,7 @@ export default function DashboardManager() {
           <div className="space-y-3">
             {todayAppointments.map((app) => {
               const start = new Date(app.startsAt);
-              const timeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const timeStr = start.toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' });
 
               return (
                 <div key={app.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
