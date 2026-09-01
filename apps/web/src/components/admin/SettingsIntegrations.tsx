@@ -12,7 +12,10 @@ import {
   Bot, 
   Send, 
   Save, 
-  X
+  X,
+  MapPin,
+  Upload,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -67,6 +70,8 @@ export default function SettingsIntegrations() {
   const [importFilterKeyword, setImportFilterKeyword] = useState('cliente');
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [parsedStats, setParsedStats] = useState<{ total: number; matched: number } | null>(null);
 
   // WhatsApp Simulator Chat
   const [simMessage, setSimMessage] = useState('');
@@ -233,13 +238,67 @@ export default function SettingsIntegrations() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al importar contactos');
 
-      setImportResult(`✅ ${data.message} (${data.skippedCount} omitidos por no contener "${importFilterKeyword}")`);
+      setImportResult(`✅ ${data.message} (${data.skippedCount} omitidos por no coincidir con el filtro)`);
       setImportText('');
+      setSelectedFileName(null);
+      setParsedStats(null);
+      if (refetchUser) await refetchUser();
     } catch (err: any) {
       setImportResult(`❌ ${err.message || 'Error al procesar contactos'}`);
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFileName(file.name);
+    setImportResult(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = (event.target?.result as string) || '';
+      setImportText(content);
+
+      // Parse and compute live preview stats
+      const kw = importFilterKeyword.trim().toLowerCase();
+      let totalFound = 0;
+      let matchedCount = 0;
+
+      if (content.includes('BEGIN:VCARD')) {
+        const vcards = content.split('END:VCARD');
+        for (const card of vcards) {
+          const fnMatch = card.match(/(?:FN|N)(?:;[^:]*)?:(.*)/i);
+          const telMatch = card.match(/TEL(?:;[^:]*)?:(.*)/i);
+          if (fnMatch && telMatch) {
+            totalFound++;
+            if (!kw || fnMatch[1].toLowerCase().includes(kw)) {
+              matchedCount++;
+            }
+          }
+        }
+      } else {
+        const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          const parts = line.split(/[,;\t|\-]/).map(p => p.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            const possiblePhone = parts.find(p => p.replace(/\D/g, '').length >= 8);
+            const possibleName = parts.find(p => p !== possiblePhone);
+            if (possiblePhone && possibleName) {
+              totalFound++;
+              if (!kw || possibleName.toLowerCase().includes(kw)) {
+                matchedCount++;
+              }
+            }
+          }
+        }
+      }
+
+      setParsedStats({ total: totalFound, matched: matchedCount });
+    };
+    reader.readAsText(file);
   };
 
   const handleSaveWhatsappSettings = async () => {
@@ -546,9 +605,22 @@ export default function SettingsIntegrations() {
                 placeholder="Ej: Av. Providencia 1234, Local 4, Santiago"
                 className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Se incluye en las confirmaciones de WhatsApp y genera el link de Google Maps.
-              </p>
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-[10px] text-slate-500">
+                  Se incluye en las confirmaciones de WhatsApp y genera el link de Google Maps.
+                </p>
+                {address.trim() && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center space-x-1 shrink-0 ml-2"
+                  >
+                    <span>Ver en Maps 🗺️</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
             </div>
 
             <div>
@@ -1202,12 +1274,60 @@ export default function SettingsIntegrations() {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Pega aquí la lista de contactos o archivo VCF / CSV:
+              {/* File Upload Area (Mobile & Desktop) */}
+              <div className="p-4 bg-slate-950 border-2 border-dashed border-slate-800 hover:border-emerald-500/50 rounded-2xl transition-all text-center">
+                <input
+                  type="file"
+                  id="contactsFileInput"
+                  accept=".vcf,.vcard,.csv,.txt"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <label
+                  htmlFor="contactsFileInput"
+                  className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+                >
+                  <div className="h-10 w-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white hover:text-emerald-400 underline">
+                      Selecciona o sube tu archivo desde el teléfono / PC
+                    </span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Compatible con contactos de WhatsApp, Google Contacts o iPhone (.vcf, .csv, .txt)
+                    </p>
+                  </div>
                 </label>
+
+                {selectedFileName && (
+                  <div className="mt-3 p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-300 flex items-center justify-between">
+                    <div className="flex items-center space-x-2 truncate">
+                      <FileText className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <span className="font-mono truncate">{selectedFileName}</span>
+                    </div>
+                    {parsedStats && (
+                      <span className="text-[10px] font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                        {parsedStats.matched} de {parsedStats.total} son clientes
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    O pega el texto / lista de contactos manualmente:
+                  </label>
+                  {importText.trim() && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {importText.split('\n').filter(Boolean).length} líneas cargadas
+                    </span>
+                  )}
+                </div>
                 <textarea
-                  rows={6}
+                  rows={4}
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder={`Ejemplo:\nJuan Pérez cliente, +56912345678\nPedro Soto cliente, +56987654321\nTía María, +56911223344 (este será ignorado)`}

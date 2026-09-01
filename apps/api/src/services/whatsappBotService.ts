@@ -627,8 +627,10 @@ export async function classifyAndProcessMessage(
         timeZone: 'America/Santiago'
       });
 
-      const addressText = professional.address || 'Providencia, Santiago';
-      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
+      const addressText = professional.address ? professional.address : professional.businessName;
+      const mapsUrl = professional.address 
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.address)}`
+        : `https://espejosstudio.cl/${professional.slug}`;
       const phoneText = professional.phone || professional.whatsapp || '';
 
       const confirmationTicket = `✅ *¡CITA AGENDADA CON ÉXITO!* 💈
@@ -780,7 +782,7 @@ REGLAS DE ORO:
 2. ${fewShotContext}
 3. SERVICIOS Y PRECIOS DISPONIBLES:
 ${servicesList}
-4. DIRECCIÓN DEL LOCAL: ${professional.address || 'Providencia, Santiago'}
+4. DIRECCIÓN DEL LOCAL: ${professional.address || professional.businessName}
 5. ENLACE DIRECTO DE RESERVAS: https://espejosstudio.cl/${professional.slug}
 6. Respuestas CORTAS (máximo 2 a 3 líneas).
 7. Si el cliente desea agendar, invítalo a escribir "Quiero agendar" o entrar al enlace directo.`;
