@@ -22,6 +22,7 @@ import { dashboardRoutes } from './modules/dashboard.js';
 import { visagismRoutes } from './modules/visagism.js';
 import whatsappRoutes from './modules/whatsapp.js';
 import { initializeGalleryWatcher } from './lib/galleryWatcher.js';
+import { initializeWhatsAppSessions } from './services/whatsappSessionService.js';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
@@ -76,6 +77,10 @@ async function main() {
   try {
     await server.listen({ port, host });
     server.log.info(`🚀 API Server running at http://localhost:${port}`);
+    // Auto-restore any existing WhatsApp Web sessions
+    initializeWhatsAppSessions().catch((err) => {
+      server.log.error(err, '[WhatsApp] Error auto-restoring sessions:');
+    });
   } catch (err) {
     server.log.error(err);
     process.exit(1);

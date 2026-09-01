@@ -15,6 +15,7 @@ services:
     volumes:
       - ./apps/api/prisma:/app/apps/api/prisma
       - ./apps/api/uploads:/app/apps/api/uploads
+      - ./apps/api/sessions:/app/apps/api/sessions
 
   espejos-web:
     build:

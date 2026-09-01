@@ -27,3 +27,4 @@ postgres_data
 redis_data
 gallery_uploads
 apps/api/uploads/
+apps/api/sessions/
