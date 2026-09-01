@@ -53,6 +53,7 @@ Principio de 3 capas aisladas:
 | **2026-09-01** | Antigravity 2.0 | API | Arquitectura conversacional completa con **Máquina de Estados (FSM)** para WhatsApp Bot: verificación de cliente existente vs nuevo, consulta de disponibilidad en tiempo real, menús numerados `1️⃣, 2️⃣, 3️⃣`, reserva atómica, tickets de confirmación, sincronización de Google Calendar y guardrails anti-spam. |
 | **2026-09-01** | Antigravity 2.0 | API / Web | Perfeccionamiento UX de WhatsApp Bot: Menú de selección de servicios con precios y duraciones exactas, memoria inteligente de servicio habitual para clientes recurrentes, ticket con datos reales del profesional + link de Google Maps, filtro de contactos por palabra clave (`whatsappClientTagKeyword`) e importador de contactos. |
 | **2026-09-02** | Antigravity 2.0 | API / Web | Formulario dedicado de Dirección Física & Teléfono Comercial con botón de verificación en Google Maps; Selector móvil de archivos `.vcf`, `.csv`, `.txt` para importar contactos de WhatsApp; y corrección estricta de huso horario (`America/Santiago`) en cálculo de slots y sincronización de Google Calendar. |
+| **2026-09-02** | Antigravity 2.0 | API | Flujo interactivo multi-día (`AWAITING_DAY_CHOICE`): listado de días de la semana (1️⃣ Hoy, 2️⃣ Mañana, 3️⃣ Viernes...), despliegue de **todos** los horarios disponibles de apertura a cierre (10:00 a 20:00), y reconocimiento inteligente de horas directas ("15:00", "15 horas"). |
 
 ---
 
