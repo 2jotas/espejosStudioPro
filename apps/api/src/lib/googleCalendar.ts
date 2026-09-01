@@ -228,8 +228,8 @@ export function calculateAvailableTimeSlots(params: {
   busyRanges: BusyRange[];
   workStartHour?: number; // default 10 (10:00 AM Santiago)
   workEndHour?: number; // default 20 (08:00 PM Santiago)
-  disabledDays?: number[]; // default [2, 3] (Tuesday & Wednesday off)
-  blockedSlots?: string[]; // default ['10:00', '20:00']
+  disabledDays?: number[];
+  blockedSlots?: string[];
 }): Array<{ timeStr: string; startIso: string; endIso: string }> {
   const {
     dateStr,
@@ -237,8 +237,8 @@ export function calculateAvailableTimeSlots(params: {
     busyRanges,
     workStartHour = 10,
     workEndHour = 20,
-    disabledDays = [2, 3], // Tuesday (2) & Wednesday (3) disabled by default
-    blockedSlots = ['10:00', '20:00'],
+    disabledDays = [],
+    blockedSlots = [],
   } = params;
 
   const slots: Array<{ timeStr: string; startIso: string; endIso: string }> = [];
@@ -252,8 +252,8 @@ export function calculateAvailableTimeSlots(params: {
   const daysMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   const dayOfWeek = daysMap[dayOfWeekParts] ?? 0;
 
-  // If day is disabled (e.g. Tuesday or Wednesday), return no slots
-  if (disabledDays.includes(dayOfWeek)) {
+  // If day is disabled, return no slots
+  if (disabledDays.length > 0 && disabledDays.includes(dayOfWeek)) {
     return slots;
   }
 

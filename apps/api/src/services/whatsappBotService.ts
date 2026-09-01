@@ -34,12 +34,21 @@ export interface OfferedSlot {
   formattedChoice: string;
 }
 
+export interface OfferedDay {
+  index: number;
+  dateStr: string;
+  dayLabel: string;
+  fullLabel: string;
+}
+
 export interface BotConversationState {
-  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE_CHOICE' | 'AWAITING_HABITUAL_CHOICE' | 'AWAITING_SLOT';
+  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE_CHOICE' | 'AWAITING_HABITUAL_CHOICE' | 'AWAITING_DAY_CHOICE' | 'AWAITING_SLOT';
   clientName?: string;
   clientId?: string;
   selectedServiceId?: string;
   habitualServiceId?: string;
+  selectedDateStr?: string;
+  offeredDays?: OfferedDay[];
   offeredSlots?: OfferedSlot[];
   offeredServices?: Array<{ index: number; id: string; name: string; price: number; durationMinutes: number }>;
   isRescheduling?: boolean;
@@ -100,113 +109,155 @@ export function formatCLP(amount: number): string {
 }
 
 /**
- * Calculates ALL available slots for the nearest available working day for a specific duration
+ * Returns upcoming available working days (e.g. 6 days)
  */
-export async function getTopAvailableSlotsForBot(
-  professional: any,
-  durationMinutes = 30
-): Promise<OfferedSlot[]> {
-  const offeredSlots: OfferedSlot[] = [];
+export function getUpcomingDaysForBot(count = 6): OfferedDay[] {
+  const days: OfferedDay[] = [];
   const now = new Date();
-
-  // Check up to 7 upcoming days to find open availability
-  const dateOptions: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    dateOptions.push(d);
-  }
-
   const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' });
   const dayNameFormatter = new Intl.DateTimeFormat('es-CL', { weekday: 'long', timeZone: 'America/Santiago' });
+  const monthFormatter = new Intl.DateTimeFormat('es-CL', { month: 'long', day: 'numeric', timeZone: 'America/Santiago' });
 
-  for (const dateObj of dateOptions) {
-    const dateStr = formatter.format(dateObj); // YYYY-MM-DD
+  for (let i = 0; i < 14; i++) {
+    if (days.length >= count) break;
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dateStr = formatter.format(d);
     const isToday = formatter.format(now) === dateStr;
     const tomorrowObj = new Date();
     tomorrowObj.setDate(now.getDate() + 1);
     const isTomorrow = formatter.format(tomorrowObj) === dateStr;
 
-    let dayLabel = isToday ? 'Hoy' : isTomorrow ? 'Mañana' : capitalize(dayNameFormatter.format(dateObj));
+    const weekdayName = capitalize(dayNameFormatter.format(d));
+    const dayMonth = capitalize(monthFormatter.format(d));
+    let dayLabel = isToday ? 'Hoy' : isTomorrow ? 'Mañana' : weekdayName;
+    let fullLabel = isToday ? `*Hoy* (${weekdayName}, ${dayMonth})` : isTomorrow ? `*Mañana* (${weekdayName}, ${dayMonth})` : `*${weekdayName}* (${dayMonth})`;
 
-    // Calculate busy ranges for this date
-    const windowStart = new Date(`${dateStr}T00:00:00.000Z`);
-    windowStart.setUTCDate(windowStart.getUTCDate() - 1);
-    const windowEnd = new Date(`${dateStr}T23:59:59.999Z`);
-    windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
+    const index = days.length + 1;
+    days.push({ index, dateStr, dayLabel, fullLabel });
+  }
 
-    const dbAppointments = await prisma.appointment.findMany({
-      where: {
-        professionalId: professional.id,
-        status: { in: ['pending', 'confirmed'] },
-        startsAt: { lte: windowEnd },
-        endsAt: { gte: windowStart },
-      },
-    });
+  return days;
+}
 
-    const busyRanges: BusyRange[] = dbAppointments.map((app) => ({
-      start: app.startsAt,
-      end: app.endsAt,
-    }));
+/**
+ * Builds Day Selection Menu text
+ */
+export function buildDaySelectionMenu(days: OfferedDay[], serviceName?: string): string {
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
+  const list = days.map((d, i) => `${emojis[i] || `${d.index}.`} ${d.fullLabel}`).join('\n');
+  return `📅 *¿Para qué día te gustaría agendar${serviceName ? ` tu *${serviceName}*` : ''}?* 💈\n\n${list}\n\n👉 *Responde con el número de tu día preferido (ej: 1 o 2).*`;
+}
 
-    const dayStartIso = getSantiagoUtcDate(dateStr, '00:00').toISOString();
-    const dayEndIso = getSantiagoUtcDate(dateStr, '23:59').toISOString();
+/**
+ * Calculates ALL available slots for a specific date in America/Santiago timezone (10:00 to 20:00)
+ */
+export async function getSlotsForSpecificDate(
+  professional: any,
+  dateStr: string,
+  durationMinutes = 30
+): Promise<OfferedSlot[]> {
+  const offeredSlots: OfferedSlot[] = [];
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' });
+  const dayNameFormatter = new Intl.DateTimeFormat('es-CL', { weekday: 'long', timeZone: 'America/Santiago' });
+  const isToday = formatter.format(now) === dateStr;
+  const tomorrowObj = new Date();
+  tomorrowObj.setDate(now.getDate() + 1);
+  const isTomorrow = formatter.format(tomorrowObj) === dateStr;
 
-    if (professional.googleCalendarConnected && professional.googleRefreshToken) {
-      const googleBusy = await fetchGoogleBusyRanges(
-        professional.googleRefreshToken,
-        dayStartIso,
-        dayEndIso
-      );
-      busyRanges.push(...googleBusy);
-    } else if (professional.googleCalendarConnected && professional.googleApiKey && professional.googleCalendarId) {
-      const googleBusy = await fetchGoogleBusyRangesViaApiKey(
-        professional.googleCalendarId,
-        professional.googleApiKey,
-        dayStartIso,
-        dayEndIso
-      );
-      busyRanges.push(...googleBusy);
-    }
+  const dateObj = getSantiagoUtcDate(dateStr, '12:00');
+  let dayLabel = isToday ? 'Hoy' : isTomorrow ? 'Mañana' : capitalize(dayNameFormatter.format(dateObj));
 
-    const rawSlots = calculateAvailableTimeSlots({
+  const windowStart = new Date(`${dateStr}T00:00:00.000Z`);
+  windowStart.setUTCDate(windowStart.getUTCDate() - 1);
+  const windowEnd = new Date(`${dateStr}T23:59:59.999Z`);
+  windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
+
+  const dbAppointments = await prisma.appointment.findMany({
+    where: {
+      professionalId: professional.id,
+      status: { in: ['pending', 'confirmed'] },
+      startsAt: { lte: windowEnd },
+      endsAt: { gte: windowStart },
+    },
+  });
+
+  const busyRanges: BusyRange[] = dbAppointments.map((app) => ({
+    start: app.startsAt,
+    end: app.endsAt,
+  }));
+
+  const dayStartIso = getSantiagoUtcDate(dateStr, '00:00').toISOString();
+  const dayEndIso = getSantiagoUtcDate(dateStr, '23:59').toISOString();
+
+  if (professional.googleCalendarConnected && professional.googleRefreshToken) {
+    const googleBusy = await fetchGoogleBusyRanges(
+      professional.googleRefreshToken,
+      dayStartIso,
+      dayEndIso
+    );
+    busyRanges.push(...googleBusy);
+  } else if (professional.googleCalendarConnected && professional.googleApiKey && professional.googleCalendarId) {
+    const googleBusy = await fetchGoogleBusyRangesViaApiKey(
+      professional.googleCalendarId,
+      professional.googleApiKey,
+      dayStartIso,
+      dayEndIso
+    );
+    busyRanges.push(...googleBusy);
+  }
+
+  const rawSlots = calculateAvailableTimeSlots({
+    dateStr,
+    durationMinutes,
+    busyRanges,
+  });
+
+  // Filter out past slots if today (15 min buffer)
+  const bufferTime = now.getTime() + 15 * 60 * 1000;
+  const validSlots = rawSlots.filter((slot) => {
+    const slotTime = new Date(slot.startIso).getTime();
+    if (isToday) return slotTime > bufferTime;
+    return true;
+  });
+
+  const emojiNumbers = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '1️⃣1️⃣', '1️⃣2️⃣', '1️⃣3️⃣', '1️⃣4️⃣', '1️⃣5️⃣', '1️⃣6️⃣', '1️⃣7️⃣', '1️⃣8️⃣', '1️⃣9️⃣', '2️⃣0️⃣'];
+
+  for (let i = 0; i < validSlots.length; i++) {
+    const slot = validSlots[i];
+    const index = i + 1;
+    const emoji = emojiNumbers[i] || `${index}.`;
+
+    offeredSlots.push({
+      index,
+      startIso: slot.startIso,
+      endIso: slot.endIso,
       dateStr,
-      durationMinutes,
-      busyRanges,
+      timeLabel: `${slot.timeStr} hrs`,
+      dayLabel,
+      formattedChoice: `${emoji} *${slot.timeStr} hrs*`
     });
-
-    // Filter out slots in the past or within 15 minutes from right now
-    const bufferTime = now.getTime() + 15 * 60 * 1000;
-    const validSlots = rawSlots.filter((slot) => {
-      const slotTime = new Date(slot.startIso).getTime();
-      return slotTime > bufferTime;
-    });
-
-    if (validSlots.length > 0) {
-      const emojiNumbers = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '1️⃣1️⃣', '1️⃣2️⃣', '1️⃣3️⃣', '1️⃣4️⃣', '1️⃣5️⃣', '1️⃣6️⃣', '1️⃣7️⃣', '1️⃣8️⃣', '1️⃣9️⃣', '2️⃣0️⃣'];
-
-      for (let i = 0; i < validSlots.length; i++) {
-        const slot = validSlots[i];
-        const index = i + 1;
-        const emoji = emojiNumbers[i] || `${index}.`;
-
-        offeredSlots.push({
-          index,
-          startIso: slot.startIso,
-          endIso: slot.endIso,
-          dateStr,
-          timeLabel: `${slot.timeStr} hrs`,
-          dayLabel,
-          formattedChoice: `${emoji} *${dayLabel}* a las *${slot.timeStr} hrs*`
-        });
-      }
-
-      // We found the available day with all its slots! Break to offer the full day's hours.
-      break;
-    }
   }
 
   return offeredSlots;
+}
+
+/**
+ * Calculates ALL available slots for the nearest available working day
+ */
+export async function getTopAvailableSlotsForBot(
+  professional: any,
+  durationMinutes = 30
+): Promise<OfferedSlot[]> {
+  const days = getUpcomingDaysForBot(7);
+  for (const day of days) {
+    const slots = await getSlotsForSpecificDate(professional, day.dateStr, durationMinutes);
+    if (slots.length > 0) {
+      return slots;
+    }
+  }
+  return [];
 }
 
 /**
@@ -461,7 +512,34 @@ export async function classifyAndProcessMessage(
 
   // STEP: AWAITING_HABITUAL_CHOICE (Returning client: Keep habitual service or change?)
   if (state.step === 'AWAITING_HABITUAL_CHOICE') {
-    const choice = parseChoiceNumber(lowerText);
+    const directHour = extractDirectHour(lowerText);
+    const isDayRequest = lowerText.includes('otro dia') || lowerText.includes('otro día') || lowerText.includes('otra fecha') || lowerText.includes('dias') || lowerText.includes('días');
+
+    if (isDayRequest) {
+      state.step = 'AWAITING_DAY_CHOICE';
+      const days = getUpcomingDaysForBot(6);
+      state.offeredDays = days;
+      const service = professional.services.find(s => s.id === state.habitualServiceId) || professional.services[0];
+      state.selectedServiceId = service?.id;
+      const reply = buildDaySelectionMenu(days, service?.name);
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+    }
+
+    if (directHour) {
+      // User directly typed an hour (e.g. "15:00" or "15 horas")
+      const service = professional.services.find(s => s.id === state.habitualServiceId) || professional.services[0];
+      state.selectedServiceId = service?.id;
+      const slots = await getTopAvailableSlotsForBot(professional, service?.durationMinutes || 30);
+      state.offeredSlots = slots;
+      const matchedSlot = slots.find(s => s.timeLabel.startsWith(directHour));
+      if (matchedSlot) {
+        state.step = 'AWAITING_SLOT';
+        // Fall through to book matched slot
+      }
+    }
+
+    const choice = parseChoiceNumber(lowerText, state.offeredSlots);
 
     if (choice === 1 && state.habitualServiceId) {
       // Confirmed habitual service -> compute slots
@@ -473,17 +551,19 @@ export async function classifyAndProcessMessage(
         state.step = 'AWAITING_SLOT';
         state.offeredSlots = slots;
         const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-        const reply = `Excelente elección. Estos son los horarios disponibles para tu *${service?.name}* (${service?.durationMinutes} min):\n\n${slotsMenu}\n\n🌐 *Ver más días / calendario completo:* https://espejosstudio.cl/${professional.slug}\n\n👉 *Responde con el número de tu horario preferido (ej: 1).*`;
+        const reply = `Excelente elección. Estos son los horarios disponibles para tu *${service?.name}* (${service?.durationMinutes} min):\n\n${slotsMenu}\n\n📅 *¿Prefieres otro día?* Escribe *"otro día"*.\n👉 *Responde con el número de tu horario preferido (ej: 1) o escribe la hora (ej: 15:00).*`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       } else {
-        state.step = 'IDLE';
-        const reply = `Por el momento no nos quedan cupos disponibles para los próximos días. Puedes revisar el calendario web en https://espejosstudio.cl/${professional.slug} 💈`;
+        state.step = 'AWAITING_DAY_CHOICE';
+        const days = getUpcomingDaysForBot(6);
+        state.offeredDays = days;
+        const reply = `Por el momento hoy no nos quedan cupos disponibles.\n\n${buildDaySelectionMenu(days, service?.name)}`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       }
-    } else {
-      // Choice 2 or other text -> Display full service menu
+    } else if (choice === 2 || lowerText.includes('carta') || lowerText.includes('otro servicio') || lowerText.includes('otros')) {
+      // Display full service menu
       state.step = 'AWAITING_SERVICE_CHOICE';
       const { menuText, offeredServices } = buildServiceMenu(professional.services, professional.businessName);
       state.offeredServices = offeredServices;
@@ -494,8 +574,24 @@ export async function classifyAndProcessMessage(
 
   // STEP: AWAITING_SERVICE_CHOICE (User chooses service 1, 2, 3...)
   if (state.step === 'AWAITING_SERVICE_CHOICE' && state.offeredServices && state.offeredServices.length > 0) {
-    const serviceIndex = parseChoiceNumber(lowerText);
-    const selectedOffered = state.offeredServices.find(s => s.index === serviceIndex);
+    const isDayRequest = lowerText.includes('otro dia') || lowerText.includes('otro día') || lowerText.includes('otra fecha') || lowerText.includes('dias') || lowerText.includes('días');
+    if (isDayRequest) {
+      state.step = 'AWAITING_DAY_CHOICE';
+      const days = getUpcomingDaysForBot(6);
+      state.offeredDays = days;
+      state.selectedServiceId = state.offeredServices[0]?.id;
+      const reply = buildDaySelectionMenu(days, state.offeredServices[0]?.name);
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+    }
+
+    const directHour = extractDirectHour(lowerText);
+    let selectedOffered = state.offeredServices.find(s => s.index === parseChoiceNumber(lowerText));
+
+    if (!selectedOffered && directHour) {
+      // Default to first service if user wrote time directly
+      selectedOffered = state.offeredServices[0];
+    }
 
     if (!selectedOffered) {
       const { menuText } = buildServiceMenu(professional.services, professional.businessName);
@@ -510,28 +606,67 @@ export async function classifyAndProcessMessage(
     if (slots.length > 0) {
       state.step = 'AWAITING_SLOT';
       state.offeredSlots = slots;
+
+      if (directHour) {
+        const matchedSlot = slots.find(s => s.timeLabel.startsWith(directHour));
+        if (matchedSlot) {
+          // Fall through to book matched slot directly
+        }
+      }
+
       const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const reply = `Has seleccionado *${selectedOffered.name}* (${formatCLP(selectedOffered.price)} — ${selectedOffered.durationMinutes} min) 💈.\n\nHorarios disponibles:\n\n${slotsMenu}\n\n🌐 *Ver más días / calendario completo:* https://espejosstudio.cl/${professional.slug}\n\n👉 *Responde con el número de tu opción (ej: 1).*`;
+      const reply = `Has seleccionado *${selectedOffered.name}* (${formatCLP(selectedOffered.price)} — ${selectedOffered.durationMinutes} min) 💈.\n\nHorarios disponibles:\n\n${slotsMenu}\n\n📅 *¿Prefieres ver otro día?* Escribe *"otro día"*.\n👉 *Responde con el número de tu opción (ej: 1) o escribe la hora (ej: 15:00).*`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     } else {
-      state.step = 'IDLE';
-      const reply = `Para *${selectedOffered.name}* no nos quedan cupos libres en los próximos días. Puedes ver las fechas en https://espejosstudio.cl/${professional.slug} 💈`;
+      state.step = 'AWAITING_DAY_CHOICE';
+      const days = getUpcomingDaysForBot(6);
+      state.offeredDays = days;
+      const reply = `Para *${selectedOffered.name}* no nos quedan cupos libres hoy.\n\n${buildDaySelectionMenu(days, selectedOffered.name)}`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     }
   }
 
+  // STEP: AWAITING_DAY_CHOICE (User chooses specific day 1, 2, 3... from days menu)
+  if (state.step === 'AWAITING_DAY_CHOICE' && state.offeredDays && state.offeredDays.length > 0) {
+    const chosenDay = parseDayChoice(lowerText, state.offeredDays);
+
+    if (chosenDay) {
+      state.selectedDateStr = chosenDay.dateStr;
+      const serviceToBook = professional.services.find((s: any) => s.id === state.selectedServiceId) || professional.services[0];
+      const duration = serviceToBook?.durationMinutes || 30;
+      const slots = await getSlotsForSpecificDate(professional, chosenDay.dateStr, duration);
+
+      if (slots.length > 0) {
+        state.step = 'AWAITING_SLOT';
+        state.offeredSlots = slots;
+        const slotsList = slots.map(s => s.formattedChoice).join('\n');
+        const reply = `💈 Horarios disponibles para el *${chosenDay.dayLabel}* (*${serviceToBook?.name}*):\n\n${slotsList}\n\n📅 *¿Prefieres ver otro día?* Escribe *"otro día"*.\n👉 *Responde con el número de tu horario preferido (ej: 1) o escribe la hora (ej: 15:00).*`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      } else {
+        const reply = `Para el día *${chosenDay.dayLabel}* no quedan horas disponibles. Puedes elegir otro día respondiendo con su número o ver nuestro calendario en https://espejosstudio.cl/${professional.slug} 💈`;
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
+      }
+    }
+  }
+
   // STEP: AWAITING_SLOT (User chooses slot 1, 2, ..., or types time directly)
   if (state.step === 'AWAITING_SLOT' && state.offeredSlots && state.offeredSlots.length > 0) {
-    const choiceNum = parseChoiceNumber(lowerText, state.offeredSlots);
-
-    if (lowerText.includes('otro') || lowerText.includes('ver mas') || lowerText.includes('ver más') || lowerText.includes('calendario')) {
-      state.step = 'IDLE';
-      const reply = `Puedes ver todos los días y horarios libres de nuestro calendario interactivo aquí: https://espejosstudio.cl/${professional.slug} 💈 ¡Te esperamos!`;
+    const isDayRequest = lowerText.includes('otro dia') || lowerText.includes('otro día') || lowerText.includes('otra fecha') || lowerText.includes('cambiar dia') || lowerText.includes('cambiar día') || lowerText.includes('dias') || lowerText.includes('días');
+    if (isDayRequest) {
+      state.step = 'AWAITING_DAY_CHOICE';
+      const days = getUpcomingDaysForBot(6);
+      state.offeredDays = days;
+      const serviceToBook = professional.services.find((s: any) => s.id === state.selectedServiceId) || professional.services[0];
+      const reply = buildDaySelectionMenu(days, serviceToBook?.name);
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     }
+
+    const choiceNum = parseChoiceNumber(lowerText, state.offeredSlots);
 
     if (choiceNum && choiceNum >= 1 && choiceNum <= state.offeredSlots.length) {
       const chosenSlot = state.offeredSlots[choiceNum - 1];
@@ -697,7 +832,7 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
           state.offeredSlots = slots;
 
           const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-          const reply = `¡Hola ${client.firstName}! Horarios disponibles para tu *${habitualService?.name || 'Corte'}*:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Elige una opción (ej: 1).*`;
+          const reply = `¡Hola ${client.firstName}! Horarios disponibles para tu *${habitualService?.name || 'Corte'}*:\n\n${slotsMenu}\n\n📅 *¿Prefieres ver otro día?* Escribe *"otro día"*.\n👉 *Responde con el número de tu horario preferido (ej: 1) o escribe la hora (ej: 15:00).*`;
           await logAssistantReply(professional.id, cleanPhone, reply);
           return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
         }
@@ -846,21 +981,64 @@ async function logAssistantReply(professionalId: string, phone: string, content:
   }
 }
 
+function extractDirectHour(text: string): string | null {
+  const clean = text.trim().toLowerCase();
+  // 1. Direct time format: "15:00", "15:30", "10:30", "15.00", "15 30"
+  const timeMatch = clean.match(/(\d{1,2})[:.\s](\d{2})/);
+  if (timeMatch) {
+    return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+  }
+  // 2. Hour string: "15 horas", "15 hrs", "a las 15", "a las 3", "3 pm", "11 am"
+  const hourMatch = clean.match(/(?:a las\s+)?(\d{1,2})\s*(?:hrs|horas|hrs\.|h|am|pm)?\b/);
+  if (hourMatch) {
+    const rawH = parseInt(hourMatch[1], 10);
+    if (rawH >= 10 && rawH <= 20) {
+      return `${String(rawH).padStart(2, '0')}:00`;
+    }
+    if (rawH >= 1 && rawH <= 8 && (clean.includes('pm') || clean.includes('tarde') || rawH >= 2)) {
+      return `${String(rawH + 12).padStart(2, '0')}:00`;
+    }
+    if (rawH >= 9 && rawH <= 11) {
+      return `${String(rawH).padStart(2, '0')}:00`;
+    }
+  }
+  return null;
+}
+
+function parseDayChoice(text: string, offeredDays?: OfferedDay[]): OfferedDay | null {
+  if (!offeredDays || offeredDays.length === 0) return null;
+  const clean = text.trim().toLowerCase();
+
+  // 1. Check digit match (1, 2, 3...)
+  const digitMatch = clean.match(/\b(\d{1,2})\b/);
+  if (digitMatch) {
+    const num = parseInt(digitMatch[1], 10);
+    const found = offeredDays.find(d => d.index === num);
+    if (found) return found;
+  }
+
+  // 2. Check keyword day match
+  if (clean.includes('hoy')) return offeredDays.find(d => d.dayLabel.toLowerCase().includes('hoy')) || offeredDays[0];
+  if (clean.includes('mañana') || clean.includes('manana')) return offeredDays.find(d => d.dayLabel.toLowerCase().includes('mañana')) || offeredDays[1];
+  if (clean.includes('lunes')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('lunes')) || null;
+  if (clean.includes('martes')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('martes')) || null;
+  if (clean.includes('miercoles') || clean.includes('miércoles')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('miércoles') || d.fullLabel.toLowerCase().includes('miercoles')) || null;
+  if (clean.includes('jueves')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('jueves')) || null;
+  if (clean.includes('viernes')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('viernes')) || null;
+  if (clean.includes('sabado') || clean.includes('sábado')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('sábado') || d.fullLabel.toLowerCase().includes('sabado')) || null;
+  if (clean.includes('domingo')) return offeredDays.find(d => d.fullLabel.toLowerCase().includes('domingo')) || null;
+
+  return null;
+}
+
 function parseChoiceNumber(text: string, offeredSlots?: OfferedSlot[]): number | null {
   const clean = text.trim().toLowerCase();
 
-  // 1. Direct hour string match (e.g. user typed "10:30" or "10 30" or "11:00" or "11")
+  // 1. Direct hour string match (e.g. user typed "10:30" or "10 30" or "11:00" or "15 horas")
   if (offeredSlots && offeredSlots.length > 0) {
-    const timeMatch = clean.match(/(\d{1,2})[:.\s](\d{2})/);
-    if (timeMatch) {
-      const matchedTimeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-      const foundSlot = offeredSlots.find(s => s.timeLabel.startsWith(matchedTimeStr));
-      if (foundSlot) return foundSlot.index;
-    }
-    const simpleHourMatch = clean.match(/\b(\d{1,2})\s*(hrs|horas|am|pm)?\b/);
-    if (simpleHourMatch) {
-      const matchedHour = simpleHourMatch[1].padStart(2, '0');
-      const foundSlot = offeredSlots.find(s => s.timeLabel.startsWith(`${matchedHour}:00`));
+    const directHour = extractDirectHour(clean);
+    if (directHour) {
+      const foundSlot = offeredSlots.find(s => s.timeLabel.startsWith(directHour));
       if (foundSlot) return foundSlot.index;
     }
   }
