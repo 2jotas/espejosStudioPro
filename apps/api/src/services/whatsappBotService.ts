@@ -100,7 +100,7 @@ export function formatCLP(amount: number): string {
 }
 
 /**
- * Calculates top 4 available slots across today and upcoming working days for a specific duration
+ * Calculates ALL available slots for the nearest available working day for a specific duration
  */
 export async function getTopAvailableSlotsForBot(
   professional: any,
@@ -109,9 +109,9 @@ export async function getTopAvailableSlotsForBot(
   const offeredSlots: OfferedSlot[] = [];
   const now = new Date();
 
-  // Determine dates for today, tomorrow, and subsequent 3 days
+  // Check up to 7 upcoming days to find open availability
   const dateOptions: Date[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     dateOptions.push(d);
@@ -121,8 +121,6 @@ export async function getTopAvailableSlotsForBot(
   const dayNameFormatter = new Intl.DateTimeFormat('es-CL', { weekday: 'long', timeZone: 'America/Santiago' });
 
   for (const dateObj of dateOptions) {
-    if (offeredSlots.length >= 4) break;
-
     const dateStr = formatter.format(dateObj); // YYYY-MM-DD
     const isToday = formatter.format(now) === dateStr;
     const tomorrowObj = new Date();
@@ -177,28 +175,34 @@ export async function getTopAvailableSlotsForBot(
       busyRanges,
     });
 
-    // Filter out slots in the past or within 30 minutes from right now
-    const bufferTime = now.getTime() + 30 * 60 * 1000;
+    // Filter out slots in the past or within 15 minutes from right now
+    const bufferTime = now.getTime() + 15 * 60 * 1000;
     const validSlots = rawSlots.filter((slot) => {
       const slotTime = new Date(slot.startIso).getTime();
       return slotTime > bufferTime;
     });
 
-    for (const slot of validSlots) {
-      if (offeredSlots.length >= 4) break;
-      const index = offeredSlots.length + 1;
-      const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
-      const emoji = emojis[index - 1] || `${index}.`;
+    if (validSlots.length > 0) {
+      const emojiNumbers = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '1️⃣1️⃣', '1️⃣2️⃣', '1️⃣3️⃣', '1️⃣4️⃣', '1️⃣5️⃣', '1️⃣6️⃣', '1️⃣7️⃣', '1️⃣8️⃣', '1️⃣9️⃣', '2️⃣0️⃣'];
 
-      offeredSlots.push({
-        index,
-        startIso: slot.startIso,
-        endIso: slot.endIso,
-        dateStr,
-        timeLabel: `${slot.timeStr} hrs`,
-        dayLabel,
-        formattedChoice: `${emoji} *${dayLabel}* a las *${slot.timeStr} hrs*`
-      });
+      for (let i = 0; i < validSlots.length; i++) {
+        const slot = validSlots[i];
+        const index = i + 1;
+        const emoji = emojiNumbers[i] || `${index}.`;
+
+        offeredSlots.push({
+          index,
+          startIso: slot.startIso,
+          endIso: slot.endIso,
+          dateStr,
+          timeLabel: `${slot.timeStr} hrs`,
+          dayLabel,
+          formattedChoice: `${emoji} *${dayLabel}* a las *${slot.timeStr} hrs*`
+        });
+      }
+
+      // We found the available day with all its slots! Break to offer the full day's hours.
+      break;
     }
   }
 
@@ -469,12 +473,12 @@ export async function classifyAndProcessMessage(
         state.step = 'AWAITING_SLOT';
         state.offeredSlots = slots;
         const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-        const reply = `Excelente elección. Estos son los horarios disponibles para tu *${service?.name}* (${service?.durationMinutes} min):\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día*\n\n👉 *Responde con el número de tu horario preferido (ej: 1).*`;
+        const reply = `Excelente elección. Estos son los horarios disponibles para tu *${service?.name}* (${service?.durationMinutes} min):\n\n${slotsMenu}\n\n🌐 *Ver más días / calendario completo:* https://espejosstudio.cl/${professional.slug}\n\n👉 *Responde con el número de tu horario preferido (ej: 1).*`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       } else {
         state.step = 'IDLE';
-        const reply = `Por el momento no nos quedan cupos disponibles para hoy ni mañana. Puedes revisar las próximas fechas en https://espejosstudio.cl/${professional.slug} 💈`;
+        const reply = `Por el momento no nos quedan cupos disponibles para los próximos días. Puedes revisar el calendario web en https://espejosstudio.cl/${professional.slug} 💈`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       }
@@ -507,22 +511,22 @@ export async function classifyAndProcessMessage(
       state.step = 'AWAITING_SLOT';
       state.offeredSlots = slots;
       const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const reply = `Has seleccionado *${selectedOffered.name}* (${formatCLP(selectedOffered.price)} — ${selectedOffered.durationMinutes} min) 💈.\n\nHorarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1).*`;
+      const reply = `Has seleccionado *${selectedOffered.name}* (${formatCLP(selectedOffered.price)} — ${selectedOffered.durationMinutes} min) 💈.\n\nHorarios disponibles:\n\n${slotsMenu}\n\n🌐 *Ver más días / calendario completo:* https://espejosstudio.cl/${professional.slug}\n\n👉 *Responde con el número de tu opción (ej: 1).*`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     } else {
       state.step = 'IDLE';
-      const reply = `Para *${selectedOffered.name}* no nos quedan cupos libres hoy ni mañana. Puedes ver las próximas fechas en https://espejosstudio.cl/${professional.slug} 💈`;
+      const reply = `Para *${selectedOffered.name}* no nos quedan cupos libres en los próximos días. Puedes ver las fechas en https://espejosstudio.cl/${professional.slug} 💈`;
       await logAssistantReply(professional.id, cleanPhone, reply);
       return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
     }
   }
 
-  // STEP: AWAITING_SLOT (User chooses 1, 2, 3, 4, or 5)
+  // STEP: AWAITING_SLOT (User chooses slot 1, 2, ..., or types time directly)
   if (state.step === 'AWAITING_SLOT' && state.offeredSlots && state.offeredSlots.length > 0) {
-    const choiceNum = parseChoiceNumber(lowerText);
+    const choiceNum = parseChoiceNumber(lowerText, state.offeredSlots);
 
-    if (choiceNum === 5 || lowerText.includes('otro') || lowerText.includes('ver mas') || lowerText.includes('ver más') || lowerText.includes('calendario')) {
+    if (lowerText.includes('otro') || lowerText.includes('ver mas') || lowerText.includes('ver más') || lowerText.includes('calendario')) {
       state.step = 'IDLE';
       const reply = `Puedes ver todos los días y horarios libres de nuestro calendario interactivo aquí: https://espejosstudio.cl/${professional.slug} 💈 ¡Te esperamos!`;
       await logAssistantReply(professional.id, cleanPhone, reply);
@@ -842,15 +846,43 @@ async function logAssistantReply(professionalId: string, phone: string, content:
   }
 }
 
-function parseChoiceNumber(text: string): number | null {
-  const digitMatch = text.match(/\b([1-9])\b/);
-  if (digitMatch) return parseInt(digitMatch[1], 10);
+function parseChoiceNumber(text: string, offeredSlots?: OfferedSlot[]): number | null {
+  const clean = text.trim().toLowerCase();
 
-  if (text.includes('primera') || text.includes('primero') || text.includes('uno') || text.includes('la 1')) return 1;
-  if (text.includes('segunda') || text.includes('segundo') || text.includes('dos') || text.includes('la 2')) return 2;
-  if (text.includes('tercera') || text.includes('tercero') || text.includes('tres') || text.includes('la 3')) return 3;
-  if (text.includes('cuarta') || text.includes('cuarto') || text.includes('cuatro') || text.includes('la 4')) return 4;
-  if (text.includes('quinta') || text.includes('quinto') || text.includes('cinco') || text.includes('la 5')) return 5;
+  // 1. Direct hour string match (e.g. user typed "10:30" or "10 30" or "11:00" or "11")
+  if (offeredSlots && offeredSlots.length > 0) {
+    const timeMatch = clean.match(/(\d{1,2})[:.\s](\d{2})/);
+    if (timeMatch) {
+      const matchedTimeStr = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+      const foundSlot = offeredSlots.find(s => s.timeLabel.startsWith(matchedTimeStr));
+      if (foundSlot) return foundSlot.index;
+    }
+    const simpleHourMatch = clean.match(/\b(\d{1,2})\s*(hrs|horas|am|pm)?\b/);
+    if (simpleHourMatch) {
+      const matchedHour = simpleHourMatch[1].padStart(2, '0');
+      const foundSlot = offeredSlots.find(s => s.timeLabel.startsWith(`${matchedHour}:00`));
+      if (foundSlot) return foundSlot.index;
+    }
+  }
+
+  // 2. Numeric digit match (e.g. "1", "2", "12", "opcion 3", "la 4")
+  const digitMatch = clean.match(/\b(\d{1,2})\b/);
+  if (digitMatch) {
+    const num = parseInt(digitMatch[1], 10);
+    if (num > 0) return num;
+  }
+
+  // 3. Spanish word numbers
+  if (clean.includes('primera') || clean.includes('primero') || clean.includes('uno') || clean.includes('la 1')) return 1;
+  if (clean.includes('segunda') || clean.includes('segundo') || clean.includes('dos') || clean.includes('la 2')) return 2;
+  if (clean.includes('tercera') || clean.includes('tercero') || clean.includes('tres') || clean.includes('la 3')) return 3;
+  if (clean.includes('cuarta') || clean.includes('cuarto') || clean.includes('cuatro') || clean.includes('la 4')) return 4;
+  if (clean.includes('quinta') || clean.includes('quinto') || clean.includes('cinco') || clean.includes('la 5')) return 5;
+  if (clean.includes('sexta') || clean.includes('sexto') || clean.includes('seis') || clean.includes('la 6')) return 6;
+  if (clean.includes('septima') || clean.includes('séptima') || clean.includes('siete') || clean.includes('la 7')) return 7;
+  if (clean.includes('octava') || clean.includes('ocho') || clean.includes('la 8')) return 8;
+  if (clean.includes('novena') || clean.includes('nueve') || clean.includes('la 9')) return 9;
+  if (clean.includes('decima') || clean.includes('décima') || clean.includes('diez') || clean.includes('la 10')) return 10;
 
   return null;
 }
