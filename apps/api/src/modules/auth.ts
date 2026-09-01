@@ -305,20 +305,53 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Get Current Professional Session
   fastify.get('/auth/me', { preHandler: [authenticateProfessional] }, async (request, reply) => {
-    return { user: request.userSession };
+    const professional = await fastify.prisma.professional.findUnique({
+      where: { id: request.userSession!.id },
+      select: {
+        id: true,
+        email: true,
+        slug: true,
+        businessName: true,
+        plan: true,
+        bio: true,
+        address: true,
+        phone: true,
+        whatsapp: true,
+      }
+    });
+
+    if (!professional) {
+      return reply.status(404).send({ error: 'NotFound', message: 'Usuario no encontrado' });
+    }
+
+    return {
+      user: {
+        id: professional.id,
+        email: professional.email,
+        slug: professional.slug,
+        businessName: professional.businessName,
+        plan: professional.plan as 'free' | 'pro',
+        bio: professional.bio || '',
+        address: professional.address || '',
+        phone: professional.phone || '',
+        whatsapp: professional.whatsapp || '',
+      }
+    };
   });
 
-  // Update Professional Profile (Business Name, Slug, Bio)
+  // Update Professional Profile (Business Name, Slug, Bio, Address, Phone, WhatsApp)
   fastify.put<{
     Body: {
       businessName?: string;
       slug?: string;
       bio?: string;
+      address?: string;
       phone?: string;
+      whatsapp?: string;
     };
   }>('/auth/profile', { preHandler: [authenticateProfessional] }, async (request, reply) => {
     const userSession = request.userSession!;
-    const { businessName, slug, bio, phone } = request.body;
+    const { businessName, slug, bio, address, phone, whatsapp } = request.body;
 
     const professional = await fastify.prisma.professional.findUnique({
       where: { id: userSession.id },
@@ -360,7 +393,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         businessName: businessName ? businessName.trim() : professional.businessName,
         slug: newSlug,
         bio: bio !== undefined ? bio.trim() : professional.bio,
+        address: address !== undefined ? address.trim() : professional.address,
         phone: phone !== undefined ? phone.trim() : professional.phone,
+        whatsapp: whatsapp !== undefined ? whatsapp.trim() : professional.whatsapp,
       },
     });
 
@@ -370,6 +405,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       slug: updated.slug,
       businessName: updated.businessName,
       plan: updated.plan as 'free' | 'pro',
+      bio: updated.bio || '',
+      address: updated.address || '',
+      phone: updated.phone || '',
+      whatsapp: updated.whatsapp || '',
     };
 
     const token = fastify.jwt.sign(updatedSession, { expiresIn: '7d' });

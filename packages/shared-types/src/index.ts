@@ -10,6 +10,10 @@ export interface UserSession {
   slug: string;
   businessName: string;
   plan: PlanType;
+  bio?: string;
+  address?: string;
+  phone?: string;
+  whatsapp?: string;
 }
 
 export interface HealthCheckResponse {

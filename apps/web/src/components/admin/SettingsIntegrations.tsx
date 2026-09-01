@@ -22,7 +22,9 @@ export default function SettingsIntegrations() {
   // Profile Edit State
   const [businessName, setBusinessName] = useState(user?.businessName || '');
   const [slug, setSlug] = useState(user?.slug || '');
-  const [bio, setBio] = useState('');
+  const [bio, setBio] = useState(user?.bio || '');
+  const [address, setAddress] = useState(user?.address || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [isSlugAvailable, setIsSlugAvailable] = useState<boolean | null>(true);
   const [slugReason, setSlugReason] = useState<string | null>(null);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
@@ -59,6 +61,13 @@ export default function SettingsIntegrations() {
   const [isSavingWhatsappSettings, setIsSavingWhatsappSettings] = useState(false);
   const [whatsappSaveMessage, setWhatsappSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // WhatsApp Import Contacts State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importFilterKeyword, setImportFilterKeyword] = useState('cliente');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+
   // WhatsApp Simulator Chat
   const [simMessage, setSimMessage] = useState('');
   const [simHistory, setSimHistory] = useState<Array<{ role: 'user' | 'bot'; text: string }>>([
@@ -74,8 +83,11 @@ export default function SettingsIntegrations() {
   // Sync user state when loaded
   useEffect(() => {
     if (user) {
-      setBusinessName(user.businessName);
-      setSlug(user.slug);
+      setBusinessName(user.businessName || '');
+      setSlug(user.slug || '');
+      setBio(user.bio || '');
+      setAddress(user.address || '');
+      setPhone(user.phone || '');
     }
   }, [user]);
 
@@ -159,6 +171,8 @@ export default function SettingsIntegrations() {
           businessName,
           slug,
           bio,
+          address,
+          phone,
         }),
       });
 
@@ -168,12 +182,63 @@ export default function SettingsIntegrations() {
         throw new Error(data.error || 'Error al actualizar el perfil');
       }
 
-      setProfileMessage({ type: 'success', text: '¡Perfil y URL pública actualizados exitosamente!' });
+      setProfileMessage({ type: 'success', text: '¡Perfil, dirección física y datos actualizados exitosamente!' });
       if (refetchUser) await refetchUser();
     } catch (err: any) {
       setProfileMessage({ type: 'error', text: err.message || 'No se pudo guardar el perfil' });
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleImportContacts = async () => {
+    if (!importText.trim()) return;
+    setIsImporting(true);
+    setImportResult(null);
+
+    try {
+      // Parse line by line: e.g. "Juan Perez cliente, +56912345678" or VCF format
+      const lines = importText.split('\n').map(l => l.trim()).filter(Boolean);
+      const parsedContacts: Array<{ name: string; phone: string }> = [];
+
+      let currentName = '';
+      for (const line of lines) {
+        if (line.toUpperCase().startsWith('FN:') || line.toUpperCase().startsWith('N:')) {
+          currentName = line.replace(/^(FN:|N:)/i, '').trim();
+        } else if (line.toUpperCase().startsWith('TEL')) {
+          const phone = line.replace(/^TEL.*?:/i, '').trim();
+          if (phone) parsedContacts.push({ name: currentName || 'Contacto', phone });
+          currentName = '';
+        } else {
+          const parts = line.split(/[,;\t|\-]/).map(p => p.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            const possiblePhone = parts.find(p => p.replace(/\D/g, '').length >= 8);
+            const possibleName = parts.find(p => p !== possiblePhone);
+            if (possiblePhone && possibleName) {
+              parsedContacts.push({ name: possibleName, phone: possiblePhone });
+            }
+          }
+        }
+      }
+
+      const res = await fetch('/api/whatsapp/import-contacts', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          contacts: parsedContacts,
+          filterKeyword: importFilterKeyword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al importar contactos');
+
+      setImportResult(`✅ ${data.message} (${data.skippedCount} omitidos por no contener "${importFilterKeyword}")`);
+      setImportText('');
+    } catch (err: any) {
+      setImportResult(`❌ ${err.message || 'Error al procesar contactos'}`);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -469,6 +534,40 @@ export default function SettingsIntegrations() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Dirección Física del Local / Estudio 📍
+              </label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Ej: Av. Providencia 1234, Local 4, Santiago"
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Se incluye en las confirmaciones de WhatsApp y genera el link de Google Maps.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Teléfono de Contacto Comercial 📞
+              </label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Ej: +56 9 1234 5678"
+                className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Número para contacto y soporte a tus clientes.
+              </p>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={isSavingProfile || isCheckingSlug || !isSlugAvailable}
@@ -649,6 +748,16 @@ export default function SettingsIntegrations() {
               {isSavingWhatsappSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>Guardar Configuración del Bot</span>
             </button>
+
+            <div className="pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="w-full py-2 bg-slate-800/80 hover:bg-slate-700/80 text-emerald-400 text-xs font-semibold rounded-xl border border-slate-700/80 flex items-center justify-center space-x-2 transition-all shadow-sm"
+              >
+                <span>📥 Importar / Sincronizar Contactos con Filtro</span>
+              </button>
+            </div>
           </div>
 
           {/* Right Column: Live Chat Simulator */}
@@ -1049,6 +1158,86 @@ export default function SettingsIntegrations() {
               >
                 {isDeletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Confirmar Baja</span>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Contacts Modal with Keyword Filter */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative space-y-5 text-left max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Importar Clientes de WhatsApp</h3>
+                  <p className="text-slate-400 text-xs">Filtra automáticamente por palabra clave</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsImportModalOpen(false); setImportResult(null); }}
+                className="p-1.5 bg-slate-800 text-slate-400 hover:text-white rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Palabra Clave para Filtrar Clientes:
+                </label>
+                <input
+                  type="text"
+                  value={importFilterKeyword}
+                  onChange={(e) => setImportFilterKeyword(e.target.value)}
+                  placeholder="cliente"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Solo se guardarán los contactos cuyo nombre contenga este término (ej: "Juan Pérez cliente").
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Pega aquí la lista de contactos o archivo VCF / CSV:
+                </label>
+                <textarea
+                  rows={6}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={`Ejemplo:\nJuan Pérez cliente, +56912345678\nPedro Soto cliente, +56987654321\nTía María, +56911223344 (este será ignorado)`}
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 font-mono resize-none leading-relaxed"
+                />
+              </div>
+
+              {importResult && (
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium text-slate-300">
+                  {importResult}
+                </div>
+              )}
+
+              <div className="flex items-center space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsImportModalOpen(false); setImportResult(null); }}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImportContacts}
+                  disabled={!importText.trim() || isImporting}
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2"
+                >
+                  {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Procesar e Importar</span>}
+                </button>
+              </div>
             </div>
           </div>
         </div>
