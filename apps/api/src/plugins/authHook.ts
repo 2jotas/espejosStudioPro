@@ -24,6 +24,7 @@ export async function authenticateProfessional(request: FastifyRequest, reply: F
 
     const decoded = request.server.jwt.verify<UserSession>(token);
     request.userSession = decoded;
+    (request as any).user = decoded;
   } catch (err) {
     return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or expired authentication token' });
   }

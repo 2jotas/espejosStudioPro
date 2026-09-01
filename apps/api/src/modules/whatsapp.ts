@@ -13,11 +13,17 @@ import {
 const prisma = new PrismaClient();
 
 export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
+  // Helper to extract authenticated professional ID
+  const getProfId = (req: any): string => req.userSession?.id || req.user?.id;
+
   // 1. Get WhatsApp Status & Bot Settings for Logged-in Professional
   fastify.get('/status', {
     preHandler: [authenticateProfessional]
   }, async (request: any, reply) => {
-    const professionalId = request.user.id;
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
 
     const professional = await prisma.professional.findUnique({
       where: { id: professionalId },
@@ -56,7 +62,10 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/connect', {
     preHandler: [authenticateProfessional]
   }, async (request: any, reply) => {
-    const professionalId = request.user.id;
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
 
     try {
       const result = await startWhatsAppSession(professionalId);
@@ -79,7 +88,10 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/disconnect', {
     preHandler: [authenticateProfessional]
   }, async (request: any, reply) => {
-    const professionalId = request.user.id;
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
 
     await stopWhatsAppSession(professionalId);
 
@@ -90,7 +102,10 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.put('/settings', {
     preHandler: [authenticateProfessional]
   }, async (request: any, reply) => {
-    const professionalId = request.user.id;
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
     const { botEnabled, tone, customPrompt, fewShotExamples, reminderHours } = request.body || {};
 
     const updated = await prisma.professional.update({
@@ -123,7 +138,10 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/test-chat', {
     preHandler: [authenticateProfessional]
   }, async (request: any, reply) => {
-    const professionalId = request.user.id;
+    const professionalId = getProfId(request);
+    if (!professionalId) {
+      return reply.code(401).send({ error: 'No autenticado' });
+    }
     const { message, senderPhone } = request.body || {};
 
     if (!message) {
