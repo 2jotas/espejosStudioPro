@@ -1,4 +1,4 @@
-import baileysPkg from '@whiskeysockets/baileys';
+import * as BaileysModule from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
@@ -9,14 +9,16 @@ import { classifyAndProcessMessage } from './whatsappBotService.js';
 const prisma = new PrismaClient();
 const logger = pino({ level: 'silent' });
 
-// Safe interop for Baileys ESM/CJS
-const makeWASocket = (baileysPkg as any).default || baileysPkg;
-const {
-  DisconnectReason,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore
-} = (baileysPkg as any);
+// Safe interop for Baileys ESM/CJS (handles both default export and named export trees)
+const Baileys: any = (BaileysModule as any).useMultiFileAuthState 
+  ? BaileysModule 
+  : ((BaileysModule as any).default?.useMultiFileAuthState ? (BaileysModule as any).default : BaileysModule);
+
+const makeWASocket = Baileys.default || Baileys;
+const useMultiFileAuthState = Baileys.useMultiFileAuthState || (BaileysModule as any).useMultiFileAuthState;
+const fetchLatestBaileysVersion = Baileys.fetchLatestBaileysVersion || (BaileysModule as any).fetchLatestBaileysVersion;
+const DisconnectReason = Baileys.DisconnectReason || (BaileysModule as any).DisconnectReason;
+const makeCacheableSignalKeyStore = Baileys.makeCacheableSignalKeyStore || (BaileysModule as any).makeCacheableSignalKeyStore;
 
 // Active sockets and QR states per professional
 const activeSockets = new Map<string, any>();
