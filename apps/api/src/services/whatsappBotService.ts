@@ -4,6 +4,7 @@ import {
   fetchGoogleBusyRangesViaApiKey,
   calculateAvailableTimeSlots,
   createGoogleCalendarEvent,
+  getSantiagoUtcDate,
   BusyRange
 } from '../lib/googleCalendar.js';
 
@@ -150,8 +151,8 @@ export async function getTopAvailableSlotsForBot(
       end: app.endsAt,
     }));
 
-    const dayStartIso = `${dateStr}T00:00:00.000Z`;
-    const dayEndIso = `${dateStr}T23:59:59.999Z`;
+    const dayStartIso = getSantiagoUtcDate(dateStr, '00:00').toISOString();
+    const dayEndIso = getSantiagoUtcDate(dateStr, '23:59').toISOString();
 
     if (professional.googleCalendarConnected && professional.googleRefreshToken) {
       const googleBusy = await fetchGoogleBusyRanges(

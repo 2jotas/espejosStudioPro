@@ -8,6 +8,7 @@ import {
   fetchGoogleFullEventsViaApiKey,
   verifyGoogleApiKeyConnection,
   calculateAvailableTimeSlots,
+  getSantiagoUtcDate,
 } from '../lib/googleCalendar.js';
 
 export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
@@ -60,9 +61,9 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       end: app.endsAt,
     }));
 
-    // Start & End ISO for Google Calendar queries
-    const dayStartIso = `${date}T00:00:00.000Z`;
-    const dayEndIso = `${date}T23:59:59.999Z`;
+    // Start & End ISO for Google Calendar queries in Santiago timezone
+    const dayStartIso = getSantiagoUtcDate(date, '00:00').toISOString();
+    const dayEndIso = getSantiagoUtcDate(date, '23:59').toISOString();
 
     // If Google Calendar is connected via OAuth
     if (professional.googleCalendarConnected && professional.googleRefreshToken) {

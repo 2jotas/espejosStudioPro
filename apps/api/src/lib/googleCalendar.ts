@@ -184,8 +184,8 @@ export async function createGoogleCalendarEvent(
       requestBody: {
         summary: eventData.summary,
         description: eventData.description,
-        start: { dateTime: eventData.startIso },
-        end: { dateTime: eventData.endIso },
+        start: { dateTime: eventData.startIso, timeZone: 'America/Santiago' },
+        end: { dateTime: eventData.endIso, timeZone: 'America/Santiago' },
       },
     });
 
@@ -197,16 +197,37 @@ export async function createGoogleCalendarEvent(
 }
 
 /**
- * Calculates available time slots for a given date.
- * Default working hours: 09:00 to 19:00
- * Slot step: 15 minutes
+ * Converts a Chilean date string (YYYY-MM-DD) and local time string (HH:mm) into a true UTC Date object
+ */
+export function getSantiagoUtcDate(dateStr: string, timeStr: string): Date {
+  const dummy = new Date(`${dateStr}T${timeStr}:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(dummy);
+  const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const santiagoDateStr = `${m.year}-${m.month}-${m.day}T${m.hour}:${m.minute}:${m.second}Z`;
+  const offsetMs = dummy.getTime() - new Date(santiagoDateStr).getTime();
+  return new Date(dummy.getTime() + offsetMs);
+}
+
+/**
+ * Calculates available time slots for a given date in Chile timezone (America/Santiago).
+ * Default working hours: 10:00 to 20:00
+ * Slot step: 30 minutes
  */
 export function calculateAvailableTimeSlots(params: {
-  dateStr: string; // YYYY-MM-DD
+  dateStr: string; // YYYY-MM-DD in America/Santiago
   durationMinutes: number;
   busyRanges: BusyRange[];
-  workStartHour?: number; // default 10 (10:00 AM)
-  workEndHour?: number; // default 20 (08:00 PM / 20:00)
+  workStartHour?: number; // default 10 (10:00 AM Santiago)
+  workEndHour?: number; // default 20 (08:00 PM Santiago)
   disabledDays?: number[]; // default [2, 3] (Tuesday & Wednesday off)
   blockedSlots?: string[]; // default ['10:00', '20:00']
 }): Array<{ timeStr: string; startIso: string; endIso: string }> {
@@ -217,7 +238,7 @@ export function calculateAvailableTimeSlots(params: {
     workStartHour = 10,
     workEndHour = 20,
     disabledDays = [2, 3], // Tuesday (2) & Wednesday (3) disabled by default
-    blockedSlots = ['10:00', '20:00'], // 10:00 AM and 20:00 PM always reserved by default
+    blockedSlots = ['10:00', '20:00'],
   } = params;
 
   const slots: Array<{ timeStr: string; startIso: string; endIso: string }> = [];
@@ -225,71 +246,49 @@ export function calculateAvailableTimeSlots(params: {
   const dateParts = dateStr.split('-');
   if (dateParts.length !== 3) return slots;
 
-  const year = parseInt(dateParts[0], 10);
-  const month = parseInt(dateParts[1], 10) - 1;
-  const day = parseInt(dateParts[2], 10);
-
-  const targetDate = new Date(Date.UTC(year, month, day, 12, 0, 0));
-  const dayOfWeek = targetDate.getUTCDay(); // 0 = Sun, 1 = Mon, 2 = Tue, 3 = Wed, 4 = Thu, 5 = Fri, 6 = Sat
+  // Day of week in Santiago
+  const middayDate = getSantiagoUtcDate(dateStr, '12:00');
+  const dayOfWeekParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', weekday: 'short' }).format(middayDate);
+  const daysMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dayOfWeek = daysMap[dayOfWeekParts] ?? 0;
 
   // If day is disabled (e.g. Tuesday or Wednesday), return no slots
   if (disabledDays.includes(dayOfWeek)) {
     return slots;
   }
 
-  const startOfDay = new Date(Date.UTC(year, month, day, workStartHour, 0, 0));
-  const endOfDay = new Date(Date.UTC(year, month, day, workEndHour, 0, 0));
+  // Generate slots every 30 minutes from workStartHour to workEndHour
+  for (let hour = workStartHour; hour < workEndHour; hour++) {
+    for (let min = 0; min < 60; min += 30) {
+      const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 
-  let currentPointer = new Date(startOfDay.getTime());
+      // Check if slot is explicitly blocked (e.g. 10:00 or 20:00)
+      if (blockedSlots.includes(timeStr)) {
+        continue;
+      }
 
-  while (currentPointer.getTime() + durationMinutes * 60 * 1000 <= endOfDay.getTime()) {
-    const slotStart = new Date(currentPointer.getTime());
-    const slotEnd = new Date(currentPointer.getTime() + durationMinutes * 60 * 1000);
+      const slotStart = getSantiagoUtcDate(dateStr, timeStr);
+      const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
-    const hoursStr = String(slotStart.getUTCHours()).padStart(2, '0');
-    const minsStr = String(slotStart.getUTCMinutes()).padStart(2, '0');
-    const timeStr = `${hoursStr}:${minsStr}`;
+      // Check if slot extends past working hours
+      const closingTime = getSantiagoUtcDate(dateStr, `${String(workEndHour).padStart(2, '0')}:00`);
+      if (slotEnd.getTime() > closingTime.getTime()) {
+        continue;
+      }
 
-    // Check if slot is explicitly blocked (e.g. 10:00 or 20:00)
-    const isBlocked = blockedSlots.includes(timeStr);
-
-    const slotStartMinutes = slotStart.getUTCHours() * 60 + slotStart.getUTCMinutes();
-    const slotEndMinutes = slotStartMinutes + durationMinutes;
-
-    // Check overlap with busy ranges (using direct timestamp overlap + time-of-day overlap)
-    const isConflict = busyRanges.some((busy) => {
-      // 1. Direct timestamp overlap
-      if (slotStart < busy.end && slotEnd > busy.start) return true;
-
-      // 2. Time-of-day overlap on target date
-      const busyStartUtcMin = busy.start.getUTCHours() * 60 + busy.start.getUTCMinutes();
-      const busyEndUtcMin = busy.end.getUTCHours() * 60 + busy.end.getUTCMinutes();
-
-      const busyStartLocalMin = busy.start.getHours() * 60 + busy.start.getMinutes();
-      const busyEndLocalMin = busy.end.getHours() * 60 + busy.end.getMinutes();
-
-      const overlapUtc = slotStartMinutes < busyEndUtcMin && slotEndMinutes > busyStartUtcMin;
-      const overlapLocal = slotStartMinutes < busyEndLocalMin && slotEndMinutes > busyStartLocalMin;
-
-      // Check if busy range belongs to the same target date
-      const busyDateUtc = busy.start.toISOString().split('T')[0];
-      const busyDateLocal = busy.start.toLocaleDateString('sv-SE');
-
-      const isSameDate = busyDateUtc === dateStr || busyDateLocal === dateStr;
-
-      return isSameDate && (overlapUtc || overlapLocal);
-    });
-
-    if (!isConflict && !isBlocked) {
-      slots.push({
-        timeStr,
-        startIso: slotStart.toISOString(),
-        endIso: slotEnd.toISOString(),
+      // Check overlap with busy ranges (database appointments & Google Calendar events)
+      const isConflict = busyRanges.some((busy) => {
+        return slotStart < busy.end && slotEnd > busy.start;
       });
-    }
 
-    // Step by 30 minutes
-    currentPointer = new Date(currentPointer.getTime() + 30 * 60 * 1000);
+      if (!isConflict) {
+        slots.push({
+          timeStr,
+          startIso: slotStart.toISOString(),
+          endIso: slotEnd.toISOString(),
+        });
+      }
+    }
   }
 
   return slots;
