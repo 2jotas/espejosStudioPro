@@ -17,13 +17,17 @@ async def send_safe_reply(update: Update, text: str):
     msg = update.effective_message or update.message
     if not msg:
         return
+    print(f"[TelegramBot] send_safe_reply: sending {len(text)} chars...", flush=True)
     for i in range(0, len(text), CHUNK_SIZE):
         chunk = text[i:i + CHUNK_SIZE]
         try:
             await msg.reply_text(chunk, parse_mode="Markdown")
-        except Exception:
+            print("[TelegramBot] Message successfully sent with Markdown parse mode", flush=True)
+        except Exception as err:
+            print(f"[TelegramBot] Markdown parse failed ({err}), retrying in plain text...", flush=True)
             try:
                 await msg.reply_text(chunk)
+                print("[TelegramBot] Message successfully sent in plain text", flush=True)
             except Exception as e2:
                 print(f"[TelegramBot] Error sending reply: {e2}", flush=True)
 
@@ -172,11 +176,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
-    await send_safe_reply(update, "⚡ *Orquestando solicitud con Hermes...*")
+    if update.effective_chat:
+        try:
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        except Exception:
+            pass
 
     try:
         data = await asyncio.to_thread(orch.orchestrate, text)
         resultado = data.get("resultado", "")
+        print(f"[TelegramBot] Orchestration complete, delivering {len(resultado)} chars...", flush=True)
         await send_safe_reply(update, resultado)
     except Exception as e:
         print(f"[TelegramBot] handle_message error: {e}", flush=True)
