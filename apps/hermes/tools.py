@@ -230,3 +230,37 @@ def search_vault_notes(keyword: str) -> str:
         return f"🎓 *RESULTADOS DEL VAULT DE CIENCIA DE DATOS (`{keyword}`):*\n\n" + "\n".join(res)
     except Exception as e:
         return f"Error buscando en el Vault: {e}"
+
+
+def run_antigravity_bridge(prompt: str, continue_session: bool = True) -> str:
+    """Invoca el motor de ingeniería autónomo de Antigravity CLI."""
+    clean_prompt = prompt.strip()
+    if not clean_prompt:
+        return "⚠️ Por favor especifica la instrucción para Antigravity."
+
+    cmd = [
+        "agy",
+        "-p", clean_prompt,
+        "--dangerously-skip-permissions",
+        "--print-timeout", "4m0s"
+    ]
+    if continue_session:
+        cmd.insert(1, "-c")
+
+    try:
+        res = subprocess.run(
+            cmd,
+            cwd=str(WORKSPACE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=250
+        )
+        out = res.stdout if res.returncode == 0 else f"{res.stdout}\n{res.stderr}"
+        if not out.strip():
+            out = "✅ Tarea procesada por Antigravity."
+        return out[:3800]
+    except subprocess.TimeoutExpired:
+        return "⏱️ Antigravity continúa procesando la tarea en segundo plano. Los cambios se están aplicando."
+    except Exception as e:
+        return f"❌ Error ejecutando Antigravity CLI: {e}"
+

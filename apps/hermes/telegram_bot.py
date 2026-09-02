@@ -138,6 +138,20 @@ async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_safe_reply(update, f"```\n{res}\n```")
 
 
+async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt_text = " ".join(context.args) if context.args else ""
+    if not prompt_text:
+        await send_safe_reply(update, "⚠️ Escribe tu instrucción de programación para Antigravity.\nEj: `/agy revisa el estado del repositorio y lista tareas pendientes`")
+        return
+
+    await send_safe_reply(update, "🚀 *Invocando a Antigravity Engine en el VPS...*\n_Analizando el proyecto y ejecutando tareas de ingeniería..._")
+    try:
+        resultado = tools.run_antigravity_bridge(prompt_text, continue_session=True)
+        await send_safe_reply(update, f"🧠 *Respuesta de Antigravity (Bridge):*\n\n{resultado}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error en Antigravity Bridge: {e}")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     if not text:
@@ -161,6 +175,11 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("agentes", list_agents))
     app.add_handler(CommandHandler("ayuda", ayuda))
+
+    # Antigravity Bridge
+    app.add_handler(CommandHandler("agy", cmd_antigravity))
+    app.add_handler(CommandHandler("antigravity", cmd_antigravity))
+    app.add_handler(CommandHandler("code", cmd_antigravity))
 
     # Comandos de Agentes
     app.add_handler(CommandHandler("atlas", cmd_atlas))
