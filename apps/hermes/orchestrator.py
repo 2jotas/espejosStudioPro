@@ -54,14 +54,17 @@ KEYWORDS = {
         "apolo", "tiktok", "reel", "youtube", "guion", "copy", "imagen", "viral",
         "redes", "monetizar", "shorts", "cta", "hook", "gancho", "producto digital",
         "copywriting", "contenido", "publicidad", "anuncio", "funnel", "embudo",
-        "seguidores", "estrategia", "feed", "público objetivo", "afiliados", "auto.espejosstudio.cl"
+        "seguidores", "estrategia", "feed", "público objetivo", "afiliados", "auto.espejosstudio.cl",
+        "letra", "letras", "abecedario", "alfabeto", "colorear", "dibujo", "contorno",
+        "lámina", "lamina", "rellenar", "cuaderno", "pdf", "libro", "boceto", "mockup",
+        "portada", "hoja", "bilingüe", "ficha"
     ],
     "universidad": [
         "athena", "estadistica", "matematicas", "sql", "python", "datos", "r",
         "apuntes", "rag", "machine learning", "estudio", "probabilidad",
         "regresión", "clustering", "pandas", "numpy", "scikit", "deep learning",
         "streamlit", "chromadb", "embeddings", "chunking", "modelo",
-        "dataset", "dataframe", "algoritmo", "consulta", "query", "join",
+        "dataset", "dataframe", "algoritmo", "consulta", "query",
         "índice", "ventana", "window", "explicar", "investigación", "carrera", "vault"
     ],
 }
@@ -84,7 +87,7 @@ def classify(text: str) -> str:
     if any(token in lower for token in ["mercurio", "quant", "trading", "bolsa", "bitcoin", "btc", "eth", "rsi", "backtesting"]):
         scores["trading"] += 3
 
-    if any(token in lower for token in ["apolo", "tiktok", "reel", "youtube", "guion", "viral", "copy", "producto digital"]):
+    if any(token in lower for token in ["apolo", "tiktok", "reel", "youtube", "guion", "viral", "copy", "producto digital", "letra", "colorear", "contorno", "rellenar", "abecedario", "lámina", "lamina", "ficha"]):
         scores["contenido"] += 3
 
     if any(token in lower for token in ["athena", "estadistica", "matematicas", "sql", "python", "rag", "machine learning", "vault", "apuntes"]):

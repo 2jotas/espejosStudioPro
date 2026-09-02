@@ -1,11 +1,12 @@
 """
 Compilador y Generador de Fichas Maestras Bilingües (English Primary + Subtítulo Español)
 Cada ficha incluye:
-- Header: Palabra en Inglés en grande + Subtítulo en Español
-- Lienzo al Óleo de Época en Miniatura con Marco Dorado
-- Lámina para Colorear Clean Bold Line-Art para niños
-- Pauta de Caligrafía Punteada Bilingüe
-- Versículo Bíblico en Inglés (empieza por la letra) + Traducción al Español
+- Header: Letras Huecas de Contorno Grueso (Bubble Outline) para colorear la letra mayúscula y minúscula.
+- Palabra en Inglés en grande + Subtítulo en Español.
+- Lienzo al Óleo de Época en Miniatura con Marco Dorado.
+- Lámina para Colorear Clean Bold Line-Art para niños.
+- Pauta de Caligrafía Punteada Bilingüe.
+- Versículo Bíblico en Inglés (empieza por la letra) + Traducción al Español.
 """
 
 import os
@@ -13,10 +14,31 @@ from pathlib import Path
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 UPLOADS_DIR = Path("/app/workspace/apps/api/uploads")
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+try:
+    FONT_HEADER = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 64)
+    FONT_TITLE_EN = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+    FONT_TITLE_ES = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+    FONT_ARTIST = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    FONT_TRACE_TITLE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+    FONT_TRACE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
+    FONT_VERSE_HEAD = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    FONT_VERSE_EN = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    FONT_VERSE_ES = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+except Exception:
+    FONT_HEADER = ImageFont.load_default()
+    FONT_TITLE_EN = ImageFont.load_default()
+    FONT_TITLE_ES = ImageFont.load_default()
+    FONT_ARTIST = ImageFont.load_default()
+    FONT_TRACE_TITLE = ImageFont.load_default()
+    FONT_TRACE = ImageFont.load_default()
+    FONT_VERSE_HEAD = ImageFont.load_default()
+    FONT_VERSE_EN = ImageFont.load_default()
+    FONT_VERSE_ES = ImageFont.load_default()
 
 BILINGUAL_ALPHABET = [
     {
@@ -295,10 +317,12 @@ def generate_bilingual_sheet(item):
     d.rectangle([(30, 30), (1370, 1770)], outline="#0f172a", width=8)
     d.rectangle([(45, 45), (1355, 1755)], outline="#0f172a", width=2)
 
-    # Header Izquierdo (Inglés Primario + Subtítulo Español)
-    d.text((80, 75), f"{l} {l.lower()}", fill="#0f172a")
-    d.text((280, 80), item["word_en"], fill="#0284c7")
-    d.text((280, 128), f"Español: {item['word_es']}", fill="#64748b")
+    # LETRAS HUECAS DE CONTORNO (Bubble Outline) PARA COLOREAR ARRIBA A LA IZQUIERDA
+    d.text((80, 75), f"{l} {l.lower()}", font=FONT_HEADER, fill="#ffffff", stroke_width=5, stroke_fill="#000000")
+
+    # Header Título Bilingüe
+    d.text((280, 80), item["word_en"], font=FONT_TITLE_EN, fill="#0284c7")
+    d.text((280, 130), f"Español: {item['word_es']}", font=FONT_TITLE_ES, fill="#64748b")
     d.line([(80, 175), (960, 175)], fill="#0f172a", width=3)
 
     # Incrustar Lienzo al Óleo de Inspiración (Top-Right)
@@ -306,7 +330,7 @@ def generate_bilingual_sheet(item):
     if canvas_file.exists():
         c_img = Image.open(canvas_file).convert("RGB").resize((320, 320), Image.Resampling.LANCZOS)
         base.paste(c_img, (1000, 70))
-        d.text((1160, 405), f"🎨 {item['artist']}", fill="#475569", anchor="mm", align="center")
+        d.text((1160, 405), f"🎨 {item['artist']}", font=FONT_ARTIST, fill="#475569", anchor="mm", align="center")
 
     # Incrustar Lámina de Colorear (Clean Bold Line-Art)
     lineart_file = UPLOADS_DIR / item["lineart"]
@@ -317,21 +341,21 @@ def generate_bilingual_sheet(item):
         base.paste(l_img, (290, 430))
 
     # Pautas de Caligrafía Punteada Bilingüe
-    d.text((80, 1280), f"✏️ Trace uppercase '{l}' and lowercase '{l.lower()}' (Practica el trazo):", fill="#0f172a")
+    d.text((80, 1280), f"✏️ Trace uppercase '{l}' and lowercase '{l.lower()}' (Practica el trazo):", font=FONT_TRACE_TITLE, fill="#0f172a")
     
     # Fila Mayúsculas
     d.rectangle([(80, 1320), (1320, 1390)], outline="#cbd5e1", fill="#ffffff")
-    d.text((700, 1355), f"{l}      {l}      {l}      {l}      {l}      {l}      {l}      {l}", fill="#94a3b8", anchor="mm")
+    d.text((700, 1355), f"{l}      {l}      {l}      {l}      {l}      {l}      {l}      {l}", font=FONT_TRACE, fill="#94a3b8", anchor="mm")
 
     # Fila Minúsculas
     d.rectangle([(80, 1410), (1320, 1480)], outline="#cbd5e1", fill="#ffffff")
-    d.text((700, 1445), f"{l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}", fill="#94a3b8", anchor="mm")
+    d.text((700, 1445), f"{l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}      {l.lower()}", font=FONT_TRACE, fill="#94a3b8", anchor="mm")
 
     # Recuadro de Versículo Bíblico Bilingüe
     d.rounded_rectangle([(80, 1515), (1320, 1680)], radius=15, outline="#0f172a", width=3, fill="#f8fafc")
-    d.text((700, 1545), f"📖 SCRIPTURE VERSE (LETTER {l}):", fill="#0f172a", anchor="mm")
-    d.text((700, 1590), f'"{item["verse_en"]}"', fill="#0369a1", anchor="mm")
-    d.text((700, 1635), f'Español: "{item["verse_es"]}"', fill="#475569", anchor="mm")
+    d.text((700, 1545), f"📖 SCRIPTURE VERSE (LETTER {l}):", font=FONT_VERSE_HEAD, fill="#0f172a", anchor="mm")
+    d.text((700, 1590), f'"{item["verse_en"]}"', font=FONT_VERSE_EN, fill="#0369a1", anchor="mm")
+    d.text((700, 1635), f'Español: "{item["verse_es"]}"', font=FONT_VERSE_ES, fill="#475569", anchor="mm")
 
     base.save(png_out, quality=95)
 
@@ -341,7 +365,15 @@ def generate_bilingual_sheet(item):
     c.setLineWidth(3); c.setStrokeColor(colors.black); c.rect(20, 20, w - 40, h - 40)
     c.setLineWidth(1); c.rect(24, 24, w - 48, h - 48)
 
-    c.setFont("Helvetica-Bold", 44); c.drawString(45, h - 68, f"{l} {l.lower()}")
+    # LETRAS DE CONTORNO HUECAS EN PDF PARA COLOREAR
+    text_obj = c.beginText(45, h - 68)
+    text_obj.setFont("Helvetica-Bold", 46)
+    text_obj.setTextRenderMode(1) # 1 = Stroke text (outline only, ready to color in)
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(2.5)
+    text_obj.textOut(f"{l} {l.lower()}")
+    c.drawText(text_obj)
+
     c.setFont("Helvetica-Bold", 20); c.drawString(140, h - 55, item["word_en"])
     c.setFont("Helvetica-Oblique", 11); c.setFillColor(colors.HexColor('#475569')); c.drawString(140, h - 73, f"Español: {item['word_es']}")
     c.setFillColor(colors.black)
@@ -387,8 +419,8 @@ def generate_bilingual_sheet(item):
     return png_out, pdf_out
 
 if __name__ == "__main__":
-    print("🎨 Generando todas las 26 Fichas Bilingües...")
+    print("🎨 Generando todas las 26 Fichas Bilingües con Letras de Contorno para Rellenar...")
     for item in BILINGUAL_ALPHABET:
         png, pdf = generate_bilingual_sheet(item)
-        print(f"✔ Generada Ficha Bilingüe: {item['letter']} ({png.name})")
-    print("🏆 ¡TODAS LAS FICHAS BILINGÜES ESTÁN LISTAS!")
+        print(f"✔ Generada Ficha: {item['letter']} ({png.name})")
+    print("🏆 ¡TODAS LAS FICHAS CON LETRAS HUECAS ESTÁN LISTAS!")
