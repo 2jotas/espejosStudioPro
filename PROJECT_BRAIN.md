@@ -57,6 +57,7 @@ Principio de 3 capas aisladas:
 | **2026-09-02** | Antigravity 2.0 | API | Flujo interactivo multi-día (`AWAITING_DAY_CHOICE`): listado de días de la semana (1️⃣ Hoy, 2️⃣ Mañana, 3️⃣ Viernes...), despliegue de **todos** los horarios disponibles de apertura a cierre (10:00 a 20:00), y reconocimiento inteligente de horas directas ("15:00", "15 horas"). |
 | **2026-09-02** | Antigravity 2.0 | Gateway / Nginx | Habilitación de subdominios `performance.espejosstudio.cl` (AI Visagismo Studio), `auto.espejosstudio.cl` (Content Automation Studio) y `bankai.espejosstudio.cl` (Hermes Master Dashboard) en Gateway Nginx HTTP y HTTPS. |
 | **2026-09-02** | Antigravity 2.0 | Hermes / API | Despliegue de **Hermes Multi-Agent Harness** con 5 especialistas (**Atlas**, **Romina**, **Mercurio/Quant**, **Athena**, **Apolo**), herramientas de ejecución real (Docker socket, Shell, CRM live query, Market quotes con yfinance, Vault search) y **Antigravity Bridge** (`/agy`, `/code`) para programar e iterar por Telegram/WhatsApp. |
+| **2026-09-02** | Antigravity 2.0 | Hermes / AI | Implementación de motor **Dual-Pass Agent-Judge & Optimizer** (`/eval`, `/super`, `/judge`): doble pasada donde el especialista de Hermes genera la propuesta base y **Antigravity Engine** la audita, optimiza y emite la respuesta definitiva avalada técnicamente. |
 
 ---
 
