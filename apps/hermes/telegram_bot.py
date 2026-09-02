@@ -211,6 +211,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ Error procesando la solicitud: {e}")
 
 
+import domain_expansion as de
+
+
+async def cmd_dominio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = de.get_active_domains()
+    await send_safe_reply(update, msg)
+
+
+async def cmd_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt_text = " ".join(context.args) if context.args else ""
+    if not prompt_text:
+        await send_safe_reply(update, "⚠️ Especifica el prompt para la Extensión de Dominio de Vídeo.\nEj: `/video Time-lapse coloreando mandala de león geométrico en papel 4K vertical`")
+        return
+
+    await send_safe_reply(update, "🌌 *Activando Extensión de Dominio: Cinema Cuántico (Ultra-Fast Video)...*\n_Procesando pipeline de vídeo con IA..._")
+    try:
+        res = await asyncio.to_thread(de.generate_fast_video, prompt_text)
+        if res.get("video_url"):
+            video_url = res["video_url"]
+            await send_safe_reply(update, f"🎬 *Vídeo Ultra-Rápido Generado con Éxito ({res.get('provider')}):*\n\n🔗 [Ver / Descargar Vídeo MP4]({video_url})")
+            if update.effective_chat:
+                try:
+                    await context.bot.send_video(chat_id=update.effective_chat.id, video=video_url, caption=f"✨ {prompt_text[:100]}")
+                except Exception:
+                    pass
+        else:
+            await send_safe_reply(update, res.get("prompt_optimizado", "Vídeo procesado."))
+    except Exception as e:
+        print(f"[TelegramBot] cmd_video error: {e}", flush=True)
+        msg = update.effective_message or update.message
+        if msg:
+            await msg.reply_text(f"❌ Error en Extensión de Dominio Video: {e}")
+
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
@@ -218,6 +252,12 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("agentes", list_agents))
     app.add_handler(CommandHandler("ayuda", ayuda))
+
+    # Extensión de Dominio (Domain Expansion)
+    app.add_handler(CommandHandler("dominio", cmd_dominio))
+    app.add_handler(CommandHandler("expansion", cmd_dominio))
+    app.add_handler(CommandHandler("video", cmd_video))
+    app.add_handler(CommandHandler("animar", cmd_video))
 
     # Antigravity Bridge & Dual-Pass Evaluator
     app.add_handler(CommandHandler("agy", cmd_antigravity))
