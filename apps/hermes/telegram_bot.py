@@ -11,25 +11,56 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 
 async def send_safe_reply(update: Update, text: str):
-    CHUNK_SIZE = 4000
     if not text:
         return
     msg = update.effective_message or update.message
     if not msg:
         return
-    print(f"[TelegramBot] send_safe_reply: sending {len(text)} chars...", flush=True)
-    for i in range(0, len(text), CHUNK_SIZE):
-        chunk = text[i:i + CHUNK_SIZE]
+
+    # Dividir texto respetando párrafos para nunca romper bloques Markdown
+    MAX_LEN = 3500
+    chunks = []
+    current_chunk = ""
+
+    for paragraph in text.split("\n\n"):
+        if len(current_chunk) + len(paragraph) + 2 <= MAX_LEN:
+            current_chunk += (paragraph + "\n\n")
+        else:
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            # Si el párrafo por sí solo supera MAX_LEN, cortarlo
+            if len(paragraph) > MAX_LEN:
+                for i in range(0, len(paragraph), MAX_LEN):
+                    chunks.append(paragraph[i:i + MAX_LEN])
+                current_chunk = ""
+            else:
+                current_chunk = paragraph + "\n\n"
+
+    if current_chunk.strip():
+        chunks.append(current_chunk.strip())
+
+    if not chunks:
+        chunks = [text]
+
+    print(f"[TelegramBot] send_safe_reply: delivering {len(chunks)} message segment(s)...", flush=True)
+
+    for idx, chunk in enumerate(chunks):
+        if not chunk:
+            continue
         try:
             await msg.reply_text(chunk, parse_mode="Markdown")
-            print("[TelegramBot] Message successfully sent with Markdown parse mode", flush=True)
+            print(f"[TelegramBot] Segment {idx + 1}/{len(chunks)} sent (Markdown mode)", flush=True)
         except Exception as err:
-            print(f"[TelegramBot] Markdown parse failed ({err}), retrying in plain text...", flush=True)
+            print(f"[TelegramBot] Segment {idx + 1}/{len(chunks)} Markdown failed ({err}), retrying plain text...", flush=True)
             try:
-                await msg.reply_text(chunk)
-                print("[TelegramBot] Message successfully sent in plain text", flush=True)
+                # Limpiar caracteres conflictivos en plain text
+                clean_chunk = chunk.replace("```", "").replace("**", "")
+                await msg.reply_text(clean_chunk)
+                print(f"[TelegramBot] Segment {idx + 1}/{len(chunks)} sent (Plain text mode)", flush=True)
             except Exception as e2:
-                print(f"[TelegramBot] Error sending reply: {e2}", flush=True)
+                print(f"[TelegramBot] Fatal error sending segment {idx + 1}: {e2}", flush=True)
+        await asyncio.sleep(0.3)
+
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
