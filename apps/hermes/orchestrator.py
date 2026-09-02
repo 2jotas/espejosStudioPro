@@ -187,6 +187,7 @@ def get_realtime_system_context(agent_name: str, request: str) -> str:
 
 
 def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: str) -> str:
+    print(f"[Orchestrator] Getting realtime context for agent '{agent_name}'...", flush=True)
     realtime_context = get_realtime_system_context(agent_name, user_request)
 
     full_user_request = (
@@ -195,38 +196,45 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
         f"{realtime_context}"
     ) if realtime_context else user_request
 
-    # 1. Intentar con Google Gemini (3.7 Flash, 3.6 Flash, Flash Latest)
+    # 1. Intentar con Google Gemini (Flash Latest, 3.5 Flash)
     if GEMINI_API_KEY:
-        gemini_candidates = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash"]
+        gemini_candidates = ["gemini-flash-latest", "gemini-3.5-flash"]
         client_gemini = OpenAI(
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            api_key=GEMINI_API_KEY.strip()
+            api_key=GEMINI_API_KEY.strip(),
+            timeout=5.0
         )
         for g_model in gemini_candidates:
             try:
+                print(f"[Orchestrator] Trying Gemini model: {g_model}...", flush=True)
                 completion = client_gemini.chat.completions.create(
                     model=g_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": full_user_request}
                     ],
-                    max_tokens=2048
+                    max_tokens=2048,
+                    timeout=5.0
                 )
                 content = completion.choices[0].message.content
                 if content:
+                    print(f"[Orchestrator] Gemini {g_model} succeeded ({len(content)} chars)!", flush=True)
                     return content
             except Exception as e:
+                print(f"[Orchestrator] Gemini {g_model} error: {e}", flush=True)
                 continue
 
-    # 2. Fallback de ultra-alta velocidad con Groq (GPT-OSS-120B, Qwen 3.8 27B, Compound)
-    candidate_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", LLM_MODEL]
-    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
+    # 2. Fallback de ultra-alta velocidad con Groq (GPT-OSS-120B, Qwen 3.8 27B)
+    candidate_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]
+    print(f"[Orchestrator] Falling back to Groq models...", flush=True)
+    client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY, timeout=5.0)
 
     last_err = None
     for model_id in candidate_models:
         if not model_id:
             continue
         try:
+            print(f"[Orchestrator] Trying Groq model: {model_id}...", flush=True)
             completion = client.chat.completions.create(
                 model=model_id,
                 messages=[
@@ -234,9 +242,13 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
                     {"role": "user", "content": full_user_request},
                 ],
                 max_tokens=2048,
+                timeout=15.0
             )
-            return completion.choices[0].message.content or ""
+            out = completion.choices[0].message.content or ""
+            print(f"[Orchestrator] Groq {model_id} succeeded ({len(out)} chars)!", flush=True)
+            return out
         except Exception as e:
+            print(f"[Orchestrator] Groq {model_id} error: {e}", flush=True)
             last_err = e
             continue
 
