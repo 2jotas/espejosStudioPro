@@ -19,26 +19,25 @@ from PIL import Image, ImageDraw, ImageFont
 UPLOADS_DIR = Path("/app/workspace/apps/api/uploads")
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-try:
-    FONT_HEADER = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 64)
-    FONT_TITLE_EN = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-    FONT_TITLE_ES = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
-    FONT_ARTIST = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
-    FONT_TRACE_TITLE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
-    FONT_TRACE = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
-    FONT_VERSE_HEAD = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-    FONT_VERSE_EN = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-    FONT_VERSE_ES = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-except Exception:
-    FONT_HEADER = ImageFont.load_default()
-    FONT_TITLE_EN = ImageFont.load_default()
-    FONT_TITLE_ES = ImageFont.load_default()
-    FONT_ARTIST = ImageFont.load_default()
-    FONT_TRACE_TITLE = ImageFont.load_default()
-    FONT_TRACE = ImageFont.load_default()
-    FONT_VERSE_HEAD = ImageFont.load_default()
-    FONT_VERSE_EN = ImageFont.load_default()
-    FONT_VERSE_ES = ImageFont.load_default()
+FONT_DIR = "/usr/local/lib/python3.11/site-packages/reportlab/fonts"
+VERA_BD = os.path.join(FONT_DIR, "VeraBd.ttf")
+VERA_RG = os.path.join(FONT_DIR, "Vera.ttf")
+
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+pdfmetrics.registerFont(TTFont("VeraBd", VERA_BD))
+pdfmetrics.registerFont(TTFont("Vera", VERA_RG))
+
+FONT_HEADER = ImageFont.truetype(VERA_BD, 100)
+FONT_TITLE_EN = ImageFont.truetype(VERA_BD, 42)
+FONT_TITLE_ES = ImageFont.truetype(VERA_RG, 26)
+FONT_ARTIST = ImageFont.truetype(VERA_BD, 18)
+FONT_TRACE_TITLE = ImageFont.truetype(VERA_BD, 24)
+FONT_TRACE = ImageFont.truetype(VERA_RG, 40)
+FONT_VERSE_HEAD = ImageFont.truetype(VERA_BD, 22)
+FONT_VERSE_EN = ImageFont.truetype(VERA_BD, 22)
+FONT_VERSE_ES = ImageFont.truetype(VERA_RG, 20)
 
 BILINGUAL_ALPHABET = [
     {
@@ -318,11 +317,11 @@ def generate_bilingual_sheet(item):
     d.rectangle([(45, 45), (1355, 1755)], outline="#0f172a", width=2)
 
     # LETRAS HUECAS DE CONTORNO (Bubble Outline) PARA COLOREAR ARRIBA A LA IZQUIERDA
-    d.text((80, 75), f"{l} {l.lower()}", font=FONT_HEADER, fill="#ffffff", stroke_width=5, stroke_fill="#000000")
+    d.text((80, 48), f"{l} {l.lower()}", font=FONT_HEADER, fill="#ffffff", stroke_width=5, stroke_fill="#000000")
 
     # Header Título Bilingüe
-    d.text((280, 80), item["word_en"], font=FONT_TITLE_EN, fill="#0284c7")
-    d.text((280, 130), f"Español: {item['word_es']}", font=FONT_TITLE_ES, fill="#64748b")
+    d.text((360, 68), item["word_en"], font=FONT_TITLE_EN, fill="#0284c7")
+    d.text((360, 122), f"Español: {item['word_es']}", font=FONT_TITLE_ES, fill="#64748b")
     d.line([(80, 175), (960, 175)], fill="#0f172a", width=3)
 
     # Incrustar Lienzo al Óleo de Inspiración (Top-Right)
@@ -366,16 +365,18 @@ def generate_bilingual_sheet(item):
     c.setLineWidth(1); c.rect(24, 24, w - 48, h - 48)
 
     # LETRAS DE CONTORNO HUECAS EN PDF PARA COLOREAR
-    text_obj = c.beginText(45, h - 68)
-    text_obj.setFont("Helvetica-Bold", 46)
-    text_obj.setTextRenderMode(1) # 1 = Stroke text (outline only, ready to color in)
+    c.saveState()
     c.setStrokeColor(colors.black)
-    c.setLineWidth(2.5)
+    c.setLineWidth(2.8)
+    text_obj = c.beginText(45, h - 72)
+    text_obj.setFont("VeraBd", 48)
+    text_obj.setTextRenderMode(1) # 1 = Stroke text (outline only, ready to color in)
     text_obj.textOut(f"{l} {l.lower()}")
     c.drawText(text_obj)
+    c.restoreState()
 
-    c.setFont("Helvetica-Bold", 20); c.drawString(140, h - 55, item["word_en"])
-    c.setFont("Helvetica-Oblique", 11); c.setFillColor(colors.HexColor('#475569')); c.drawString(140, h - 73, f"Español: {item['word_es']}")
+    c.setFont("VeraBd", 18); c.drawString(160, h - 55, item["word_en"])
+    c.setFont("Vera", 11); c.setFillColor(colors.HexColor('#475569')); c.drawString(160, h - 73, f"Español: {item['word_es']}")
     c.setFillColor(colors.black)
 
     if canvas_file.exists():
