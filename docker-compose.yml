@@ -42,6 +42,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
       - ./:/app/workspace
       - ./apps/hermes:/app/apps/hermes
       - ./PROJECT_BRAIN.md:/app/PROJECT_BRAIN.md
