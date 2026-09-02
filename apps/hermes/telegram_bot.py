@@ -309,29 +309,65 @@ async def cmd_revisar_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_safe_reply(update, caption)
 
 
+async def cmd_revisar_j(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Envía la ficha maestra de la Letra J para aprobación directa del usuario."""
+    chat = update.effective_chat
+    if not chat:
+        return
+
+    caption = (
+        "🎨 *PROPUESTA DE FICHA MAESTRA: LETRA J (Jesús Buen Pastor)*\n\n"
+        "• **Lienzo al Óleo de Inspiración:** Pintura al óleo con marco dorado mostrando a Jesús con el tierno corderito en brazos, pradera verde con flores y cielo de atardecer dorado.\n"
+        "• **Lámina para Colorear:** `Clean Bold Line-Art` de la misma escena pastoral con líneas negras gruesas para niños.\n"
+        "• **Pauta:** Caligrafía punteada para trazar `J` mayúscula y `j` minúscula.\n"
+        "• **Versículo Bíblico (Inicia con J):**\n"
+        "_\"Justo es el Señor en todos sus caminos, y misericordioso en todas sus obras.\" — Salmos 145:17_\n\n"
+        "🔗 [Ver PDF Imprimible 300 DPI](https://espejosstudio.cl/uploads/page_J_masterpiece.pdf)\n"
+        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_J_masterpiece.png)"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ APROBAR FICHA J", callback_data="approve_letter_J"),
+            InlineKeyboardButton("✏️ SOLICITAR AJUSTE", callback_data="reject_letter_J")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    photo_path = "/app/workspace/apps/api/uploads/page_J_masterpiece.png"
+    if os.path.exists(photo_path):
+        with open(photo_path, "rb") as f:
+            await context.bot.send_photo(chat_id=chat.id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await send_safe_reply(update, caption)
+
+
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if not query:
         return
     await query.answer()
 
-    if query.data == "approve_letter_A":
+    if query.data in ["approve_letter_A", "approve_letter_J"]:
+        letter_name = "J" if "J" in query.data else "A"
         await query.edit_message_caption(
             caption=(
-                "✅ *¡FICHA LETRA A APROBADA OFICIALMENTE!* 🎉\n\n"
-                "La Letra A queda guardada como estándar de oro para el resto del abecedario.\n"
-                "Continuando con la generación y ensamblado de las siguientes letras en cola (B, C, D...)."
+                f"✅ *¡FICHA LETRA {letter_name} APROBADA OFICIALMENTE!* 🎉\n\n"
+                f"El estándar maestro de óleo + line-art para la Letra {letter_name} queda certificado.\n"
+                "Continuando con el ensamblado de las siguientes obras."
             ),
             parse_mode="Markdown"
         )
-    elif query.data == "reject_letter_A":
+    elif query.data in ["reject_letter_A", "reject_letter_J"]:
+        letter_name = "J" if "J" in query.data else "A"
         await query.edit_message_caption(
             caption=(
-                "✏️ *Solicitud de ajuste registrada para la Letra A.*\n"
-                "Escríbeme por aquí qué elemento te gustaría cambiar (ej: más animales, otra tipografía o cambio de versículo)."
+                f"✏️ *Solicitud de ajuste registrada para la Letra {letter_name}.*\n"
+                "Escríbeme por aquí qué elemento específico deseas afinar."
             ),
             parse_mode="Markdown"
         )
+
 
 
 
@@ -377,8 +413,10 @@ def main():
     app.add_handler(CommandHandler("crm", cmd_crm))
     # Flujo de Aprobación de Fichas (Coloring Book)
     app.add_handler(CommandHandler("revisar_a", cmd_revisar_a))
-    app.add_handler(CommandHandler("boceto", cmd_revisar_a))
-    app.add_handler(CommandHandler("ficha", cmd_revisar_a))
+    app.add_handler(CommandHandler("revisar_j", cmd_revisar_j))
+    app.add_handler(CommandHandler("boceto_j", cmd_revisar_j))
+    app.add_handler(CommandHandler("boceto", cmd_revisar_j))
+    app.add_handler(CommandHandler("ficha", cmd_revisar_j))
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 
     # Mensajes Naturales
