@@ -13,12 +13,18 @@ async def send_safe_reply(update: Update, text: str):
     CHUNK_SIZE = 4000
     if not text:
         return
+    msg = update.effective_message or update.message
+    if not msg:
+        return
     for i in range(0, len(text), CHUNK_SIZE):
         chunk = text[i:i + CHUNK_SIZE]
         try:
-            await update.message.reply_text(chunk, parse_mode="Markdown")
-        except Exception:
-            await update.message.reply_text(chunk)
+            await msg.reply_text(chunk, parse_mode="Markdown")
+        except Exception as err:
+            try:
+                await msg.reply_text(chunk)
+            except Exception as e2:
+                print(f"[TelegramBot] Error sending reply: {e2}", flush=True)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,6 +146,7 @@ async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt_text = " ".join(context.args) if context.args else ""
+    print(f"[TelegramBot] /agy command received: {prompt_text}", flush=True)
     if not prompt_text:
         await send_safe_reply(update, "⚠️ Escribe tu instrucción de programación para Antigravity.\nEj: `/agy revisa el estado del repositorio y lista tareas pendientes`")
         return
@@ -149,11 +156,16 @@ async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
         resultado = tools.run_antigravity_bridge(prompt_text, continue_session=True)
         await send_safe_reply(update, f"🧠 *Respuesta de Antigravity (Bridge):*\n\n{resultado}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error en Antigravity Bridge: {e}")
+        print(f"[TelegramBot] cmd_antigravity error: {e}", flush=True)
+        msg = update.effective_message or update.message
+        if msg:
+            await msg.reply_text(f"❌ Error en Antigravity Bridge: {e}")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (update.message.text or "").strip()
+    msg = update.effective_message or update.message
+    text = (msg.text or "").strip() if msg else ""
+    print(f"[TelegramBot] Natural message received: '{text}'", flush=True)
     if not text:
         return
 
@@ -161,11 +173,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         data = orch.orchestrate(text)
-        categoria = data.get("agente_asignado", "unknown")
         resultado = data.get("resultado", "")
         await send_safe_reply(update, resultado)
     except Exception as e:
-        await update.message.reply_text(f"❌ Error procesando la solicitud: {e}")
+        print(f"[TelegramBot] handle_message error: {e}", flush=True)
+        if msg:
+            await msg.reply_text(f"❌ Error procesando la solicitud: {e}")
 
 
 def main():
