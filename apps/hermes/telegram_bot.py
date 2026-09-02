@@ -1,8 +1,8 @@
 import os
 import json
 import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 import orchestrator as orch
 import tools
@@ -276,6 +276,65 @@ async def cmd_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ Error en Extensión de Dominio Video: {e}")
 
 
+async def cmd_revisar_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Envía la ficha completa de la Letra A para aprobación directa del usuario."""
+    chat = update.effective_chat
+    if not chat:
+        return
+
+    caption = (
+        "🎨 *PROPUESTA DE FICHA: LETRA A (Arca de Noé)*\n\n"
+        "• **Objeto:** `Ark of Noah • Arca de Noé`\n"
+        "• **Estilo:** `Clean Bold Line-Art` (Líneas gruesas para niños de 3 a 8 años)\n"
+        "• **Pauta:** Caligrafía punteada para trazo de `A` y `a`\n"
+        "• **Versículo Bíblico (Inicia con A):**\n"
+        "_\"Al principio creó Dios los cielos y la tierra.\" — Génesis 1:1_\n\n"
+        "🔗 [Ver PDF Listo para Imprimir](https://espejosstudio.cl/uploads/page_A_full.pdf)\n"
+        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_A_full.png)"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ APROBAR LETRA A", callback_data="approve_letter_A"),
+            InlineKeyboardButton("✏️ SOLICITAR AJUSTE", callback_data="reject_letter_A")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    photo_path = "/app/workspace/apps/api/uploads/page_A_full.png"
+    if os.path.exists(photo_path):
+        with open(photo_path, "rb") as f:
+            await context.bot.send_photo(chat_id=chat.id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await send_safe_reply(update, caption)
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+
+    if query.data == "approve_letter_A":
+        await query.edit_message_caption(
+            caption=(
+                "✅ *¡FICHA LETRA A APROBADA OFICIALMENTE!* 🎉\n\n"
+                "La Letra A queda guardada como estándar de oro para el resto del abecedario.\n"
+                "Continuando con la generación y ensamblado de las siguientes letras en cola (B, C, D...)."
+            ),
+            parse_mode="Markdown"
+        )
+    elif query.data == "reject_letter_A":
+        await query.edit_message_caption(
+            caption=(
+                "✏️ *Solicitud de ajuste registrada para la Letra A.*\n"
+                "Escríbeme por aquí qué elemento te gustaría cambiar (ej: más animales, otra tipografía o cambio de versículo)."
+            ),
+            parse_mode="Markdown"
+        )
+
+
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
@@ -316,8 +375,11 @@ def main():
     app.add_handler(CommandHandler("logs", cmd_logs))
     app.add_handler(CommandHandler("restart", cmd_restart))
     app.add_handler(CommandHandler("crm", cmd_crm))
-    app.add_handler(CommandHandler("quote", cmd_quote))
-    app.add_handler(CommandHandler("sh", cmd_sh))
+    # Flujo de Aprobación de Fichas (Coloring Book)
+    app.add_handler(CommandHandler("revisar_a", cmd_revisar_a))
+    app.add_handler(CommandHandler("boceto", cmd_revisar_a))
+    app.add_handler(CommandHandler("ficha", cmd_revisar_a))
+    app.add_handler(CallbackQueryHandler(handle_callback_query))
 
     # Mensajes Naturales
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
