@@ -222,6 +222,9 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
                     return content
             except Exception as e:
                 print(f"[Orchestrator] Gemini {g_model} error: {e}", flush=True)
+                if "429" in str(e) or "quota" in str(e).lower():
+                    print("[Orchestrator] Gemini quota reached (429), switching instantly to Groq LPU...", flush=True)
+                    break
                 continue
 
     # 2. Fallback de ultra-alta velocidad con Groq (GPT-OSS-120B, Qwen 3.8 27B)
