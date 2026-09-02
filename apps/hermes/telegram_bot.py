@@ -276,94 +276,108 @@ async def cmd_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ Error en Extensión de Dominio Video: {e}")
 
 
-async def cmd_revisar_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envía la ficha completa de la Letra A para aprobación directa del usuario."""
-    chat = update.effective_chat
-    if not chat:
+from build_bilingual_pages import BILINGUAL_ALPHABET
+
+async def send_bilingual_letter(chat_id: int, letter_char: str, context: ContextTypes.DEFAULT_TYPE):
+    """Envía la ficha bilingüe de una letra específica para revisión interactiva."""
+    letter_char = letter_char.upper()
+    item = next((x for x in BILINGUAL_ALPHABET if x["letter"] == letter_char), None)
+    if not item:
+        await context.bot.send_message(chat_id=chat_id, text=f"⚠️ Letra `{letter_char}` no encontrada en el catálogo.")
         return
 
     caption = (
-        "🎨 *PROPUESTA DE FICHA MAESTRA: LETRA A (Arca de Noé)*\n\n"
-        "• **Lienzo al Óleo de Inspiración:** Pintura al óleo clásica en miniatura con marco dorado y cielo de arcoíris (Estilo *William Turner*).\n"
-        "• **Lámina para Colorear:** `Clean Bold Line-Art` de la misma escena con líneas gruesas y limpias.\n"
-        "• **Pauta:** Caligrafía punteada para trazar `A` y `a`\n"
-        "• **Versículo Bíblico (Inicia con A):**\n"
-        "_\"Al principio creó Dios los cielos y la tierra.\" — Génesis 1:1_\n\n"
-        "🔗 [Ver PDF Imprimible 300 DPI](https://espejosstudio.cl/uploads/page_A_masterpiece.pdf)\n"
-        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_A_masterpiece.png)"
+        f"🎨 *REVISIÓN BILINGÜE: LETRA {letter_char}*\n\n"
+        f"• **Título en Inglés (Primario):** `{item['word_en']}`\n"
+        f"• **Subtítulo en Español:** `{item['word_es']}`\n"
+        f"• **Lienzo al Óleo de Inspiración:** {item['artist']}\n"
+        f"• **Lámina de Coloreado:** `Clean Bold Line-Art` (Líneas gruesas de 300 DPI)\n"
+        f"• **Pauta de Caligrafía:** Trazo guiado de `{letter_char}` y `{letter_char.lower()}`\n\n"
+        f"📖 **Scripture Verse ({letter_char}):**\n"
+        f"_{item['verse_en']}_\n"
+        f"_Español: \"{item['verse_es']}\"_\n\n"
+        f"🔗 [Descargar Ficha PDF](https://espejosstudio.cl/uploads/page_{letter_char}_bilingual.pdf)\n"
+        f"🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_{letter_char}_bilingual.png)"
     )
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ APROBAR FICHA A", callback_data="approve_letter_A"),
-            InlineKeyboardButton("✏️ SOLICITAR AJUSTE", callback_data="reject_letter_A")
+            InlineKeyboardButton(f"✅ APROBAR LETRA {letter_char}", callback_data=f"approve_{letter_char}"),
+            InlineKeyboardButton("✏️ AJUSTE", callback_data=f"reject_{letter_char}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    photo_path = "/app/workspace/apps/api/uploads/page_A_masterpiece.png"
+    photo_path = f"/app/workspace/apps/api/uploads/page_{letter_char}_bilingual.png"
     if os.path.exists(photo_path):
         with open(photo_path, "rb") as f:
-            await context.bot.send_photo(chat_id=chat.id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
+            await context.bot.send_photo(chat_id=chat_id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
     else:
-        await send_safe_reply(update, caption)
+        await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="Markdown", reply_markup=reply_markup)
 
 
-async def cmd_revisar_j(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envía la ficha maestra de la Letra J para aprobación directa del usuario."""
+async def cmd_revisar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando para iniciar la revisión secuencial del abecedario (/revisar o /revisar b)."""
     chat = update.effective_chat
     if not chat:
         return
 
-    caption = (
-        "🎨 *PROPUESTA DE FICHA MAESTRA: LETRA J (Jesús Buen Pastor)*\n\n"
-        "• **Lienzo al Óleo de Inspiración:** Pintura al óleo con marco dorado mostrando a Jesús con el tierno corderito en brazos, pradera verde con flores y cielo de atardecer dorado.\n"
-        "• **Lámina para Colorear:** `Clean Bold Line-Art` de la misma escena pastoral con líneas negras gruesas para niños.\n"
-        "• **Pauta:** Caligrafía punteada para trazar `J` mayúscula y `j` minúscula.\n"
-        "• **Versículo Bíblico (Inicia con J):**\n"
-        "_\"Justo es el Señor en todos sus caminos, y misericordioso en todas sus obras.\" — Salmos 145:17_\n\n"
-        "🔗 [Ver PDF Imprimible 300 DPI](https://espejosstudio.cl/uploads/page_J_masterpiece.pdf)\n"
-        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_J_masterpiece.png)"
-    )
+    target_letter = "A"
+    if context.args and len(context.args) > 0:
+        target_letter = context.args[0][0].upper()
 
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ APROBAR FICHA J", callback_data="approve_letter_J"),
-            InlineKeyboardButton("✏️ SOLICITAR AJUSTE", callback_data="reject_letter_J")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    photo_path = "/app/workspace/apps/api/uploads/page_J_masterpiece.png"
-    if os.path.exists(photo_path):
-        with open(photo_path, "rb") as f:
-            await context.bot.send_photo(chat_id=chat.id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
-    else:
-        await send_safe_reply(update, caption)
+    await send_bilingual_letter(chat.id, target_letter, context)
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manejador dinámico de aprobación: avanza automáticamente a la siguiente letra."""
     query = update.callback_query
     if not query:
         return
     await query.answer()
 
-    if query.data in ["approve_letter_A", "approve_letter_J"]:
-        letter_name = "J" if "J" in query.data else "A"
+    data = query.data or ""
+    chat_id = update.effective_chat.id if update.effective_chat else None
+
+    if data.startswith("approve_"):
+        letter_char = data.split("_")[1].upper()
+        
+        # Editar pie de foto confirmando aprobación
         await query.edit_message_caption(
             caption=(
-                f"✅ *¡FICHA LETRA {letter_name} APROBADA OFICIALMENTE!* 🎉\n\n"
-                f"El estándar maestro de óleo + line-art para la Letra {letter_name} queda certificado.\n"
-                "Continuando con el ensamblado de las siguientes obras."
+                f"✅ *¡LETRA {letter_char} APROBADA Y CERTIFICADA!* 🎉\n"
+                f"La ficha `{letter_char}` queda guardada en el máster final.\n"
+                "Cargando la siguiente letra..."
             ),
             parse_mode="Markdown"
         )
-    elif query.data in ["reject_letter_A", "reject_letter_J"]:
-        letter_name = "J" if "J" in query.data else "A"
+
+        # Calcular siguiente letra
+        next_char = chr(ord(letter_char) + 1)
+        if next_char <= "Z" and chat_id:
+            await send_bilingual_letter(chat_id, next_char, context)
+        elif next_char > "Z" and chat_id:
+            # Fin del abecedario: Álbum completo aprobado
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    "🏆 *¡FELICITACIONES! HAS APROBADO LAS 26 LETRAS (A - Z)* 🌟🎉\n\n"
+                    "El Álbum Completo **Bible ABC Masterpiece Edition** ha sido compilado a 300 DPI y está listo para lanzamiento comercial.\n\n"
+                    "📥 **Descargar Álbum Maestro (28 Páginas):**\n"
+                    "https://espejosstudio.cl/uploads/bible_abc_masterpiece_album.pdf\n\n"
+                    "✨ **Galería Web Oficial:**\n"
+                    "https://espejosstudio.cl/uploads/album_preview.html\n\n"
+                    "🚀 ¡Listo para publicar en Gumroad y Etsy!"
+                ),
+                parse_mode="Markdown"
+            )
+
+    elif data.startswith("reject_"):
+        letter_char = data.split("_")[1].upper()
         await query.edit_message_caption(
             caption=(
-                f"✏️ *Solicitud de ajuste registrada para la Letra {letter_name}.*\n"
-                "Escríbeme por aquí qué elemento específico deseas afinar."
+                f"✏️ *Solicitud de ajuste para la Letra {letter_char}.*\n"
+                "Escríbeme por aquí qué elemento específico deseas afinar (óleo, frase o dibujo)."
             ),
             parse_mode="Markdown"
         )
@@ -411,12 +425,11 @@ def main():
     app.add_handler(CommandHandler("logs", cmd_logs))
     app.add_handler(CommandHandler("restart", cmd_restart))
     app.add_handler(CommandHandler("crm", cmd_crm))
-    # Flujo de Aprobación de Fichas (Coloring Book)
-    app.add_handler(CommandHandler("revisar_a", cmd_revisar_a))
-    app.add_handler(CommandHandler("revisar_j", cmd_revisar_j))
-    app.add_handler(CommandHandler("boceto_j", cmd_revisar_j))
-    app.add_handler(CommandHandler("boceto", cmd_revisar_j))
-    app.add_handler(CommandHandler("ficha", cmd_revisar_j))
+    # Flujo de Aprobación Secuencial Bilingüe (A-Z)
+    app.add_handler(CommandHandler("revisar", cmd_revisar))
+    app.add_handler(CommandHandler("boceto", cmd_revisar))
+    app.add_handler(CommandHandler("ficha", cmd_revisar))
+    app.add_handler(CommandHandler("abc", cmd_revisar))
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 
     # Mensajes Naturales
