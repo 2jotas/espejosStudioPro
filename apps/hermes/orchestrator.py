@@ -195,29 +195,31 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
         f"{realtime_context}"
     ) if realtime_context else user_request
 
-    # 1. Intentar con Google Gemini 2.0 Flash
+    # 1. Intentar con Google Gemini (3.7 Flash, 3.6 Flash, Flash Latest)
     if GEMINI_API_KEY:
-        try:
-            client_gemini = OpenAI(
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-                api_key=GEMINI_API_KEY.strip()
-            )
-            completion = client_gemini.chat.completions.create(
-                model="gemini-2.0-flash",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": full_user_request}
-                ],
-                max_tokens=2048
-            )
-            content = completion.choices[0].message.content
-            if content:
-                return content
-        except Exception as e:
-            print(f"[Orchestrator] Gemini error, falling back to Groq: {e}", flush=True)
+        gemini_candidates = ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-3.5-flash"]
+        client_gemini = OpenAI(
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            api_key=GEMINI_API_KEY.strip()
+        )
+        for g_model in gemini_candidates:
+            try:
+                completion = client_gemini.chat.completions.create(
+                    model=g_model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": full_user_request}
+                    ],
+                    max_tokens=2048
+                )
+                content = completion.choices[0].message.content
+                if content:
+                    return content
+            except Exception as e:
+                continue
 
-    # 2. Fallback con Groq
-    candidate_models = [LLM_MODEL, "openai/gpt-oss-120b", "groq/compound", "qwen/qwen3.8-27b"]
+    # 2. Fallback de ultra-alta velocidad con Groq (GPT-OSS-120B, Qwen 3.8 27B, Compound)
+    candidate_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound", LLM_MODEL]
     client = OpenAI(base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
 
     last_err = None
