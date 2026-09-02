@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 import orchestrator as orch
+import tools
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
@@ -21,59 +22,57 @@ async def send_safe_reply(update: Update, text: str):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("Command /start received", flush=True)
     welcome = (
-        "🤖 *¡Hola! Soy Hermes, tu Bot Maestro Orquestador 24/7.*\n\n"
-        "Derivo tus solicitudes al agente adecuado en tiempo real:\n"
-        "- 🎓 `/universidad` : Ejercicios SQL/Python, algoritmos y Vault de Ciencia de Datos.\n"
-        "- ✂️ `/espejos` : CRM, agendamiento, visagismo morfológico y clientes.\n"
-        "- 🎬 `/contenido` : Reels, Shorts, copy, hooks y monetización de redes (1 diario).\n"
-        "- 🛡️ `/devops` : Estado del VPS (`100.93.160.96`), contenedores Docker, Pull Requests y despliegues por Tailscale.\n\n"
-        "Comandos disponibles:\n"
-        "👉 `/agentes` - Ver la lista detallada de agentes activos.\n"
-        "👉 `/ayuda` - Ver instrucciones y ejemplos de uso.\n\n"
-        "Escribe cualquier mensaje directamente y seleccionaré el agente ideal para responderte."
+        "🤖 *¡Hola! Soy Hermes, tu Ecosistema Multi-Agente 24/7.*\n\n"
+        "Cuento con 5 Agentes Especialistas y herramientas reales conectadas a tu VPS:\n\n"
+        "🛡️ `/atlas` : DevOps, Docker, UFW, logs y salud del VPS.\n"
+        "💎 `/romina` : CRM, citas, clientes y visagismo Espejos Studio.\n"
+        "📈 `/quant` : Trading, criptomonedas, bolsa, RSI y análisis técnico.\n"
+        "🎓 `/athena` : Carrera de Ciencia de Datos, Python, SQL y Vault RAG.\n"
+        "🚀 `/apolo` : Contenido viral, funnels y monetización automática.\n\n"
+        "🛠️ *Comandos de Acción Directa en el VPS:*\n"
+        "👉 `/docker` : Estado en vivo de todos los contenedores.\n"
+        "👉 `/logs <servicio>` : Ver últimos logs (`espejos-api`, `espejos-web`...).\n"
+        "👉 `/crm` : Resumen en vivo de clientes y citas.\n"
+        "👉 `/quote <ticker>` : Cotización en vivo (ej: `/quote btc`, `/quote nvda`).\n"
+        "👉 `/restart <servicio>` : Reiniciar un contenedor del VPS.\n"
+        "👉 `/sh <comando>` : Ejecutar comando de terminal en el repositorio.\n\n"
+        "💬 O escribe cualquier mensaje natural y el agente especialista te responderá."
     )
     await send_safe_reply(update, welcome)
 
 
 async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("Command /agentes received", flush=True)
     text = (
-        "👥 *Lista de Agentes Especializados Activos en Hermes:*\n\n"
-        "1️⃣ 🎓 *Agente Universidad* (`agente_universidad.md`)\n"
-        "   • *Especialización*: Ciencia de Datos, Python, SQL, Estadística y Vault Universitario.\n"
-        "   • *Comando*: `/universidad <tu pregunta>`\n\n"
-        "2️⃣ 💎 *Agente Romina* (`agente_espejos.md`)\n"
-        "   • *Especialización*: Directora CRM, Visagismo Morfológico, Citas y Operaciones Espejos Studio.\n"
-        "   • *Comando*: `/romina <tu consulta>` (o `/espejos`)\n\n"
-        "3️⃣ 🎬 *Agente Contenido* (`agente_contenido.md`)\n"
-        "   • *Especialización*: Guiones de Reels, Shorts, Copywriting y Publicación (1 post/día).\n"
-        "   • *Comando*: `/contenido <tu tema>`\n\n"
-        "4️⃣ 🛡️ *Agente Senior DevOps / Atlas* (`agente_devops.md`)\n"
-        "   • *Especialización*: Auditoría GitHub, Estado del VPS (`100.93.160.96`), UFW y Despliegues.\n"
-        "   • *Comando*: `/devops <tu orden>`"
+        "👥 *Los 5 Agentes Especialistas de Hermes:*\n\n"
+        "1️⃣ 🛡️ *Atlas — DevOps & SysAdmin* (`/atlas`)\n"
+        "   • Guardián del VPS, Docker, UFW, Git y despliegues.\n\n"
+        "2️⃣ 💎 *Romina — Directora de Operaciones & Visagismo* (`/romina`)\n"
+        "   • Gestión de CRM, clientes, citas y estética con IA.\n\n"
+        "3️⃣ 📈 *Mercurio / Quant — Trading & Finanzas* (`/quant`)\n"
+        "   • Análisis técnico, criptoactivos, bolsa y optimización de bots.\n\n"
+        "4️⃣ 🎓 *Athena — Tutora Ciencia de Datos & RAG* (`/athena`)\n"
+        "   • Malla de 4 años de carrera, Python, SQL y Vault de Obsidian.\n\n"
+        "5️⃣ 🚀 *Apolo — Growth & Monetización* (`/apolo`)\n"
+        "   • Guiones virales, productos digitales y automatización `auto.espejosstudio.cl`."
     )
     await send_safe_reply(update, text)
 
 
 async def ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("Command /ayuda received", flush=True)
     text = (
-        "💡 *Guía de Uso de Hermes:* \n\n"
-        "• Puedes escribir cualquier mensaje natural (ej: *'Crea una idea de Reel para barbería'*) y Hermes elegirá automáticamente el agente adecuado.\n"
-        "• O puedes forzar un agente específico usando su comando:\n"
-        "  - `/universidad Explícame qué es una regresión lineal en Python`\n"
-        "  - `/espejos ¿Cómo funciona el módulo de visagismo?`\n"
-        "  - `/contenido Dame el guión del Reel de hoy`\n"
-        "  - `/devops Revisa el estado de la infraestructura`"
+        "💡 *Ejemplos de Uso de Hermes:* \n\n"
+        "• *DevOps*: `¿Cómo están los contenedores de Docker?` o `/docker`\n"
+        "• *CRM*: `¿Cuántas citas confirmadas hay para hoy?` o `/crm`\n"
+        "• *Trading*: `¿Cómo está el RSI de Bitcoin y Ethereum?` o `/quote btc`\n"
+        "• *Universidad*: `Explícame qué es una regresión logística en Python`\n"
+        "• *Contenido*: `Crea un guión viral de 30s sobre visagismo masculino`"
     )
     await send_safe_reply(update, text)
 
 
 async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes.DEFAULT_TYPE):
     prompt_text = " ".join(context.args) if context.args else ""
-    print(f"Command /{agent_key} received: {prompt_text}", flush=True)
     if not prompt_text:
         await send_safe_reply(update, f"⚠️ Escribe tu consulta después del comando. Ej: `/{agent_key} tu pregunta`")
         return
@@ -81,31 +80,66 @@ async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes
     await send_safe_reply(update, f"⚡ *Ejecutando agente `{agent_key.upper()}`...*")
     try:
         resultado = orch.run_specific_agent(agent_key, prompt_text)
-        respuesta = (
-            f"🤖 *Respuesta del Agente `{agent_key.upper()}`:*\n\n"
-            f"{resultado}"
-        )
-        await send_safe_reply(update, respuesta)
+        await send_safe_reply(update, resultado)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
 
-async def cmd_universidad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_forced_agent("universidad", update, context)
+# Handlers por Agente
+async def cmd_atlas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("devops", update, context)
 
-async def cmd_espejos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_romina(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await run_forced_agent("espejos", update, context)
 
-async def cmd_contenido(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_quant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("trading", update, context)
+
+async def cmd_athena(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await run_forced_agent("universidad", update, context)
+
+async def cmd_apolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await run_forced_agent("contenido", update, context)
 
-async def cmd_devops(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await run_forced_agent("devops", update, context)
+
+# Handlers de Herramientas Directas
+async def cmd_docker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    res = tools.docker_ps()
+    await send_safe_reply(update, res)
+
+async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    target = context.args[0] if context.args else "espejos-api"
+    res = tools.docker_logs(target, tail=30)
+    await send_safe_reply(update, res)
+
+async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await send_safe_reply(update, "⚠️ Especifica el contenedor a reiniciar. Ej: `/restart espejos-api`")
+        return
+    res = tools.docker_restart(context.args[0])
+    await send_safe_reply(update, res)
+
+async def cmd_crm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    res = tools.query_crm_summary()
+    await send_safe_reply(update, res)
+
+async def cmd_quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sym = context.args[0] if context.args else "BTC-USD"
+    res = tools.get_market_quote(sym)
+    await send_safe_reply(update, res)
+
+async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cmd_str = " ".join(context.args) if context.args else ""
+    if not cmd_str:
+        await send_safe_reply(update, "⚠️ Especifica el comando a ejecutar. Ej: `/sh git status`")
+        return
+    await send_safe_reply(update, f"⚡ *Ejecutando:* `{cmd_str}`...")
+    res = tools.execute_shell(cmd_str)
+    await send_safe_reply(update, f"```\n{res}\n```")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
-    print(f"Message received: {text}", flush=True)
     if not text:
         return
 
@@ -113,50 +147,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         data = orch.orchestrate(text)
-
         categoria = data.get("agente_asignado", "unknown")
         resultado = data.get("resultado", "")
-        archivo = data.get("archivo_salida", "")
-
-        respuesta = (
-            f"🤖 *Agente Seleccionado:* `{categoria.upper()}`\n\n"
-            f"*Respuesta:*\n{resultado}\n\n"
-            f"📂 *Registro guardado:* `{archivo}`"
-        )
-        await send_safe_reply(update, respuesta)
+        await send_safe_reply(update, resultado)
     except Exception as e:
         await update.message.reply_text(f"❌ Error procesando la solicitud: {e}")
 
 
-async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    prompt_text = " ".join(context.args) if context.args else ""
-    if not prompt_text:
-        await send_safe_reply(update, "⚠️ Escribe tu instrucción de ingeniería después del comando. Ej: `/gemini revisa el estado del proyecto`")
-        return
-    await send_safe_reply(update, "🧠 *Gemini Engine analizando con memoria viva de PROJECT_BRAIN.md...*")
-    try:
-        import gemini_engine as gemini
-        res = gemini.run_gemini_agent(prompt_text)
-        await send_safe_reply(update, f"🧠 *Respuesta de Gemini Pro (VPS)*:\n\n{res}")
-    except Exception as e:
-        await send_safe_reply(update, f"❌ Error: {e}")
-
-
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    
+    # Comandos de Sistema & Ayuda
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("agentes", list_agents))
     app.add_handler(CommandHandler("ayuda", ayuda))
-    app.add_handler(CommandHandler("universidad", cmd_universidad))
-    app.add_handler(CommandHandler("espejos", cmd_espejos))
-    app.add_handler(CommandHandler("romina", cmd_espejos))
-    app.add_handler(CommandHandler("contenido", cmd_contenido))
-    app.add_handler(CommandHandler("devops", cmd_devops))
-    app.add_handler(CommandHandler("gemini", cmd_gemini))
-    app.add_handler(CommandHandler("code", cmd_gemini))
+
+    # Comandos de Agentes
+    app.add_handler(CommandHandler("atlas", cmd_atlas))
+    app.add_handler(CommandHandler("devops", cmd_atlas))
+    app.add_handler(CommandHandler("romina", cmd_romina))
+    app.add_handler(CommandHandler("espejos", cmd_romina))
+    app.add_handler(CommandHandler("quant", cmd_quant))
+    app.add_handler(CommandHandler("trading", cmd_quant))
+    app.add_handler(CommandHandler("mercurio", cmd_quant))
+    app.add_handler(CommandHandler("athena", cmd_athena))
+    app.add_handler(CommandHandler("universidad", cmd_athena))
+    app.add_handler(CommandHandler("apolo", cmd_apolo))
+    app.add_handler(CommandHandler("contenido", cmd_apolo))
+
+    # Herramientas Directas
+    app.add_handler(CommandHandler("docker", cmd_docker))
+    app.add_handler(CommandHandler("logs", cmd_logs))
+    app.add_handler(CommandHandler("restart", cmd_restart))
+    app.add_handler(CommandHandler("crm", cmd_crm))
+    app.add_handler(CommandHandler("quote", cmd_quote))
+    app.add_handler(CommandHandler("sh", cmd_sh))
+
+    # Mensajes Naturales
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot Maestro corriendo activamente en Docker VPS 24/7...", flush=True)
+    print("🚀 Hermes Multi-Agent Harness corriendo en VPS 24/7...", flush=True)
     app.run_polling()
 
 

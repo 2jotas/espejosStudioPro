@@ -2,11 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system network utilities (ping, curl, iproute2)
+# Install system network utilities, git and docker cli
 RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     curl \
+    git \
     iproute2 \
+    docker.io \
     && rm -rf /var/lib/apt-get/lists/*
 
 # Install python dependencies

@@ -41,8 +41,11 @@ services:
       - LLM_MODEL=${LLM_MODEL:-groq/compound}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/app/workspace
       - ./apps/hermes/outputs:/app/apps/hermes/outputs
       - ./PROJECT_BRAIN.md:/app/PROJECT_BRAIN.md
+      - ../formacion-ciencia-datos:/app/vault:ro
     depends_on:
       - espejos-api
 
