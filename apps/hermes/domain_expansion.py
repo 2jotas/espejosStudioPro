@@ -12,6 +12,12 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+try:
+    import fal_client
+    HAS_FAL_SDK = True
+except ImportError:
+    HAS_FAL_SDK = False
+
 WORKSPACE_DIR = Path("/app/workspace")
 if not WORKSPACE_DIR.exists():
     WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -33,7 +39,7 @@ DOMAINS_REGISTRY = {
     "video_engine": {
         "nombre": "Extensión de Dominio: Cinema Cuántico (Ultra-Fast Video)",
         "descripcion": "Generación de vídeo hiperrealista 9:16/16:9 a partir de texto o imágenes (Fal.ai, Replicate, Luma, Runway).",
-        "proveedores": ["fal.ai", "replicate", "luma", "runway", "minimax"]
+        "proveedores": ["fal.ai (Wan 2.1 / Kling / Luma)", "replicate", "runway", "minimax"]
     },
     "antigravity_bridge": {
         "nombre": "Extensión de Dominio: Forja de Código Antigravity",
@@ -61,34 +67,67 @@ def get_active_domains() -> str:
 
 def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_ratio: str = "9:16", duration: int = 5) -> Dict[str, Any]:
     """
-    Genera un vídeo ultra-rápido utilizando las mejores APIs de IA disponibles.
+    Genera un vídeo ultra-rápido utilizando Fal.ai SDK oficial o fallback REST.
     Soporta:
-    1. Fal.ai (Luma Fast / Wan2.1 Fast / Kling / Hunyuan)
-    2. Replicate (AnimateDiff Lightning / Stable Video Diffusion)
-    3. Luma Dream Machine API
+    1. Fal.ai (Wan 2.1 / Kling 1.6 / Luma Dream Machine)
+    2. Replicate (AnimateDiff Lightning / SVD)
     """
     clean_prompt = prompt.strip()
     if not clean_prompt:
         return {"success": False, "error": "Debes especificar un prompt para la generación de vídeo."}
 
-    # 1. Intentar con Fal.ai (Latencia ultra-baja ~10-25 segundos)
+    # 1. Intentar con Fal.ai (SDK oficial fal-client o REST)
     if FAL_KEY:
+        os.environ["FAL_KEY"] = FAL_KEY
         print(f"[Extensión de Dominio] Invocando Fal.ai Video API para: '{clean_prompt[:50]}...'", flush=True)
+
+        if HAS_FAL_SDK:
+            try:
+                # Seleccionar modelo Wan 2.1 Fast
+                model_endpoint = "fal-ai/wan/v2.1/t2v-480p" if not image_url else "fal-ai/wan/v2.1/i2v-480p"
+                args = {
+                    "prompt": clean_prompt,
+                    "aspect_ratio": aspect_ratio,
+                    "num_frames": 81 if duration >= 5 else 41
+                }
+                if image_url:
+                    args["image_url"] = image_url
+
+                print(f"[Extensión de Dominio] Enviando tarea a {model_endpoint}...", flush=True)
+                handler = fal_client.submit(model_endpoint, arguments=args)
+                result = handler.get()
+
+                video_url = None
+                if isinstance(result, dict):
+                    if "video" in result and isinstance(result["video"], dict):
+                        video_url = result["video"].get("url")
+                    elif "url" in result:
+                        video_url = result.get("url")
+
+                if video_url:
+                    return {
+                        "success": True,
+                        "provider": "fal.ai (Wan 2.1 Ultra-Fast SDK)",
+                        "prompt": clean_prompt,
+                        "video_url": video_url,
+                        "aspect_ratio": aspect_ratio,
+                        "duration": duration
+                    }
+            except Exception as e:
+                print(f"[Extensión de Dominio] Error con fal-client SDK: {e}", flush=True)
+
+        # Fallback REST a Fal.ai
         try:
             headers = {
                 "Authorization": f"Key {FAL_KEY}",
                 "Content-Type": "application/json"
             }
-            # Endpoint Luma Fast o Wan 2.1 Fast
-            endpoint = "https://queue.fal.run/fal-ai/wan/v2.1/t2v-480p" if not image_url else "https://queue.fal.run/fal-ai/wan/v2.1/i2v-480p"
-            payload: Dict[str, Any] = {
+            endpoint = "https://queue.fal.run/fal-ai/wan/v2.1/t2v-480p"
+            payload = {
                 "prompt": clean_prompt,
                 "aspect_ratio": aspect_ratio,
-                "num_frames": 81 if duration >= 5 else 41
+                "num_frames": 81
             }
-            if image_url:
-                payload["image_url"] = image_url
-
             resp = requests.post(endpoint, headers=headers, json=payload, timeout=30)
             if resp.status_code in [200, 201]:
                 data = resp.json()
@@ -96,14 +135,13 @@ def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_rat
                 if video_url:
                     return {
                         "success": True,
-                        "provider": "fal.ai (Wan 2.1 Ultra-Fast)",
+                        "provider": "fal.ai (REST Queue)",
                         "prompt": clean_prompt,
                         "video_url": video_url,
-                        "aspect_ratio": aspect_ratio,
-                        "duration": duration
+                        "aspect_ratio": aspect_ratio
                     }
         except Exception as e:
-            print(f"[Extensión de Dominio] Error en Fal.ai: {e}", flush=True)
+            print(f"[Extensión de Dominio] Error en Fal.ai REST: {e}", flush=True)
 
     # 2. Intentar con Replicate
     if REPLICATE_API_TOKEN:
@@ -113,7 +151,6 @@ def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_rat
                 "Authorization": f"Token {REPLICATE_API_TOKEN}",
                 "Content-Type": "application/json"
             }
-            # AnimateDiff-Lightning o Minimax Video
             payload = {
                 "version": "5e13554e22ff112ca001df1e63a1378d30e0e02eb4b74f3289ba113c12662058",
                 "input": {
@@ -125,7 +162,6 @@ def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_rat
             if resp.status_code == 201:
                 pred = resp.json()
                 pred_id = pred.get("id")
-                # Poll breve
                 poll_url = f"https://api.replicate.com/v1/predictions/{pred_id}"
                 for _ in range(15):
                     time.sleep(2)
@@ -146,7 +182,7 @@ def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_rat
         except Exception as e:
             print(f"[Extensión de Dominio] Error en Replicate: {e}", flush=True)
 
-    # 3. Mapeo de Pipeline Listo / Instrucciones de Activación si aún no se ingresa la clave
+    # 3. Pipeline Listo
     return {
         "success": True,
         "mode": "pipeline_ready",
@@ -158,10 +194,7 @@ def generate_fast_video(prompt: str, image_url: Optional[str] = None, aspect_rat
             f"• **Aspect Ratio:** `{aspect_ratio}` (Vertical Ultra HD)\n"
             f"• **Estilo:** 4K Photorealistic, smooth 60fps motion, cinematic lighting, zero artifacting.\n"
             f"• **Duración:** `{duration} segundos`\n\n"
-            f"🔑 **Para conectar tu API preferida al instante en `.env`:**\n"
-            f"• `FAL_KEY=tu_clave_fal_ai` (Recomendado para vídeo en <15s)\n"
-            f"• O `REPLICATE_API_TOKEN=tu_token`\n"
-            f"• O `LUMA_API_KEY=tu_clave_luma`\n"
-            f"• O `RUNWAYML_API_SECRET=tu_clave_runway`"
+            f"🔑 **Extensión de Dominio lista para conectar tu API key:**\n"
+            f"Indícame tu clave `FAL_KEY` de Fal.ai y la integraré al instante para generar vídeos en <15s."
         )
     }
