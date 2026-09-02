@@ -13,7 +13,7 @@ Principio de 3 capas aisladas:
 
 ### Los 5 Pilares del Ecosistema:
 1. 💈 **Web Barbería & Visagismo (`espejosstudio.cl`)**: Landing comercial, catálogo de cortes morfológicos y agendamiento online.
-2. ✂️ **CRM & Asistente Giovanni (`app.espejosstudio.cl`)**: Gestión de citas, visagismo con inpainting IA, retención de clientes y Passkeys.
+2. ✂️ **CRM & Asistente Romina (`app.espejosstudio.cl`)**: Gestión de citas, visagismo con inpainting IA, retención de clientes y Passkeys.
 3. 🎓 **Vault 4 Años Ciencia de Datos (`formacion.espejosstudio.cl`)**: Visualizador interactivo de los 4 años de carrera (Estadística, Python, SQL, Machine Learning, RAG y playground de código).
 4. 🎭 **Visagismo & AI Hair Studio (`performance.espejosstudio.cl`)**: Simulador interactivo de visagismo con selfie/cámara, renderizado de nuevo look con IA y ficha técnica gamificada para el barbero.
 5. 🎬 **Fábrica de Contenido & Automatización (`auto.espejosstudio.cl`)**: Pipeline de videos virales Antes/Después, generación de guiones con hooks y distribución a TikTok/Reels/Shorts.

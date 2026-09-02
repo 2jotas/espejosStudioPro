@@ -37,7 +37,7 @@ KEYWORDS = {
         "merge", "producción", "status", "logs", "puerto", "ssl", "nodo", "laptop"
     ],
     "espejos": [
-        "crm", "gravity", "clientes", "agenda", "citas", "servicios",
+        "romina", "crm", "gravity", "clientes", "agenda", "citas", "servicios",
         "barberos", "estilistas", "dashboard", "negocio", "retención",
         "experiencia", "personalización", "cliente activo", "turno",
         "reserva", "confirmación", "recordatorio", "profesional", "prestador",

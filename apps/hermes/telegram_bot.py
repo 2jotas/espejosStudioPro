@@ -44,13 +44,13 @@ async def list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1️⃣ 🎓 *Agente Universidad* (`agente_universidad.md`)\n"
         "   • *Especialización*: Ciencia de Datos, Python, SQL, Estadística y Vault Universitario.\n"
         "   • *Comando*: `/universidad <tu pregunta>`\n\n"
-        "2️⃣ ✂️ *Agente Espejos* (`agente_espejos.md`)\n"
-        "   • *Especialización*: CRM Barbería, Visagismo Morfológico, Citas y Clientes.\n"
-        "   • *Comando*: `/espejos <tu consulta>`\n\n"
+        "2️⃣ 💎 *Agente Romina* (`agente_espejos.md`)\n"
+        "   • *Especialización*: Directora CRM, Visagismo Morfológico, Citas y Operaciones Espejos Studio.\n"
+        "   • *Comando*: `/romina <tu consulta>` (o `/espejos`)\n\n"
         "3️⃣ 🎬 *Agente Contenido* (`agente_contenido.md`)\n"
         "   • *Especialización*: Guiones de Reels, Shorts, Copywriting y Publicación (1 post/día).\n"
         "   • *Comando*: `/contenido <tu tema>`\n\n"
-        "4️⃣ 🛡️ *Agente Senior DevOps* (`agente_devops.md`)\n"
+        "4️⃣ 🛡️ *Agente Senior DevOps / Atlas* (`agente_devops.md`)\n"
         "   • *Especialización*: Auditoría GitHub, Estado del VPS (`100.93.160.96`), UFW y Despliegues.\n"
         "   • *Comando*: `/devops <tu orden>`"
     )
@@ -149,6 +149,7 @@ def main():
     app.add_handler(CommandHandler("ayuda", ayuda))
     app.add_handler(CommandHandler("universidad", cmd_universidad))
     app.add_handler(CommandHandler("espejos", cmd_espejos))
+    app.add_handler(CommandHandler("romina", cmd_espejos))
     app.add_handler(CommandHandler("contenido", cmd_contenido))
     app.add_handler(CommandHandler("devops", cmd_devops))
     app.add_handler(CommandHandler("gemini", cmd_gemini))

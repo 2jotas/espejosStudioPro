@@ -19,7 +19,7 @@ Antes de proponer cambios, consultar o continuar tareas, lee y respeta siempre:
 
 ## 💈 Los 4 Pilares del Proyecto
 1. **Landing & Visagismo (`espejosstudio.cl`)**: Web comercial, catálogo de cortes y agendamiento online.
-2. **CRM Giovanni (`app.espejosstudio.cl`)**: Gestión de citas, visagismo morfológico con inpainting IA y Passkeys.
+2. **CRM Romina (`app.espejosstudio.cl`)**: Gestión de citas, visagismo morfológico con inpainting IA y Passkeys.
 3. **Plataforma Formación (`formacion.espejosstudio.cl`)**: Vault interactivo de 4 años de Ciencia de Datos sincronizado mediante Syncthing.
 4. **Fábrica de Contenido**: Automatización de guiones diarios y copywriting con `agente_contenido`.
 
