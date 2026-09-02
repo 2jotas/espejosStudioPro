@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -20,7 +21,7 @@ async def send_safe_reply(update: Update, text: str):
         chunk = text[i:i + CHUNK_SIZE]
         try:
             await msg.reply_text(chunk, parse_mode="Markdown")
-        except Exception as err:
+        except Exception:
             try:
                 await msg.reply_text(chunk)
             except Exception as e2:
@@ -85,10 +86,12 @@ async def run_forced_agent(agent_key: str, update: Update, context: ContextTypes
 
     await send_safe_reply(update, f"⚡ *Ejecutando agente `{agent_key.upper()}`...*")
     try:
-        resultado = orch.run_specific_agent(agent_key, prompt_text)
+        resultado = await asyncio.to_thread(orch.run_specific_agent, agent_key, prompt_text)
         await send_safe_reply(update, resultado)
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        msg = update.effective_message or update.message
+        if msg:
+            await msg.reply_text(f"❌ Error: {e}")
 
 
 # Handlers por Agente
@@ -110,28 +113,28 @@ async def cmd_apolo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Handlers de Herramientas Directas
 async def cmd_docker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = tools.docker_ps()
+    res = await asyncio.to_thread(tools.docker_ps)
     await send_safe_reply(update, res)
 
 async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = context.args[0] if context.args else "espejos-api"
-    res = tools.docker_logs(target, tail=30)
+    res = await asyncio.to_thread(tools.docker_logs, target, 30)
     await send_safe_reply(update, res)
 
 async def cmd_restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await send_safe_reply(update, "⚠️ Especifica el contenedor a reiniciar. Ej: `/restart espejos-api`")
         return
-    res = tools.docker_restart(context.args[0])
+    res = await asyncio.to_thread(tools.docker_restart, context.args[0])
     await send_safe_reply(update, res)
 
 async def cmd_crm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    res = tools.query_crm_summary()
+    res = await asyncio.to_thread(tools.query_crm_summary)
     await send_safe_reply(update, res)
 
 async def cmd_quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sym = context.args[0] if context.args else "BTC-USD"
-    res = tools.get_market_quote(sym)
+    res = await asyncio.to_thread(tools.get_market_quote, sym)
     await send_safe_reply(update, res)
 
 async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -140,7 +143,7 @@ async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_safe_reply(update, "⚠️ Especifica el comando a ejecutar. Ej: `/sh git status`")
         return
     await send_safe_reply(update, f"⚡ *Ejecutando:* `{cmd_str}`...")
-    res = tools.execute_shell(cmd_str)
+    res = await asyncio.to_thread(tools.execute_shell, cmd_str)
     await send_safe_reply(update, f"```\n{res}\n```")
 
 
@@ -153,7 +156,7 @@ async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await send_safe_reply(update, "🚀 *Invocando a Antigravity Engine en el VPS...*\n_Analizando el proyecto y ejecutando tareas de ingeniería..._")
     try:
-        resultado = tools.run_antigravity_bridge(prompt_text, continue_session=True)
+        resultado = await asyncio.to_thread(tools.run_antigravity_bridge, prompt_text, True)
         await send_safe_reply(update, f"🧠 *Respuesta de Antigravity (Bridge):*\n\n{resultado}")
     except Exception as e:
         print(f"[TelegramBot] cmd_antigravity error: {e}", flush=True)
@@ -172,7 +175,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_safe_reply(update, "⚡ *Orquestando solicitud con Hermes...*")
 
     try:
-        data = orch.orchestrate(text)
+        data = await asyncio.to_thread(orch.orchestrate, text)
         resultado = data.get("resultado", "")
         await send_safe_reply(update, resultado)
     except Exception as e:
