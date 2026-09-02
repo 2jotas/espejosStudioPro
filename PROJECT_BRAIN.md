@@ -11,11 +11,12 @@ Principio de 3 capas aisladas:
 - **Fuente de Verdad (GitHub Privado)**: `2jotas/espejosStudioPro` y `2jotas/formacion-ciencia-datos`.
 - **Fábrica 24/7 (VPS Contabo)**: Servicios en Docker, subdominios HTTPS y Hermes Daemon.
 
-### Los 4 Pilares del Ecosistema:
+### Los 5 Pilares del Ecosistema:
 1. 💈 **Web Barbería & Visagismo (`espejosstudio.cl`)**: Landing comercial, catálogo de cortes morfológicos y agendamiento online.
 2. ✂️ **CRM & Asistente Giovanni (`app.espejosstudio.cl`)**: Gestión de citas, visagismo con inpainting IA, retención de clientes y Passkeys.
 3. 🎓 **Vault 4 Años Ciencia de Datos (`formacion.espejosstudio.cl`)**: Visualizador interactivo de los 4 años de carrera (Estadística, Python, SQL, Machine Learning, RAG y playground de código).
-4. 🎬 **Fábrica de Contenido & Monetización (1 Reel/Short diario)**: Automatización de hooks, guiones virales y copywriting gestionado por `agente_contenido`.
+4. 🎭 **Visagismo & AI Hair Studio (`performance.espejosstudio.cl`)**: Simulador interactivo de visagismo con selfie/cámara, renderizado de nuevo look con IA y ficha técnica gamificada para el barbero.
+5. 🎬 **Fábrica de Contenido & Automatización (`auto.espejosstudio.cl`)**: Pipeline de videos virales Antes/Después, generación de guiones con hooks y distribución a TikTok/Reels/Shorts.
 
 ---
 
@@ -54,6 +55,7 @@ Principio de 3 capas aisladas:
 | **2026-09-01** | Antigravity 2.0 | API / Web | Perfeccionamiento UX de WhatsApp Bot: Menú de selección de servicios con precios y duraciones exactas, memoria inteligente de servicio habitual para clientes recurrentes, ticket con datos reales del profesional + link de Google Maps, filtro de contactos por palabra clave (`whatsappClientTagKeyword`) e importador de contactos. |
 | **2026-09-02** | Antigravity 2.0 | API / Web | Formulario dedicado de Dirección Física & Teléfono Comercial con botón de verificación en Google Maps; Selector móvil de archivos `.vcf`, `.csv`, `.txt` para importar contactos de WhatsApp; y corrección estricta de huso horario (`America/Santiago`) en cálculo de slots y sincronización de Google Calendar. |
 | **2026-09-02** | Antigravity 2.0 | API | Flujo interactivo multi-día (`AWAITING_DAY_CHOICE`): listado de días de la semana (1️⃣ Hoy, 2️⃣ Mañana, 3️⃣ Viernes...), despliegue de **todos** los horarios disponibles de apertura a cierre (10:00 a 20:00), y reconocimiento inteligente de horas directas ("15:00", "15 horas"). |
+| **2026-09-02** | Antigravity 2.0 | Gateway / Nginx | Habilitación de subdominios `performance.espejosstudio.cl` (AI Visagismo Studio) y `auto.espejosstudio.cl` (Content Automation Studio) en Gateway Nginx HTTP y HTTPS. |
 
 ---
 

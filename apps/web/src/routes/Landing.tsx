@@ -32,7 +32,10 @@ export default function Landing() {
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-slate-300">
+        <nav className="hidden md:flex items-center space-x-6 text-sm font-medium text-slate-300">
+          <Link to="/performance" className="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5" /> Visagismo IA
+          </Link>
           <a href="#caracteristicas" className="hover:text-white transition-colors">Características</a>
           <a href="#como-funciona" className="hover:text-white transition-colors">Cómo funciona</a>
           <a href="#precios" className="hover:text-white transition-colors">Planes</a>
