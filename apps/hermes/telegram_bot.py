@@ -169,6 +169,24 @@ async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ Error en Antigravity Bridge: {e}")
 
 
+async def cmd_eval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    prompt_text = " ".join(context.args) if context.args else ""
+    if not prompt_text:
+        await send_safe_reply(update, "⚠️ Especifica la consulta a evaluar y optimizar con Antigravity.\nEj: `/eval ¿Cuál es la mejor arquitectura para escalar el CRM?`")
+        return
+
+    await send_safe_reply(update, "🧠 *Iniciando Doble Pasada (Agente Especialista + Evaluación y Optimización con Antigravity)...*")
+    try:
+        data = await asyncio.to_thread(orch.orchestrate_with_eval, prompt_text)
+        resultado_opt = data.get("resultado_optimizado", "")
+        await send_safe_reply(update, resultado_opt)
+    except Exception as e:
+        print(f"[TelegramBot] cmd_eval error: {e}", flush=True)
+        msg = update.effective_message or update.message
+        if msg:
+            await msg.reply_text(f"❌ Error en evaluación Antigravity: {e}")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message or update.message
     text = (msg.text or "").strip() if msg else ""
@@ -201,10 +219,13 @@ def main():
     app.add_handler(CommandHandler("agentes", list_agents))
     app.add_handler(CommandHandler("ayuda", ayuda))
 
-    # Antigravity Bridge
+    # Antigravity Bridge & Dual-Pass Evaluator
     app.add_handler(CommandHandler("agy", cmd_antigravity))
     app.add_handler(CommandHandler("antigravity", cmd_antigravity))
     app.add_handler(CommandHandler("code", cmd_antigravity))
+    app.add_handler(CommandHandler("eval", cmd_eval))
+    app.add_handler(CommandHandler("super", cmd_eval))
+    app.add_handler(CommandHandler("judge", cmd_eval))
 
     # Comandos de Agentes
     app.add_handler(CommandHandler("atlas", cmd_atlas))

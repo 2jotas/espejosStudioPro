@@ -300,3 +300,33 @@ def run_specific_agent(agent_name: str, request: str) -> str:
     resultado = call_llm_with_fallback(system_prompt, request, agent_name)
     save_output_md(agent_name, resultado)
     return resultado
+
+
+def orchestrate_with_eval(request: str) -> dict:
+    """Ejecuta una doble pasada: Primero el agente genera la propuesta y luego Antigravity la audita y optimiza."""
+    data = orchestrate(request)
+    agent_name = data.get("agente_asignado", "devops")
+    propuesta_inicial = data.get("resultado", "")
+
+    eval_result = tools.evaluate_and_optimize_with_antigravity(request, agent_name, propuesta_inicial)
+
+    conn = ensure_db()
+    save_task(
+        conn,
+        categoria=f"{agent_name}_eval",
+        titulo=f"[EVAL] {request[:100]}",
+        estado="evaluada_antigravity",
+        resultado=eval_result,
+    )
+    conn.close()
+
+    md_path = save_output_md(f"{agent_name}_eval", eval_result)
+
+    return {
+        "solicitud": request,
+        "agente_asignado": agent_name,
+        "propuesta_inicial": propuesta_inicial,
+        "resultado_optimizado": eval_result,
+        "archivo_salida": str(md_path)
+    }
+

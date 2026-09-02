@@ -264,3 +264,19 @@ def run_antigravity_bridge(prompt: str, continue_session: bool = True) -> str:
     except Exception as e:
         return f"❌ Error ejecutando Antigravity CLI: {e}"
 
+
+def evaluate_and_optimize_with_antigravity(user_query: str, agent_name: str, agent_response: str) -> str:
+    """Envía la propuesta de un agente a Antigravity para que la audite, optimice y emita la versión final avalada."""
+    eval_prompt = (
+        f"Actúa como Chief AI Architect & Reviewer en el ecosistema Espejos Studio Pro.\n"
+        f"El usuario envió este requerimiento: '{user_query}'\n"
+        f"El agente '{agent_name.upper()}' generó esta respuesta inicial:\n"
+        f"```\n{agent_response}\n```\n\n"
+        f"Tu tarea:\n"
+        f"1. Evaluar la respuesta (efectividad técnica 1-100% y riesgos).\n"
+        f"2. Optimizarla al máximo y entregar la SOLUCIÓN DEFINITIVA Y PERFECCIONADA al usuario.\n"
+        f"3. Iniciar con el sello '🛡️ *AVALADO & OPTIMIZADO POR ANTIGRAVITY ENGINE* (Score: XX%)'."
+    )
+    return run_antigravity_bridge(eval_prompt, continue_session=True)
+
+
