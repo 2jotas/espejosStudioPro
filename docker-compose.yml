@@ -46,6 +46,9 @@ services:
       - ./apps/hermes/outputs:/app/apps/hermes/outputs
       - ./PROJECT_BRAIN.md:/app/PROJECT_BRAIN.md
       - ../formacion-ciencia-datos:/app/vault:ro
+      - /home/deploy/.local/bin/agy:/usr/local/bin/agy:ro
+      - /home/deploy/.gemini:/root/.gemini
+      - /home/deploy/.config:/root/.config:ro
     depends_on:
       - espejos-api
 
