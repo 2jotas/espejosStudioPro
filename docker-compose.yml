@@ -43,7 +43,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./:/app/workspace
-      - ./apps/hermes/outputs:/app/apps/hermes/outputs
+      - ./apps/hermes:/app/apps/hermes
       - ./PROJECT_BRAIN.md:/app/PROJECT_BRAIN.md
       - ../formacion-ciencia-datos:/app/vault:ro
       - /home/deploy/.local/bin/agy:/usr/local/bin/agy:ro
