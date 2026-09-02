@@ -283,25 +283,25 @@ async def cmd_revisar_a(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     caption = (
-        "🎨 *PROPUESTA DE FICHA: LETRA A (Arca de Noé)*\n\n"
-        "• **Objeto:** `Ark of Noah • Arca de Noé`\n"
-        "• **Estilo:** `Clean Bold Line-Art` (Líneas gruesas para niños de 3 a 8 años)\n"
-        "• **Pauta:** Caligrafía punteada para trazo de `A` y `a`\n"
+        "🎨 *PROPUESTA DE FICHA MAESTRA: LETRA A (Arca de Noé)*\n\n"
+        "• **Lienzo al Óleo de Inspiración:** Pintura al óleo clásica en miniatura con marco dorado y cielo de arcoíris (Estilo *William Turner*).\n"
+        "• **Lámina para Colorear:** `Clean Bold Line-Art` de la misma escena con líneas gruesas y limpias.\n"
+        "• **Pauta:** Caligrafía punteada para trazar `A` y `a`\n"
         "• **Versículo Bíblico (Inicia con A):**\n"
         "_\"Al principio creó Dios los cielos y la tierra.\" — Génesis 1:1_\n\n"
-        "🔗 [Ver PDF Listo para Imprimir](https://espejosstudio.cl/uploads/page_A_full.pdf)\n"
-        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_A_full.png)"
+        "🔗 [Ver PDF Imprimible 300 DPI](https://espejosstudio.cl/uploads/page_A_masterpiece.pdf)\n"
+        "🔗 [Ver Imagen en HD](https://espejosstudio.cl/uploads/page_A_masterpiece.png)"
     )
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ APROBAR LETRA A", callback_data="approve_letter_A"),
+            InlineKeyboardButton("✅ APROBAR FICHA A", callback_data="approve_letter_A"),
             InlineKeyboardButton("✏️ SOLICITAR AJUSTE", callback_data="reject_letter_A")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    photo_path = "/app/workspace/apps/api/uploads/page_A_full.png"
+    photo_path = "/app/workspace/apps/api/uploads/page_A_masterpiece.png"
     if os.path.exists(photo_path):
         with open(photo_path, "rb") as f:
             await context.bot.send_photo(chat_id=chat.id, photo=f, caption=caption, parse_mode="Markdown", reply_markup=reply_markup)
