@@ -225,6 +225,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text:
         return
 
+    chat_id = update.effective_chat.id if update.effective_chat else None
+
+    # 1. Interceptar si el usuario está en modo ajuste de una letra del abecedario
+    if chat_id and chat_id in USER_ADJUSTING_LETTER:
+        letter_char = USER_ADJUSTING_LETTER.pop(chat_id)
+        await send_safe_reply(update, f"🎨 *Aplicando tus ajustes a la Letra {letter_char} con FLUX...*\n_\"{text}\"_")
+        try:
+            await asyncio.to_thread(adjust_letter_with_ai, letter_char, text)
+            await send_bilingual_letter(chat_id, letter_char, context)
+            return
+        except Exception as e:
+            print(f"[TelegramBot] Error en ajuste de letra {letter_char}: {e}", flush=True)
+            await send_safe_reply(update, f"❌ Error aplicando ajuste a la Letra {letter_char}: {e}")
+            return
+
     if update.effective_chat:
         try:
             await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -276,7 +291,26 @@ async def cmd_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ Error en Extensión de Dominio Video: {e}")
 
 
-from build_bilingual_pages import BILINGUAL_ALPHABET
+from build_bilingual_pages import BILINGUAL_ALPHABET, generate_bilingual_sheet, UPLOADS_DIR
+from flux_pipeline_worker import fetch_image
+
+USER_ADJUSTING_LETTER = {}  # chat_id -> letter_char
+
+def adjust_letter_with_ai(letter_char: str, user_feedback: str) -> bool:
+    """Regenera los activos de la letra indicada según las instrucciones del usuario."""
+    letter_char = letter_char.upper()
+    item = next((x for x in BILINGUAL_ALPHABET if x["letter"] == letter_char), None)
+    if not item:
+        return False
+
+    prompt_canvas = f"Classical oil painting on canvas with ornate golden frame, {item['word_en']}, {user_feedback}, {item['artist']}, museum quality fine art miniature."
+    prompt_line = f"Professional children coloring book page, {item['word_en']}, {user_feedback}, cute friendly style, thick bold clean black outlines, pure white background, no color, no shading, vector art for kids."
+
+    fetch_image(prompt_canvas, UPLOADS_DIR / item["canvas"])
+    fetch_image(prompt_line, UPLOADS_DIR / item["lineart"])
+    generate_bilingual_sheet(item)
+    return True
+
 
 async def send_bilingual_letter(chat_id: int, letter_char: str, context: ContextTypes.DEFAULT_TYPE):
     """Envía la ficha bilingüe de una letra específica para revisión interactiva."""
@@ -317,7 +351,7 @@ async def send_bilingual_letter(chat_id: int, letter_char: str, context: Context
 
 
 async def cmd_revisar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando para iniciar la revisión secuencial del abecedario (/revisar o /revisar b)."""
+    """Comando para iniciar la revisión secuencial del abecedario (/revisar o /revisar e)."""
     chat = update.effective_chat
     if not chat:
         return
@@ -326,6 +360,21 @@ async def cmd_revisar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and len(context.args) > 0:
         target_letter = context.args[0][0].upper()
 
+    await send_bilingual_letter(chat.id, target_letter, context)
+
+
+async def cmd_ajustar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ajusta una letra directamente (/ajustar E cambiar el fondo por montañas nevadas)."""
+    chat = update.effective_chat
+    if not chat or not context.args or len(context.args) < 2:
+        await send_safe_reply(update, "⚠️ Uso: `/ajustar <LETRA> <instrucciones de ajuste>`\nEj: `/ajustar E hacer el águila más amigable volando con sol brillante`")
+        return
+
+    target_letter = context.args[0].upper()
+    instructions = " ".join(context.args[1:])
+
+    await send_safe_reply(update, f"🎨 *Ajustando la Letra {target_letter} con FLUX...*\n_\"{instructions}\"_")
+    await asyncio.to_thread(adjust_letter_with_ai, target_letter, instructions)
     await send_bilingual_letter(chat.id, target_letter, context)
 
 
@@ -341,12 +390,14 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     if data.startswith("approve_"):
         letter_char = data.split("_")[1].upper()
+        if chat_id and chat_id in USER_ADJUSTING_LETTER:
+            USER_ADJUSTING_LETTER.pop(chat_id, None)
         
         # Editar pie de foto confirmando aprobación
         await query.edit_message_caption(
             caption=(
-                f"✅ *¡LETRA {letter_char} APROBADA Y CERTIFICADA!* 🎉\n"
-                f"La ficha `{letter_char}` queda guardada en el máster final.\n"
+                f"✅ *¡LETRA {letter_char} APROBADA Y GUARDADA!* 🎉\n"
+                f"La ficha `{letter_char}` queda certificada para el máster final.\n"
                 "Cargando la siguiente letra..."
             ),
             parse_mode="Markdown"
@@ -374,10 +425,13 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     elif data.startswith("reject_"):
         letter_char = data.split("_")[1].upper()
+        if chat_id:
+            USER_ADJUSTING_LETTER[chat_id] = letter_char
         await query.edit_message_caption(
             caption=(
-                f"✏️ *Solicitud de ajuste para la Letra {letter_char}.*\n"
-                "Escríbeme por aquí qué elemento específico deseas afinar (óleo, frase o dibujo)."
+                f"✏️ *MODO AJUSTE ACTIVADO: LETRA {letter_char}*\n\n"
+                f"Escríbeme por aquí exactamente qué te gustaría cambiar de la Letra {letter_char} (ej: 'cambiar el paisaje a montañas nevadas', 'hacer el dibujo más tierno', 'otra frase').\n\n"
+                f"_Hermes regenerará la lámina con FLUX y te enviará la nueva versión de inmediato._"
             ),
             parse_mode="Markdown"
         )
@@ -430,6 +484,8 @@ def main():
     app.add_handler(CommandHandler("boceto", cmd_revisar))
     app.add_handler(CommandHandler("ficha", cmd_revisar))
     app.add_handler(CommandHandler("abc", cmd_revisar))
+    app.add_handler(CommandHandler("ajustar", cmd_ajustar))
+    app.add_handler(CommandHandler("ajuste", cmd_ajustar))
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 
     # Mensajes Naturales
