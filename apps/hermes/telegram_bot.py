@@ -72,6 +72,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📈 `/quant` : Trading, criptomonedas, bolsa, RSI y análisis técnico.\n"
         "🎓 `/athena` : Carrera de Ciencia de Datos, Python, SQL y Vault RAG.\n"
         "🚀 `/apolo` : Contenido viral, funnels y monetización automática.\n\n"
+        "⚡ *Mando Supremo Antigravity (Gemini 3.8):*\n"
+        "👉 `/super <orden>` : Antigravity como Cerebro y Hermes como Manos (diseña, modifica código y ejecuta en el VPS).\n\n"
         "🛠️ *Comandos de Acción Directa en el VPS:*\n"
         "👉 `/docker` : Estado en vivo de todos los contenedores.\n"
         "👉 `/logs <servicio>` : Ver últimos logs (`espejos-api`, `espejos-web`...).\n"
@@ -182,22 +184,71 @@ async def cmd_sh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_safe_reply(update, f"```\n{res}\n```")
 
 
-async def cmd_antigravity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_super(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Comando Supremo /super (y /agy):
+    Antigravity (Gemini 3.8) actúa como el CEREBRO director con ejecución autónoma
+    de código, herramientas y comandos en el VPS, y Hermes como las MANOS en Telegram.
+    """
     prompt_text = " ".join(context.args) if context.args else ""
-    print(f"[TelegramBot] /agy command received: {prompt_text}", flush=True)
+    print(f"[TelegramBot] /super command received: '{prompt_text}'", flush=True)
     if not prompt_text:
-        await send_safe_reply(update, "⚠️ Escribe tu instrucción de programación para Antigravity.\nEj: `/agy revisa el estado del repositorio y lista tareas pendientes`")
+        await send_safe_reply(
+            update,
+            "⚡ *MANDO SUPREMO: ANTIGRAVITY (Gemini 3.8) + HERMES*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🧠 *Antigravity (Gemini 3.8):* Cerebro Director (diseña, modifica código, ejecuta comandos y compila proyectos).\n"
+            "🤖 *Hermes:* Manos Operativas en el VPS y Telegram.\n\n"
+            "👉 *Uso:* `/super <orden técnica o de producto>`\n\n"
+            "📌 *Ejemplos de misiones:*\n"
+            "• `/super revisa git status y muestra los últimos commits`\n"
+            "• `/super ajusta la letra E a estilo acuarela en el abecedario`\n"
+            "• `/super revisa el estado de docker y los logs de espejos-api`"
+        )
         return
 
-    await send_safe_reply(update, "🚀 *Invocando a Antigravity Engine en el VPS...*\n_Analizando el proyecto y ejecutando tareas de ingeniería..._")
+    await send_safe_reply(
+        update,
+        f"🧠 *CEREBRO ANTIGRAVITY (Gemini 3.8) ACTIVADO*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 *Misión:* _{prompt_text}_\n\n"
+        f"⚙️ _Tomando control autónomo del VPS y ejecutando cambios..._\n"
+        f"⏳ _Procesando con acceso a terminal y archivos en el workspace._"
+    )
+
+    chat_id = update.effective_chat.id if update.effective_chat else None
+    stop_typing = asyncio.Event()
+
+    async def keep_typing():
+        while not stop_typing.is_set():
+            try:
+                if chat_id:
+                    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+            except Exception:
+                pass
+            await asyncio.sleep(4)
+
+    typing_task = asyncio.create_task(keep_typing())
+
     try:
-        resultado = await asyncio.to_thread(tools.run_antigravity_bridge, prompt_text, True)
-        await send_safe_reply(update, f"🧠 *Respuesta de Antigravity (Bridge):*\n\n{resultado}")
+        resultado = await asyncio.to_thread(
+            tools.run_antigravity_bridge,
+            prompt_text,
+            continue_session=True,
+            model="gemini-3.8-flash-high",
+            timeout=180
+        )
+        header = (
+            "🛡️ *MISIÓN COMPLETADA POR ANTIGRAVITY (Gemini 3.8)* 🚀✨\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        await send_safe_reply(update, header + resultado)
     except Exception as e:
-        print(f"[TelegramBot] cmd_antigravity error: {e}", flush=True)
-        msg = update.effective_message or update.message
-        if msg:
-            await msg.reply_text(f"❌ Error en Antigravity Bridge: {e}")
+        print(f"[TelegramBot] cmd_super error: {e}", flush=True)
+        await send_safe_reply(update, f"❌ Error en ejecución de Antigravity: {e}")
+    finally:
+        stop_typing.set()
+        typing_task.cancel()
 
 
 async def cmd_eval(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -453,12 +504,12 @@ def main():
     app.add_handler(CommandHandler("video", cmd_video))
     app.add_handler(CommandHandler("animar", cmd_video))
 
-    # Antigravity Bridge & Dual-Pass Evaluator
-    app.add_handler(CommandHandler("agy", cmd_antigravity))
-    app.add_handler(CommandHandler("antigravity", cmd_antigravity))
-    app.add_handler(CommandHandler("code", cmd_antigravity))
+    # Antigravity Bridge (Cerebro Gemini 3.8) & Evaluator
+    app.add_handler(CommandHandler("super", cmd_super))
+    app.add_handler(CommandHandler("agy", cmd_super))
+    app.add_handler(CommandHandler("antigravity", cmd_super))
+    app.add_handler(CommandHandler("code", cmd_super))
     app.add_handler(CommandHandler("eval", cmd_eval))
-    app.add_handler(CommandHandler("super", cmd_eval))
     app.add_handler(CommandHandler("judge", cmd_eval))
 
     # Comandos de Agentes

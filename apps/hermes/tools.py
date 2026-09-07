@@ -232,20 +232,21 @@ def search_vault_notes(keyword: str) -> str:
         return f"Error buscando en el Vault: {e}"
 
 
-def run_antigravity_bridge(prompt: str, continue_session: bool = True) -> str:
-    """Invoca el motor de ingeniería autónomo de Antigravity CLI."""
+def run_antigravity_bridge(prompt: str, continue_session: bool = True, model: str = "gemini-3.8-flash-high", timeout: int = 180) -> str:
+    """Invoca el motor de ingeniería y ejecución autónoma de Antigravity CLI (Gemini 3.8)."""
     clean_prompt = prompt.strip()
     if not clean_prompt:
         return "⚠️ Por favor especifica la instrucción para Antigravity."
 
     cmd = [
         "agy",
+        "--model", model,
         "-p", clean_prompt,
         "--dangerously-skip-permissions",
-        "--print-timeout", "4m0s"
+        "--print-timeout", f"{timeout}s"
     ]
     if continue_session:
-        cmd.insert(1, "-c")
+        cmd.append("-c")
 
     try:
         res = subprocess.run(
@@ -253,20 +254,22 @@ def run_antigravity_bridge(prompt: str, continue_session: bool = True) -> str:
             cwd=str(WORKSPACE_DIR),
             capture_output=True,
             text=True,
-            timeout=250
+            timeout=timeout + 15
         )
-        out = res.stdout if res.returncode == 0 else f"{res.stdout}\n{res.stderr}"
-        if not out.strip():
-            out = "✅ Tarea procesada por Antigravity."
-        return out[:3800]
+        raw = res.stdout if res.returncode == 0 else f"{res.stdout}\n{res.stderr}"
+        import re
+        cleaned = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', raw).strip()
+        if not cleaned:
+            cleaned = "✅ Tarea ejecutada exitosamente por Antigravity en el VPS."
+        return cleaned[:3800]
     except subprocess.TimeoutExpired:
-        return "⏱️ Antigravity continúa procesando la tarea en segundo plano. Los cambios se están aplicando."
+        return f"⏱️ Antigravity continúa procesando la tarea en segundo plano en el VPS (tiempo límite {timeout}s alcanzado)."
     except Exception as e:
         return f"❌ Error ejecutando Antigravity CLI: {e}"
 
 
 def evaluate_and_optimize_with_antigravity(user_query: str, agent_name: str, agent_response: str) -> str:
-    """Audita y optimiza la propuesta con el motor de alta velocidad de Antigravity (Groq / Gemini) en < 2 segundos."""
+    """Audita y optimiza la propuesta con Gemini 3.8 Flash (o Groq LPU como fallback) en < 2 segundos."""
     eval_system_prompt = (
         "Eres Antigravity Chief AI Architect & Reviewer en el ecosistema Espejos Studio Pro.\n"
         "Tu misión es evaluar con pensamiento crítico de élite la propuesta de un subagente y entregar la versión DEFINITIVA, OPTIMIZADA y ACCIONABLE al usuario.\n"
@@ -283,8 +286,32 @@ def evaluate_and_optimize_with_antigravity(user_query: str, agent_name: str, age
         f"Entrega la evaluación y la versión optimizada final."
     )
 
-    # 1. Intento ultrarrápido con Groq LPU (0.4s)
-    groq_key = os.getenv("GROQ_API_KEY")
+    # 1. Intento con Google Gemini 3.8 Flash
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            from openai import OpenAI
+            client_g = OpenAI(
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                api_key=gemini_key.strip(),
+                timeout=15.0
+            )
+            resp = client_g.chat.completions.create(
+                model="gemini-3.8-flash",
+                messages=[
+                    {"role": "system", "content": eval_system_prompt},
+                    {"role": "user", "content": user_msg}
+                ],
+                max_tokens=2048
+            )
+            content = resp.choices[0].message.content
+            if content:
+                return content
+        except Exception as e:
+            print(f"[Eval Gemini 3.8 Error]: {e}", flush=True)
+
+    # 2. Fallback ultrarrápido con Groq LPU
+    groq_key = os.getenv("GROQ_API_KEY") or os.getenv("LLM_API_KEY")
     if groq_key:
         try:
             from groq import Groq
@@ -301,21 +328,6 @@ def evaluate_and_optimize_with_antigravity(user_query: str, agent_name: str, age
             return completion.choices[0].message.content or "✅ Optimizado por Antigravity Engine."
         except Exception as e:
             print(f"[Eval Groq Error]: {e}", flush=True)
-
-    # 2. Intento rápido con Gemini Flash (1.2s)
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key:
-        try:
-            from google import genai
-            client = genai.Client(api_key=gemini_key)
-            resp = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"{eval_system_prompt}\n\n{user_msg}"
-            )
-            if resp.text:
-                return resp.text
-        except Exception as e:
-            print(f"[Eval Gemini Error]: {e}", flush=True)
 
     # 3. Fallback directo
     return (

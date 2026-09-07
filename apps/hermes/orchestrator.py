@@ -199,13 +199,13 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
         f"{realtime_context}"
     ) if realtime_context else user_request
 
-    # 1. Intentar con Google Gemini (Flash Latest, 3.5 Flash)
+    # 1. Intentar con Google Gemini (3.8 Flash, 3.6 Flash, 3.5 Flash)
     if GEMINI_API_KEY:
-        gemini_candidates = ["gemini-flash-latest", "gemini-3.5-flash"]
+        gemini_candidates = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
         client_gemini = OpenAI(
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             api_key=GEMINI_API_KEY.strip(),
-            timeout=5.0
+            timeout=25.0
         )
         for g_model in gemini_candidates:
             try:
@@ -217,7 +217,7 @@ def call_llm_with_fallback(system_prompt: str, user_request: str, agent_name: st
                         {"role": "user", "content": full_user_request}
                     ],
                     max_tokens=2048,
-                    timeout=5.0
+                    timeout=25.0
                 )
                 content = completion.choices[0].message.content
                 if content:
@@ -286,7 +286,7 @@ def orchestrate(request: str) -> dict:
         "agente_asignado": agent_name,
         "archivo_agente": str(AGENTS.get(agent_name, "")),
         "prompt_agente": system_prompt[:400],
-        "modelo": "gemini-2.0-flash / groq",
+        "modelo": "gemini-3.8-flash / groq",
         "resultado": resultado,
         "archivo_salida": str(md_path),
     }

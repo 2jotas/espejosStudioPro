@@ -81,10 +81,11 @@ def run_gemini_agent(user_prompt: str) -> str:
 
     # 1. Intentar endpoint oficial OpenAI-compatible de Google Gemini
     if api_key:
-        candidate_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+        candidate_models = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash"]
         client = OpenAI(
             base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             api_key=api_key,
+            timeout=25.0,
         )
         for m_name in candidate_models:
             try:
