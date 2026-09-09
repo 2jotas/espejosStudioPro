@@ -32,6 +32,7 @@ const host = '0.0.0.0';
 
 const server = Fastify({
   logger: true,
+  bodyLimit: 100 * 1024 * 1024, // 100MB body limit
 });
 
 async function main() {
@@ -59,7 +60,12 @@ async function main() {
     secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production-espejos-2026',
   });
 
-  await server.register(fastifyMultipart, { limits: { fileSize: 10 * 1024 * 1024 } });
+  await server.register(fastifyMultipart, {
+    limits: {
+      fileSize: 20 * 1024 * 1024, // 20MB per file
+      files: 25, // Up to 25 files at once
+    },
+  });
   await server.register(fastifyStatic, {
     root: path.resolve(process.cwd(), './uploads'),
     prefix: '/uploads/',

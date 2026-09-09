@@ -73,8 +73,9 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         if (!part.file) continue;
 
         // Verify mime type
+        const mime = (part.mimetype || '').toLowerCase();
         const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-        if (!allowedMimes.includes(part.mimetype)) {
+        if (!allowedMimes.includes(mime)) {
           return reply.status(400).send({
             error: 'InvalidFileType',
             message: `Formato no soportado (${part.mimetype}). Solo se permiten JPG, PNG y WebP.`,

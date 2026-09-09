@@ -60,39 +60,74 @@ export default function GalleryManager() {
     fetchGallery();
   }, []);
 
-  // Multi-file upload handler
+  // Sequential multi-file upload handler with real-time progress & error protection
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
+    const files = Array.from(fileList);
     setIsUploading(true);
     setError(null);
     setSuccessMsg(null);
-    setUploadProgress(`Subiendo y optimizando ${files.length} imagen(es)...`);
 
-    const formData = new FormData();
+    let uploadedCount = 0;
+    const errors: string[] = [];
+
     for (let i = 0; i < files.length; i++) {
-      formData.append('files', files[i]);
+      const file = files[i];
+      setUploadProgress(`Subiendo y optimizando foto ${i + 1} de ${files.length} (${file.name})...`);
+
+      // Client-side file size check (8MB)
+      if (file.size > 8 * 1024 * 1024) {
+        errors.push(`"${file.name}" supera los 8 MB permitidos (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/gallery/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        let data: any = {};
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          if (!res.ok) {
+            throw new Error(
+              res.status === 413
+                ? `"${file.name}" supera el límite de tamaño permitido por el servidor.`
+                : `Error del servidor (${res.status}) al procesar "${file.name}".`
+            );
+          }
+        }
+
+        if (!res.ok) {
+          throw new Error(data.message || `Error al subir "${file.name}".`);
+        }
+
+        uploadedCount++;
+      } catch (err: any) {
+        errors.push(err.message || `Fallo al procesar "${file.name}".`);
+      }
     }
 
-    try {
-      const res = await fetch('/api/gallery/upload', {
-        method: 'POST',
-        body: formData,
-      });
+    if (fileInputRef.current) fileInputRef.current.value = '';
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al subir imágenes');
-
-      setSuccessMsg(`✅ ${data.images?.length || files.length} foto(s) subida(s) como borrador.`);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+    if (uploadedCount > 0) {
+      setSuccessMsg(`✅ ${uploadedCount} foto(s) subida(s) correctamente como borrador.`);
       fetchGallery();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
     }
+    if (errors.length > 0) {
+      setError(errors.join(' | '));
+    }
+
+    setIsUploading(false);
+    setUploadProgress(null);
   };
 
   // Toggle Publish Status
