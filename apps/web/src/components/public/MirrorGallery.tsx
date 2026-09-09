@@ -19,6 +19,7 @@ export default function MirrorGallery({
   const [images, setImages] = useState<GalleryPhoto[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // 1. Fetch Gallery Data
   useEffect(() => {
     if (!slug) return;
     const fetchGallery = async () => {
@@ -36,12 +37,17 @@ export default function MirrorGallery({
     fetchGallery();
   }, [slug]);
 
-  // Si no hay fotos o aún está cargando sin fotos, no renderizar nada
-  if (!images || !Array.isArray(images) || images.length === 0) {
-    return null;
-  }
-
-  const activePhoto = (lightboxIndex !== null && images[lightboxIndex]) ? images[lightboxIndex] : null;
+  // 2. Keyboard Navigation for Lightbox (Unconditional Hook)
+  useEffect(() => {
+    if (lightboxIndex === null || images.length === 0) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxIndex(null);
+      if (e.key === 'ArrowLeft') setLightboxIndex((prev) => (prev !== null && images.length > 0 ? (prev - 1 + images.length) % images.length : null));
+      if (e.key === 'ArrowRight') setLightboxIndex((prev) => (prev !== null && images.length > 0 ? (prev + 1) % images.length : null));
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, images.length]);
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,17 +63,12 @@ export default function MirrorGallery({
     }
   };
 
-  // Keyboard navigation for lightbox
-  useEffect(() => {
-    if (lightboxIndex === null || images.length === 0) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightboxIndex(null);
-      if (e.key === 'ArrowLeft') setLightboxIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
-      if (e.key === 'ArrowRight') setLightboxIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxIndex, images.length]);
+  // 3. Early Return ONLY after all hooks are executed
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return null;
+  }
+
+  const activePhoto = (lightboxIndex !== null && images[lightboxIndex]) ? images[lightboxIndex] : null;
 
   return (
     <section className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 text-left space-y-4 pt-4">
