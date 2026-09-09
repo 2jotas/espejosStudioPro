@@ -44,7 +44,7 @@ export default function Landing() {
         <div className="flex items-center space-x-3">
           {user ? (
             <Link
-              to={`/${user.slug}`}
+              to="/panel"
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-600/20"
             >
               Mi Panel ({user.slug})

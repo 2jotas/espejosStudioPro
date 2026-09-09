@@ -79,8 +79,8 @@ export default function Register() {
     setIsSubmitting(true);
 
     try {
-      const user = await register({ email, password, slug: slug.trim(), businessName, phone });
-      navigate(`/${user.slug}`);
+      await register({ email, password, slug: slug.trim(), businessName, phone });
+      navigate('/panel');
     } catch (err: any) {
       setError(err.message || 'Error al crear la cuenta');
     } finally {

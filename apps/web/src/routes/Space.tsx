@@ -2,34 +2,20 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   Sparkles, 
-  LayoutDashboard, 
   Calendar, 
-  Users, 
-  Scissors, 
-  Settings, 
-  LogOut, 
   MessageSquare, 
   Clock, 
   MapPin, 
-  Eye, 
-  Check 
+  Check,
+  LayoutDashboard
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ServicesManager, { ServiceItem } from '../components/admin/ServicesManager';
-import ClientsManager from '../components/admin/ClientsManager';
-import SettingsIntegrations from '../components/admin/SettingsIntegrations';
-import GalleryManager from '../components/admin/GalleryManager';
-import PricingUpgrade from '../components/admin/PricingUpgrade';
-import CalendarManager from '../components/admin/CalendarManager';
-import DashboardTab from '../components/DashboardTab';
+import { ServiceItem } from '../components/admin/ServicesManager';
 import BookingWizard from '../components/booking/BookingWizard';
-
-type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings' | 'pricing';
 
 export default function Space() {
   const { slug } = useParams<{ slug: string }>();
-  const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const { user } = useAuth();
 
   // Visitor View State
   const [profInfo, setProfInfo] = useState<{ 
@@ -41,9 +27,6 @@ export default function Space() {
   } | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-
-  const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
-  const isOwner = Boolean(user && user.slug === slug && !isPreviewMode);
 
   // Default services fallback for John / Antofagasta
   const defaultServicesList: ServiceItem[] = [
@@ -86,140 +69,29 @@ export default function Space() {
     fetchPublicData();
   }, [slug]);
 
-  // VISTA ADMINISTRADOR (DUEÑO DEL ESPACIO)
-  if (isOwner && user) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-indigo-500 selection:text-white">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px]">
-                <div className="h-full w-full bg-slate-950 rounded-[11px] flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-indigo-400" />
-                </div>
-              </div>
-              <div>
-                <h2 className="font-bold text-white text-sm truncate">{user.businessName}</h2>
-                <span className="text-[11px] text-slate-400 font-mono">espejosstudio.cl/{user.slug}</span>
-              </div>
-            </div>
-
-            <nav className="space-y-1">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'dashboard'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span>Dashboard</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('calendar')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'calendar'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                <span>Calendario & Citas</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('clients')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'clients'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                <span>Fichas de Clientes</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('services')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'services'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Scissors className="w-4 h-4" />
-                <span>Catálogo de Servicios</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'settings'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Configuración & WhatsApp</span>
-              </button>
-            </nav>
-          </div>
-
-          <div className="pt-6 border-t border-slate-800">
-            <Link
-              to={`/${user.slug}?preview=true`}
-              className="w-full flex items-center justify-center space-x-2 py-2 mb-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Ver mi Link Público</span>
-            </Link>
-
-            <button
-              onClick={logout}
-              className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-slate-400 hover:text-rose-400 text-xs font-medium transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Cerrar Sesión</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Admin Tab Content */}
-        <main className="flex-1 p-6 md:p-10 overflow-y-auto">
-          {activeTab === 'dashboard' && <DashboardTab professionalSlug={user.slug} />}
-          {activeTab === 'calendar' && <CalendarManager />}
-          {activeTab === 'services' && <ServicesManager />}
-          {activeTab === 'clients' && <ClientsManager />}
-          {activeTab === 'settings' && <SettingsIntegrations />}
-          {activeTab === 'gallery' && <GalleryManager />}
-          {activeTab === 'pricing' && <PricingUpgrade />}
-        </main>
-      </div>
-    );
-  }
-
   // =========================================================================
   // VISTA PÚBLICA DEL CLIENTE (ESPEJOS STUDIO · ANTOFAGASTA / JOHN)
   // =========================================================================
   const displayName = profInfo?.businessName || (slug === 'john' ? 'John' : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Espejos Studio'));
   const bioText = profInfo?.bio || 'Cortes clásico, fade y barba. Preciso, tranquilo, a tiempo. Pide hora aquí.';
   const businessPhone = profInfo?.phone || '+56912345678';
+  const isOwner = Boolean(user && user.slug === slug);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-indigo-500 selection:text-white">
-      {/* Banner de Vista Previa si es el dueño */}
-      {user && user.slug === slug && isPreviewMode && (
-        <div className="bg-indigo-600 text-white text-xs font-bold py-2.5 px-4 text-center flex items-center justify-center space-x-3 sticky top-0 z-50 shadow-lg">
-          <Eye className="w-4 h-4 flex-shrink-0" />
-          <span>Vista Previa: Así es como tus clientes ven tu página de reserva</span>
+      {/* Banner flotante discreto si el dueño está conectado */}
+      {isOwner && (
+        <div className="bg-indigo-950/90 border-b border-indigo-500/30 text-indigo-200 text-xs py-2 px-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Página pública de cliente</span>
+          </div>
           <Link
-            to={`/${slug}`}
-            className="bg-slate-950 text-indigo-300 hover:text-white px-3 py-1 rounded-lg text-[11px] font-semibold border border-indigo-400/30 transition-colors ml-2"
+            to="/panel"
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-[11px] font-bold transition-all shadow-sm flex items-center space-x-1.5"
           >
-            Volver a mi Panel
+            <LayoutDashboard className="w-3 h-3" />
+            <span>Abrir Panel CRM</span>
           </Link>
         </div>
       )}
@@ -235,9 +107,9 @@ export default function Space() {
         </div>
 
         {user ? (
-          <span className="text-[11px] text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full">
-            {user.slug}
-          </span>
+          <Link to="/panel" className="text-[11px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full transition-colors">
+            {user.slug} • Panel
+          </Link>
         ) : (
           <Link to="/login" className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300">
             Acceso Profesional

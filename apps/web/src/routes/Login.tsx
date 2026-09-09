@@ -39,7 +39,7 @@ export default function Login() {
       if (user.slug === 'admin' || user.email === 'admin@espejos.cl') {
         navigate('/super-admin');
       } else {
-        navigate(`/${user.slug}`);
+        navigate('/panel');
       }
     } catch (err: any) {
       setError(sanitizeErrorMessage(err));

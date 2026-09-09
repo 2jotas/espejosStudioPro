@@ -4,6 +4,7 @@ import Landing from './routes/Landing';
 import Login from './routes/Login';
 import Register from './routes/Register';
 import Space from './routes/Space';
+import AdminPanel from './routes/AdminPanel';
 import SuperAdminDashboard from './routes/SuperAdminDashboard';
 import PerformanceApp from './routes/PerformanceApp';
 import AutoStudio from './routes/AutoStudio';
@@ -12,6 +13,7 @@ export default function App() {
   const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
   const isPerformanceSubdomain = hostname.startsWith('performance.');
   const isAutoSubdomain = hostname.startsWith('auto.');
+  const isAppSubdomain = hostname.startsWith('app.') || hostname.startsWith('agenda.');
 
   return (
     <BrowserRouter>
@@ -21,6 +23,12 @@ export default function App() {
             <Route path="*" element={<PerformanceApp />} />
           ) : isAutoSubdomain ? (
             <Route path="*" element={<AutoStudio />} />
+          ) : isAppSubdomain ? (
+            <>
+              <Route path="/login" element={<Login />} />
+              <Route path="/registro" element={<Register />} />
+              <Route path="*" element={<AdminPanel />} />
+            </>
           ) : (
             <>
               <Route path="/" element={<Landing />} />
@@ -28,6 +36,8 @@ export default function App() {
               <Route path="/visagismo" element={<PerformanceApp />} />
               <Route path="/auto" element={<AutoStudio />} />
               <Route path="/studio" element={<AutoStudio />} />
+              <Route path="/panel" element={<AdminPanel />} />
+              <Route path="/admin" element={<AdminPanel />} />
               <Route path="/login" element={<Login />} />
               <Route path="/registro" element={<Register />} />
               <Route path="/super-admin" element={<SuperAdminDashboard />} />
@@ -39,4 +49,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
