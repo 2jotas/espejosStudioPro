@@ -42,7 +42,7 @@ export interface OfferedDay {
 }
 
 export interface BotConversationState {
-  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE_CHOICE' | 'AWAITING_HABITUAL_CHOICE' | 'AWAITING_DAY_CHOICE' | 'AWAITING_SLOT';
+  step: 'IDLE' | 'AWAITING_NAME' | 'AWAITING_SERVICE_CHOICE' | 'AWAITING_HABITUAL_CHOICE' | 'AWAITING_DAY_CHOICE' | 'AWAITING_SLOT' | 'BOOKED' | 'CLOSED';
   clientName?: string;
   clientId?: string;
   selectedServiceId?: string;
@@ -53,6 +53,10 @@ export interface BotConversationState {
   offeredServices?: Array<{ index: number; id: string; name: string; price: number; durationMinutes: number }>;
   isRescheduling?: boolean;
   rescheduleAppointmentId?: string;
+  lastAppointmentId?: string;
+  lastConfirmedAt?: number;
+  lastFarewellAt?: number;
+  lastIntent?: string;
   lastInteractionTime: number;
   messageTimestamps: number[];
 }
@@ -73,20 +77,41 @@ export function normalizePhone(rawPhone: string): string {
 }
 
 /**
- * Gets or initializes conversation state with 10-minute TTL and rate-limiting
+ * Gets or initializes conversation state with adaptive TTL based on lifecycle step
  */
 function getConversationState(professionalId: string, phone: string): BotConversationState {
   const key = `${professionalId}_${phone}`;
   const now = Date.now();
   let state = conversationStates.get(key);
 
-  if (!state || (now - state.lastInteractionTime > 10 * 60 * 1000)) {
+  if (!state) {
     state = {
       step: 'IDLE',
       lastInteractionTime: now,
       messageTimestamps: []
     };
     conversationStates.set(key, state);
+  } else {
+    // Step-specific expiration rules
+    if (state.step === 'BOOKED') {
+      // 6 hours window for booked state
+      if (now - (state.lastConfirmedAt || state.lastInteractionTime) > 6 * 60 * 60 * 1000) {
+        state.step = 'IDLE';
+      }
+    } else if (state.step === 'CLOSED') {
+      // 2 hours window for closed state
+      if (now - (state.lastFarewellAt || state.lastInteractionTime) > 2 * 60 * 60 * 1000) {
+        state.step = 'IDLE';
+      }
+    } else if (state.step !== 'IDLE') {
+      // Active booking steps expire after 15 minutes of inactivity
+      if (now - state.lastInteractionTime > 15 * 60 * 1000) {
+        state.step = 'IDLE';
+        state.offeredSlots = [];
+        state.offeredDays = [];
+        state.offeredServices = [];
+      }
+    }
   }
 
   state.lastInteractionTime = now;
@@ -94,6 +119,145 @@ function getConversationState(professionalId: string, phone: string): BotConvers
   state.messageTimestamps = state.messageTimestamps.filter(t => now - t < 60000);
 
   return state;
+}
+
+/**
+ * Detects whether a message is purely a farewell, thanks, or closing acknowledgment
+ */
+export function isPureFarewell(text: string): boolean {
+  if (!text || typeof text !== 'string') return false;
+
+  const raw = text.trim();
+  if (!raw) return false;
+
+  // Emojis only check (e.g. 👍, 👌, 🙏, ✅, 🤝, 💈, 🙌, ✌️, ❤️)
+  const emojiPattern = /^[\p{Emoji}\s!.,;:\-_~]+$/u;
+  if (emojiPattern.test(raw) && !/[a-zA-Z0-9]/.test(raw)) {
+    return true;
+  }
+
+  // Normalize: remove accents, lowercase, strip punctuation
+  const normalized = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return false;
+
+  // If message contains appointment modification or question keywords, it's NOT a pure farewell
+  const nonFarewellKeywords = [
+    'cambiar', 'cambio', 'cambia', 'mover', 'mueve', 'reagendar', 'reagenda',
+    'cancelar', 'cancela', 'anular', 'anula', 'otra hora', 'otro dia', 'otro servicio',
+    'puedes', 'podrias', 'quiero', 'necesito', 'agendar', 'reservar', 'precio', 'cuanto',
+    'donde', 'direccion', 'ubicacion', 'a las', 'me sirve', 'tendras', 'tienes'
+  ];
+
+  for (const kw of nonFarewellKeywords) {
+    if (normalized.includes(kw)) {
+      return false;
+    }
+  }
+
+  const pureFarewellExact = new Set([
+    'gracias', 'muchas gracias', 'muchisimas gracias', 'mil gracias', 'vale gracias',
+    'ok gracias', 'oka gracias', 'ya gracias', 'gracias bro', 'gracias john', 'gracias compa',
+    'gracias amigo', 'gracias crack', 'grax', 'thanks', 'thx', 'ty',
+    'chao', 'chao chao', 'chau', 'chau chau', 'chaito', 'adios', 'bye', 'bye bye',
+    'nos vemos', 'nos vemoh', 'ahi nos vemos', 'nos vemos pronto', 'nos vemos alla', 'alla nos vemos',
+    'hasta luego', 'hasta pronto', 'hasta manana',
+    'listo', 'listo gracias', 'listoco', 'listo bro', 'listo amigo',
+    'ok', 'oka', 'okey', 'dale', 'dale gracias', 'dale bro', 'dale amigo',
+    'perfecto', 'perfecto gracias', 'excelente', 'excelente gracias',
+    'bacan', 'wena', 'buena', 'de una', 'genial', 'impeque', 'todo bien',
+    'buenisimo', 'buenisima', 'vale', 'vale bro', 'super', 'super gracias'
+  ]);
+
+  if (pureFarewellExact.has(normalized)) return true;
+
+  // Check if ALL words in the message are farewell / acknowledgement words
+  const farewellWords = new Set([
+    'gracias', 'muchas', 'muchisimas', 'mil', 'vale', 'ok', 'oka', 'okey', 'ya', 'bro', 'john',
+    'compa', 'amigo', 'crack', 'grax', 'thanks', 'thx', 'ty', 'chao', 'chau', 'chaito', 'adios',
+    'bye', 'nos', 'vemos', 'vemoh', 'ahi', 'pronto', 'alla', 'hasta', 'luego', 'manana',
+    'listo', 'listoco', 'dale', 'perfecto', 'excelente', 'bacan', 'wena', 'buena', 'de', 'una',
+    'genial', 'impeque', 'todo', 'bien', 'buenisimo', 'buenisima', 'super', 'saludos', 'un',
+    'abrazo', 'cuidate', 'master', 'hermano', 'igual'
+  ]);
+
+  const words = normalized.split(/\s+/);
+  if (words.length > 0 && words.every(w => farewellWords.has(w))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Detects pure opening greetings without booking or modification intents
+ */
+export function isOpeningGreeting(text: string): boolean {
+  if (!text || typeof text !== 'string') return false;
+
+  const normalized = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const pureGreetings = new Set([
+    'hola', 'hola hola', 'buenas', 'buen dia', 'buenos dias', 'buenas tardes', 'buenas noches',
+    'hi', 'hello', 'hey', 'saludos', 'que tal', 'wena', 'wena wena', 'alo'
+  ]);
+
+  if (pureGreetings.has(normalized)) return true;
+
+  const words = normalized.split(/\s+/);
+  if (words.length <= 3 && words.every(w => ['hola', 'buenas', 'buen', 'dia', 'dias', 'tardes', 'noches', 'hey', 'bro', 'amigo', 'john', 'saludos', 'que', 'tal'].includes(w))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Formats appointment datetime for farewell confirmations in America/Santiago
+ */
+export function formatAppointmentTimeForFarewell(startsAt: Date): { dayLabel: string; timeStr: string } {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' });
+  const appDateStr = formatter.format(startsAt);
+  const todayStr = formatter.format(now);
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const tomorrowStr = formatter.format(tomorrow);
+
+  const timeStr = startsAt.toLocaleTimeString('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Santiago'
+  });
+
+  let dayLabel = '';
+  if (appDateStr === todayStr) {
+    dayLabel = 'hoy';
+  } else if (appDateStr === tomorrowStr) {
+    dayLabel = 'mañana';
+  } else {
+    const weekday = startsAt.toLocaleDateString('es-CL', {
+      weekday: 'long',
+      timeZone: 'America/Santiago'
+    });
+    dayLabel = `el ${weekday}`;
+  }
+
+  return { dayLabel, timeStr };
 }
 
 /**
@@ -362,9 +526,8 @@ export async function classifyAndProcessMessage(
   const isBookingQuery = lowerText.includes('hora') || lowerText.includes('turno') || lowerText.includes('cita') || 
     lowerText.includes('corte') || lowerText.includes('agendar') || lowerText.includes('reservar') || 
     lowerText.includes('disponible') || lowerText.includes('hueco') || lowerText.includes('barba') ||
-    lowerText.includes('hoy') || lowerText.includes('mañana') || lowerText.includes('agenda') ||
-    lowerText.includes('precio') || lowerText.includes('cuanto') || lowerText.includes('servicio') ||
-    lowerText.includes('visagismo');
+    lowerText.includes('agenda') || lowerText.includes('visagismo') ||
+    lowerText.startsWith('quiero agendar') || lowerText.startsWith('agendar');
 
   // Fast Affirmative / Negative / Reschedule Check for Active Appointments
   const isAffirmative = /^(si|sí|confirmo|voy|confirmado|allá nos vemos|oka|ok|de acuerdo|dale|voy para allá|listo)$/i.test(lowerText) ||
@@ -375,77 +538,29 @@ export async function classifyAndProcessMessage(
 
   const isReschedule = lowerText.includes('mover') || lowerText.includes('cambiar hora') || lowerText.includes('reagendar') || lowerText.includes('otra hora') || lowerText.includes('mas tarde') || lowerText.includes('más tarde');
 
-  // A. CONFIRMATION HANDLING (🟢 Verde)
-  if (isAffirmative && nextAppointment && state.step === 'IDLE') {
-    await prisma.appointment.update({
-      where: { id: nextAppointment.id },
-      data: {
-        status: 'confirmed',
-        whatsappStatus: 'confirmada'
-      }
-    });
+  // =========================================================================
+  // PRIORITY 1: CANCELLATION & RESCHEDULE (Highest Priority)
+  // =========================================================================
 
-    const clientName = client?.firstName || msg.senderName || 'estimado';
-    const serviceName = nextAppointment.service?.name || 'Corte de Autor';
-    const timeStr = new Date(nextAppointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
-    const reply = `¡Excelente, ${clientName}! 💈 Tu cita de *${serviceName}* para hoy a las *${timeStr} hrs* quedó confirmada al 100%. Te esperamos en ${professional.address || professional.businessName}. ¡Nos vemos pronto! ✨`;
+  // A. CANCELLATION (🔴 Rojo)
+  if (isNegative && (nextAppointment || state.step === 'IDLE' || state.step === 'BOOKED')) {
+    if (nextAppointment) {
+      await prisma.appointment.update({
+        where: { id: nextAppointment.id },
+        data: {
+          status: 'cancelled',
+          whatsappStatus: 'cancelada'
+        }
+      });
 
-    await logAssistantReply(professional.id, cleanPhone, reply);
-    return {
-      intent: 'CONFIRMATION',
-      appointmentId: nextAppointment.id,
-      responseMessage: reply,
-      shouldIgnore: false
-    };
-  }
-
-  // B. CANCELLATION HANDLING (🔴 Rojo)
-  if (isNegative && nextAppointment && state.step === 'IDLE') {
-    await prisma.appointment.update({
-      where: { id: nextAppointment.id },
-      data: {
-        status: 'cancelled',
-        whatsappStatus: 'cancelada'
-      }
-    });
-
-    const clientName = client?.firstName || msg.senderName || 'estimado';
-    const reply = `Entendido, ${clientName}. He cancelado tu cita y liberado el horario 💈. Cuando gustes volver a agendar, puedes escribirnos por aquí o en https://espejosstudio.cl/${professional.slug}. ¡Que tengas un excelente día!`;
-
-    await logAssistantReply(professional.id, cleanPhone, reply);
-    return {
-      intent: 'CANCELLATION',
-      appointmentId: nextAppointment.id,
-      responseMessage: reply,
-      shouldIgnore: false
-    };
-  }
-
-  // C. RESCHEDULE HANDLING (🟡 Amarillo)
-  if (isReschedule && nextAppointment && state.step === 'IDLE') {
-    await prisma.appointment.update({
-      where: { id: nextAppointment.id },
-      data: { whatsappStatus: 'reagendada' }
-    });
-
-    const serviceDuration = nextAppointment.service?.durationMinutes || 30;
-    const slots = await getTopAvailableSlotsForBot(professional, serviceDuration);
-
-    if (slots.length > 0) {
-      state.step = 'AWAITING_SLOT';
-      state.clientId = client?.id;
-      state.selectedServiceId = nextAppointment.serviceId || undefined;
-      state.offeredSlots = slots;
-      state.isRescheduling = true;
-      state.rescheduleAppointmentId = nextAppointment.id;
-
-      const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const serviceName = nextAppointment.service?.name || 'Corte';
-      const reply = `¡Sin problema! Vamos a reagendar tu *${serviceName}* 💈.\n\nPróximos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
+      state.step = 'IDLE';
+      state.lastIntent = 'CANCELLATION';
+      const clientName = client?.firstName || msg.senderName || 'estimado';
+      const reply = `Entendido, ${clientName}. He cancelado tu cita y liberado el horario 💈. Cuando gustes volver a agendar, puedes escribirnos por aquí o en https://espejosstudio.cl/${professional.slug}. ¡Que tengas un excelente día!`;
 
       await logAssistantReply(professional.id, cleanPhone, reply);
       return {
-        intent: 'RESCHEDULE',
+        intent: 'CANCELLATION',
         appointmentId: nextAppointment.id,
         responseMessage: reply,
         shouldIgnore: false
@@ -453,7 +568,95 @@ export async function classifyAndProcessMessage(
     }
   }
 
-  // 5. STATE MACHINE EXECUTION
+  // B. RESCHEDULE (🟡 Amarillo)
+  if (isReschedule && (nextAppointment || state.step === 'IDLE' || state.step === 'BOOKED')) {
+    if (nextAppointment) {
+      await prisma.appointment.update({
+        where: { id: nextAppointment.id },
+        data: { whatsappStatus: 'reagendada' }
+      });
+
+      const serviceDuration = nextAppointment.service?.durationMinutes || 30;
+      const slots = await getTopAvailableSlotsForBot(professional, serviceDuration);
+
+      if (slots.length > 0) {
+        state.step = 'AWAITING_SLOT';
+        state.clientId = client?.id;
+        state.selectedServiceId = nextAppointment.serviceId || undefined;
+        state.offeredSlots = slots;
+        state.isRescheduling = true;
+        state.rescheduleAppointmentId = nextAppointment.id;
+        state.lastIntent = 'RESCHEDULE';
+
+        const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
+        const serviceName = nextAppointment.service?.name || 'Corte';
+        const reply = `¡Sin problema! Vamos a reagendar tu *${serviceName}* 💈.\n\nPróximos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
+
+        await logAssistantReply(professional.id, cleanPhone, reply);
+        return {
+          intent: 'RESCHEDULE',
+          appointmentId: nextAppointment.id,
+          responseMessage: reply,
+          shouldIgnore: false
+        };
+      }
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 2: FAREWELL / CLOSING ACKNOWLEDGMENT (High Priority - Prevents Loop)
+  // =========================================================================
+
+  if (isPureFarewell(text)) {
+    const now = Date.now();
+
+    // If state is already CLOSED and within 2 hours -> Silently ignore consecutive farewells
+    if (state.step === 'CLOSED' && (now - (state.lastFarewellAt || 0) < 2 * 60 * 60 * 1000)) {
+      return {
+        intent: 'PERSONAL',
+        shouldIgnore: true
+      };
+    }
+
+    // If appointment is confirmed (state BOOKED or active confirmed appointment)
+    let confirmedApp = (nextAppointment && nextAppointment.status === 'confirmed') ? nextAppointment : null;
+    if (!confirmedApp && state.lastAppointmentId) {
+      confirmedApp = await prisma.appointment.findUnique({
+        where: { id: state.lastAppointmentId },
+        include: { service: true }
+      });
+    }
+
+    state.step = 'CLOSED';
+    state.lastFarewellAt = now;
+    state.lastIntent = 'FAREWELL';
+
+    if (confirmedApp && confirmedApp.status === 'confirmed') {
+      const { dayLabel, timeStr } = formatAppointmentTimeForFarewell(new Date(confirmedApp.startsAt));
+      const formattedDay = (dayLabel === 'hoy' || dayLabel === 'mañana' || dayLabel.startsWith('el ')) ? dayLabel : `el ${dayLabel}`;
+      const reply = `Listo. Te espero ${formattedDay} a las ${timeStr} hrs. Cualquier cambio, avísame.`;
+
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return {
+        intent: 'CONFIRMATION',
+        appointmentId: confirmedApp.id,
+        responseMessage: reply,
+        shouldIgnore: false
+      };
+    } else {
+      const reply = `Dale, cualquier cosa aquí estoy.`;
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return {
+        intent: 'GENERAL_QUESTION',
+        responseMessage: reply,
+        shouldIgnore: false
+      };
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 3: ACTIVE CONVERSATION STATE MACHINE
+  // =========================================================================
 
   // STEP: AWAITING_NAME (New Client onboarding)
   if (state.step === 'AWAITING_NAME') {
@@ -764,9 +967,14 @@ export async function classifyAndProcessMessage(
         }).catch((err) => console.error('[WhatsAppBot] Error sync Google Calendar:', err));
       }
 
-      // Reset state to IDLE
-      state.step = 'IDLE';
+      // Transition state to BOOKED (6h window)
+      state.step = 'BOOKED';
+      state.lastAppointmentId = newAppointment.id;
+      state.lastConfirmedAt = Date.now();
+      state.lastIntent = 'BOOKED';
       state.offeredSlots = [];
+      state.offeredDays = [];
+      state.offeredServices = [];
       state.isRescheduling = false;
       state.rescheduleAppointmentId = undefined;
 
@@ -807,12 +1015,45 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
     }
   }
 
-  // 6. IDLE STATE: Handling New Inquiries
+  // =========================================================================
+  // PRIORITY 4: PENDING APPOINTMENT AFFIRMATIVE CONFIRMATION
+  // =========================================================================
 
-  if (isBookingQuery || isTaggedClient) {
+  if (isAffirmative && nextAppointment && nextAppointment.status === 'pending') {
+    await prisma.appointment.update({
+      where: { id: nextAppointment.id },
+      data: {
+        status: 'confirmed',
+        whatsappStatus: 'confirmada'
+      }
+    });
+
+    state.step = 'BOOKED';
+    state.lastAppointmentId = nextAppointment.id;
+    state.lastConfirmedAt = Date.now();
+    state.lastIntent = 'BOOKING_CONFIRMED';
+
+    const clientName = client?.firstName || msg.senderName || 'estimado';
+    const serviceName = nextAppointment.service?.name || 'Corte de Autor';
+    const timeStr = new Date(nextAppointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
+    const reply = `¡Excelente, ${clientName}! 💈 Tu cita de *${serviceName}* para hoy a las *${timeStr} hrs* quedó confirmada al 100%. Te esperamos en ${professional.address || professional.businessName}. ¡Nos vemos pronto! ✨`;
+
+    await logAssistantReply(professional.id, cleanPhone, reply);
+    return {
+      intent: 'CONFIRMATION',
+      appointmentId: nextAppointment.id,
+      responseMessage: reply,
+      shouldIgnore: false
+    };
+  }
+
+  // =========================================================================
+  // PRIORITY 5: BOOKING INQUIRIES (Explicit Booking Intent)
+  // =========================================================================
+
+  if (isBookingQuery) {
     // A. RETURNING CLIENT (Detect habitual service memory)
     if (client) {
-      // Find past completed/confirmed appointments to determine habitual service
       const pastAppointment = await prisma.appointment.findFirst({
         where: { clientId: client.id, status: { in: ['confirmed', 'completed'] } },
         orderBy: { startsAt: 'desc' },
@@ -831,7 +1072,6 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
         await logAssistantReply(professional.id, cleanPhone, reply);
         return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
       } else {
-        // Single service or direct slot display
         const duration = habitualService?.durationMinutes || 30;
         const slots = await getTopAvailableSlotsForBot(professional, duration);
 
@@ -886,8 +1126,39 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
     return { intent: 'BOOKING_INQUIRY', responseMessage: reply, shouldIgnore: false };
   }
 
-  // 7. General Questions / Pricing / Visagism Inquiry -> Gemini 2.0 Flash
-  if (client || lowerText.includes('precio') || lowerText.includes('cuanto') || lowerText.includes('donde') || lowerText.includes('direccion') || lowerText.includes('visagismo')) {
+  // =========================================================================
+  // PRIORITY 6: OPENING GREETING (Clean Welcome & Clear Short Options)
+  // =========================================================================
+
+  if (isOpeningGreeting(text)) {
+    // If client has an upcoming confirmed appointment
+    if (nextAppointment && nextAppointment.status === 'confirmed') {
+      const { dayLabel, timeStr } = formatAppointmentTimeForFarewell(new Date(nextAppointment.startsAt));
+      const formattedDay = (dayLabel === 'hoy' || dayLabel === 'mañana' || dayLabel.startsWith('el ')) ? dayLabel : `el ${dayLabel}`;
+      const reply = `¡Hola${client?.firstName ? ` ${client.firstName}` : ''}! 💈 Tienes tu cita de *${nextAppointment.service?.name || 'Corte'}* para ${formattedDay} a las *${timeStr} hrs*.\n\n¿Deseas modificarla, cancelarla o tienes alguna consulta?`;
+      await logAssistantReply(professional.id, cleanPhone, reply);
+      return {
+        intent: 'GENERAL_QUESTION',
+        responseMessage: reply,
+        shouldIgnore: false
+      };
+    }
+
+    const greetingName = client?.firstName ? ` ${client.firstName}` : '';
+    const menu = `¡Hola${greetingName}! Bienvenido a *${professional.businessName}* 💈.\n\n¿En qué te podemos ayudar hoy?\n1️⃣ ✂️ *Agendar una cita*\n2️⃣ 💈 *Ver precios y servicios*\n3️⃣ 📍 *Ubicación y horarios*\n\n👉 *Escribe "agendar" o elige una opción (1, 2 o 3).*`;
+    await logAssistantReply(professional.id, cleanPhone, menu);
+    return {
+      intent: 'GENERAL_QUESTION',
+      responseMessage: menu,
+      shouldIgnore: false
+    };
+  }
+
+  // =========================================================================
+  // PRIORITY 7: GENERAL QUESTIONS / PRICING / VISAGISM / GEMINI AI
+  // =========================================================================
+
+  if (client || lowerText.includes('precio') || lowerText.includes('cuanto') || lowerText.includes('donde') || lowerText.includes('direccion') || lowerText.includes('ubicacion') || lowerText.includes('horario') || lowerText.includes('visagismo')) {
     const aiReply = await generateGeminiBotReply(professional, client, msg.messageText);
     await logAssistantReply(professional.id, cleanPhone, aiReply);
     return {
@@ -897,7 +1168,10 @@ _(Si necesitas modificar tu cita, solo escríbenos por aquí)_`;
     };
   }
 
-  // 8. Unknown Non-Booking Message -> Personal Chat, IGNORE completely
+  // =========================================================================
+  // PRIORITY 8: UNKNOWN MESSAGE (Personal Chat / Irrelevant -> IGNORE)
+  // =========================================================================
+
   return {
     intent: 'PERSONAL',
     shouldIgnore: true
