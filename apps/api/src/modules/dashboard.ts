@@ -141,10 +141,10 @@ export const dashboardRoutes: FastifyPluginAsync = async (fastify) => {
           startsAt: a.startsAt,
           endsAt: a.endsAt,
           status: a.status,
-          serviceName: a.service?.name || 'Servicio',
+          serviceName: a.service?.name || (a.status === 'blocked' ? 'Bloqueo' : 'Walk-in'),
           servicePrice: a.service?.price || 0,
-          clientName: `${a.client.firstName} ${a.client.lastName}`,
-          clientPhone: a.client.phone,
+          clientName: a.client ? `${a.client.firstName} ${a.client.lastName}` : (a.status === 'blocked' ? (a.clientNote || 'Horario Bloqueado') : 'Cliente Walk-in'),
+          clientPhone: a.client?.phone || '',
           clientNote: a.clientNote,
         })),
       };

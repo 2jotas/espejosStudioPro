@@ -61,20 +61,15 @@ export interface BotConversationState {
 const conversationStates = new Map<string, BotConversationState>();
 
 /**
- * Normalizes phone numbers (e.g. +56912345678, 56912345678, 912345678)
+ * Normalizes phone numbers using standard Chile E.164
  */
 export function normalizePhone(rawPhone: string): string {
-  let cleaned = rawPhone.replace(/\D/g, '');
-  if (cleaned.startsWith('569') && cleaned.length === 11) {
-    return cleaned;
-  }
-  if (cleaned.startsWith('9') && cleaned.length === 9) {
-    return `56${cleaned}`;
-  }
-  if (cleaned.startsWith('56') && cleaned.length === 11) {
-    return cleaned;
-  }
-  return cleaned;
+  const digits = rawPhone.replace(/\D/g, '');
+  if (digits.startsWith('569') && digits.length === 11) return digits;
+  if (digits.startsWith('56') && digits.length === 11) return digits;
+  if (digits.startsWith('9') && digits.length === 9) return `56${digits}`;
+  if (digits.length === 8) return `569${digits}`;
+  return digits;
 }
 
 /**
@@ -109,7 +104,7 @@ export function formatCLP(amount: number): string {
 }
 
 /**
- * Returns upcoming available working days (e.g. 6 days)
+ * Returns upcoming available working days (skipping Martes y Miércoles)
  */
 export function getUpcomingDaysForBot(count = 6): OfferedDay[] {
   const days: OfferedDay[] = [];
@@ -118,11 +113,22 @@ export function getUpcomingDaysForBot(count = 6): OfferedDay[] {
   const dayNameFormatter = new Intl.DateTimeFormat('es-CL', { weekday: 'long', timeZone: 'America/Santiago' });
   const monthFormatter = new Intl.DateTimeFormat('es-CL', { month: 'long', day: 'numeric', timeZone: 'America/Santiago' });
 
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 21; i++) {
     if (days.length >= count) break;
     const d = new Date();
     d.setDate(d.getDate() + i);
     const dateStr = formatter.format(d);
+
+    // Check weekday in Santiago: skip Martes (2) y Miércoles (3)
+    const middayDate = getSantiagoUtcDate(dateStr, '12:00');
+    const dayOfWeekParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', weekday: 'short' }).format(middayDate);
+    const daysMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dayOfWeek = daysMap[dayOfWeekParts] ?? 0;
+
+    if (dayOfWeek === 2 || dayOfWeek === 3) {
+      continue; // CERRADO MARTES Y MIÉRCOLES
+    }
+
     const isToday = formatter.format(now) === dateStr;
     const tomorrowObj = new Date();
     tomorrowObj.setDate(now.getDate() + 1);
@@ -177,7 +183,7 @@ export async function getSlotsForSpecificDate(
   const dbAppointments = await prisma.appointment.findMany({
     where: {
       professionalId: professional.id,
-      status: { in: ['pending', 'confirmed'] },
+      status: { in: ['pending', 'confirmed', 'completed', 'walk_in', 'blocked', 'held'] },
       startsAt: { lte: windowEnd },
       endsAt: { gte: windowStart },
     },
@@ -212,6 +218,7 @@ export async function getSlotsForSpecificDate(
     dateStr,
     durationMinutes,
     busyRanges,
+    disabledDays: [2, 3],
   });
 
   // Filter out past slots if today (15 min buffer)
@@ -379,8 +386,9 @@ export async function classifyAndProcessMessage(
     });
 
     const clientName = client?.firstName || msg.senderName || 'estimado';
+    const serviceName = nextAppointment.service?.name || 'Corte de Autor';
     const timeStr = new Date(nextAppointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Santiago' });
-    const reply = `¡Excelente, ${clientName}! 💈 Tu cita de *${nextAppointment.service.name}* para hoy a las *${timeStr} hrs* quedó confirmada al 100%. Te esperamos en ${professional.address || professional.businessName}. ¡Nos vemos pronto! ✨`;
+    const reply = `¡Excelente, ${clientName}! 💈 Tu cita de *${serviceName}* para hoy a las *${timeStr} hrs* quedó confirmada al 100%. Te esperamos en ${professional.address || professional.businessName}. ¡Nos vemos pronto! ✨`;
 
     await logAssistantReply(professional.id, cleanPhone, reply);
     return {
@@ -420,18 +428,20 @@ export async function classifyAndProcessMessage(
       data: { whatsappStatus: 'reagendada' }
     });
 
-    const slots = await getTopAvailableSlotsForBot(professional, nextAppointment.service.durationMinutes || 30);
+    const serviceDuration = nextAppointment.service?.durationMinutes || 30;
+    const slots = await getTopAvailableSlotsForBot(professional, serviceDuration);
 
     if (slots.length > 0) {
       state.step = 'AWAITING_SLOT';
       state.clientId = client?.id;
-      state.selectedServiceId = nextAppointment.serviceId;
+      state.selectedServiceId = nextAppointment.serviceId || undefined;
       state.offeredSlots = slots;
       state.isRescheduling = true;
       state.rescheduleAppointmentId = nextAppointment.id;
 
       const slotsMenu = slots.map(s => s.formattedChoice).join('\n');
-      const reply = `¡Sin problema! Vamos a reagendar tu *${nextAppointment.service.name}* 💈.\n\nPróximos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
+      const serviceName = nextAppointment.service?.name || 'Corte';
+      const reply = `¡Sin problema! Vamos a reagendar tu *${serviceName}* 💈.\n\nPróximos horarios disponibles:\n\n${slotsMenu}\n5️⃣ 🌐 *Ver otro día / calendario completo*\n\n👉 *Responde con el número de tu opción (ej: 1 o 2).*`;
 
       await logAssistantReply(professional.id, cleanPhone, reply);
       return {
@@ -689,7 +699,7 @@ export async function classifyAndProcessMessage(
       const conflict = await prisma.appointment.findFirst({
         where: {
           professionalId: professional.id,
-          status: { in: ['pending', 'confirmed'] },
+          status: { in: ['pending', 'confirmed', 'completed', 'walk_in', 'blocked', 'held'] },
           startsAt: { lt: slotEnd },
           endsAt: { gt: slotStart }
         }

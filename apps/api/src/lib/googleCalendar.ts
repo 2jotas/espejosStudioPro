@@ -228,7 +228,7 @@ export function calculateAvailableTimeSlots(params: {
   busyRanges: BusyRange[];
   workStartHour?: number; // default 10 (10:00 AM Santiago)
   workEndHour?: number; // default 20 (08:00 PM Santiago)
-  disabledDays?: number[];
+  disabledDays?: number[]; // default [2, 3] = Tuesday, Wednesday closed
   blockedSlots?: string[];
 }): Array<{ timeStr: string; startIso: string; endIso: string }> {
   const {
@@ -237,7 +237,7 @@ export function calculateAvailableTimeSlots(params: {
     busyRanges,
     workStartHour = 10,
     workEndHour = 20,
-    disabledDays = [],
+    disabledDays = [2, 3], // Martes (2) y Miércoles (3) CERRADOS por defecto
     blockedSlots = [],
   } = params;
 
@@ -252,17 +252,23 @@ export function calculateAvailableTimeSlots(params: {
   const daysMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
   const dayOfWeek = daysMap[dayOfWeekParts] ?? 0;
 
-  // If day is disabled, return no slots
+  // If day is disabled (e.g. Martes o Miércoles), return NO slots
   if (disabledDays.length > 0 && disabledDays.includes(dayOfWeek)) {
     return slots;
   }
+
+  const now = new Date();
+  const santiagoFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' });
+  const todaySantiagoStr = santiagoFormatter.format(now);
+  const isToday = todaySantiagoStr === dateStr;
+  const bufferTime = now.getTime() + 5 * 60 * 1000; // 5 min buffer
 
   // Generate slots every 30 minutes from workStartHour to workEndHour
   for (let hour = workStartHour; hour < workEndHour; hour++) {
     for (let min = 0; min < 60; min += 30) {
       const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 
-      // Check if slot is explicitly blocked (e.g. 10:00 or 20:00)
+      // Check if slot is explicitly blocked
       if (blockedSlots.includes(timeStr)) {
         continue;
       }
@@ -270,13 +276,18 @@ export function calculateAvailableTimeSlots(params: {
       const slotStart = getSantiagoUtcDate(dateStr, timeStr);
       const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
+      // If today, filter out past slots
+      if (isToday && slotStart.getTime() <= bufferTime) {
+        continue;
+      }
+
       // Check if slot extends past working hours
       const closingTime = getSantiagoUtcDate(dateStr, `${String(workEndHour).padStart(2, '0')}:00`);
       if (slotEnd.getTime() > closingTime.getTime()) {
         continue;
       }
 
-      // Check overlap with busy ranges (database appointments & Google Calendar events)
+      // Check overlap with busy ranges (database appointments, blocks & Google Calendar events)
       const isConflict = busyRanges.some((busy) => {
         return slotStart < busy.end && slotEnd > busy.start;
       });

@@ -30,11 +30,12 @@ export async function runAppointmentRemindersCheck(): Promise<{ processed: numbe
   let sentCount = 0;
 
   for (const appt of pendingAppointments) {
-    if (!appt.professional.whatsappConnected || !appt.client.phone) {
+    if (!appt.professional.whatsappConnected || !appt.client || !appt.client.phone) {
       continue;
     }
 
     const timeStr = new Date(appt.startsAt).toLocaleTimeString('es-CL', {
+      timeZone: 'America/Santiago',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
@@ -42,7 +43,7 @@ export async function runAppointmentRemindersCheck(): Promise<{ processed: numbe
 
     const clientName = appt.client.firstName || 'estimado';
     const businessName = appt.professional.businessName;
-    const serviceName = appt.service.name;
+    const serviceName = appt.service?.name || 'Corte de Autor';
     const address = appt.professional.address ? ` en ${appt.professional.address}` : '';
 
     const reminderMessage = `¡Hola ${clientName}! 👋 Te recordamos tu cita de *${serviceName}* hoy a las *${timeStr}* con *${businessName}*${address}.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* para asegurar tu cupo o *'Cancelar'* si te surgió algún imprevisto.`;

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, MessageSquare, CheckCircle2, UserX } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, MessageSquare, CheckCircle2, UserX, DoorClosed, Lock, Undo2 } from 'lucide-react';
 import { ServiceItem } from './ServicesManager';
 import TechnicalSheetModal from './TechnicalSheetModal';
 
@@ -7,23 +7,24 @@ export interface AppointmentItem {
   id: string;
   startsAt: string;
   endsAt: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'walk_in' | 'blocked' | 'held';
+  source?: 'web' | 'whatsapp' | 'walk_in' | 'blocked' | 'google_calendar';
   whatsappStatus?: 'pendiente' | 'confirmada' | 'cancelada' | 'reagendada';
   whatsappReminderSentAt?: string | null;
   clientNote?: string;
   googleCalendarEventId?: string | null;
-  client: {
+  client?: {
     id?: string;
     firstName: string;
     lastName: string;
     phone: string;
-  };
-  service: {
+  } | null;
+  service?: {
     id: string;
     name: string;
     durationMinutes: number;
     price: number;
-  };
+  } | null;
 }
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
@@ -73,6 +74,24 @@ export default function CalendarManager() {
   // Business Schedule State (Default: 10:00 - 20:00, Tuesday & Wednesday OFF)
   const [disabledDays, setDisabledDays] = useState<number[]>([2, 3]); // 2: Tuesday, 3: Wednesday
   const [disabledSpecificDates, setDisabledSpecificDates] = useState<string[]>([]); // YYYY-MM-DD override
+
+  // Emergency Close Day & Undo Countdown State
+  const [isClosingDay, setIsClosingDay] = useState(false);
+  const [undoBlockId, setUndoBlockId] = useState<string | null>(null);
+  const [undoCountdown, setUndoCountdown] = useState<number>(0);
+  const countdownTimerRef = useRef<any>(null);
+
+  // Walk-In / Block Slot Modal State
+  const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+  const [walkInTab, setWalkInTab] = useState<'walk_in' | 'block'>('walk_in');
+  const [walkInName, setWalkInName] = useState('');
+  const [walkInPhone, setWalkInPhone] = useState('');
+  const [walkInServiceId, setWalkInServiceId] = useState('');
+  const [walkInTime, setWalkInTime] = useState('12:00');
+  const [walkInDuration, setWalkInDuration] = useState<number>(30);
+  const [walkInNotes, setWalkInNotes] = useState('');
+  const [blockReason, setBlockReason] = useState('Almuerzo / Trámite personal');
+  const [isSavingWalkIn, setIsSavingWalkIn] = useState(false);
 
   // Technical Sheet Modal v1 for Fast Closing
   const [isTechSheetModalOpen, setIsTechSheetModalOpen] = useState(false);
@@ -200,7 +219,14 @@ export default function CalendarManager() {
     }
   };
 
+  const toggleDayAvailability = (dayId: number) => {
+    setDisabledDays((prev) =>
+      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]
+    );
+  };
+
   const handleSendWhatsAppReminder = async (app: AppointmentItem) => {
+    if (!app.client?.phone) return;
     try {
       const res = await fetch(`/api/whatsapp/send-reminder/${app.id}`, { method: 'POST' });
       if (res.ok) {
@@ -212,8 +238,9 @@ export default function CalendarManager() {
         alert(`¡Recordatorio de WhatsApp enviado con éxito a ${app.client.firstName} (${app.client.phone})!`);
       } else {
         // Fallback: Open WhatsApp Web directly with prefilled reminder message
+        const serviceName = app.service?.name || 'Corte de Autor';
         const timeStr = new Date(app.startsAt).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false });
-        const text = encodeURIComponent(`¡Hola ${app.client.firstName}! 👋 Te recordamos tu cita de *${app.service.name}* hoy a las *${timeStr}* en Espejos Studio.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`);
+        const text = encodeURIComponent(`¡Hola ${app.client.firstName}! 👋 Te recordamos tu cita de *${serviceName}* hoy a las *${timeStr}* en Espejos Studio.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`);
         const cleanPhone = app.client.phone.replace(/\D/g, '');
         window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
       }
@@ -222,10 +249,123 @@ export default function CalendarManager() {
     }
   };
 
-  const toggleDayAvailability = (dayId: number) => {
-    setDisabledDays((prev) =>
-      prev.includes(dayId) ? prev.filter((d) => d !== dayId) : [...prev, dayId]
-    );
+  const handleCloseRestOfDay = async () => {
+    if (!confirm('¿Cerrar el resto del día de hoy? Ningún cliente podrá reservar por la web ni por WhatsApp hasta mañana a las 10:00.')) return;
+    try {
+      setIsClosingDay(true);
+      const res = await fetch('/api/calendar/close-rest-of-day', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Error cerrando el día');
+        return;
+      }
+      setUndoBlockId(data.blockId);
+      setUndoCountdown(60);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = setInterval(() => {
+        setUndoCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownTimerRef.current);
+            setUndoBlockId(null);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      await fetchAppointments();
+    } catch (e: any) {
+      alert(e.message || 'Error al cerrar el día');
+    } finally {
+      setIsClosingDay(false);
+    }
+  };
+
+  const handleUndoCloseDay = async () => {
+    if (!undoBlockId) return;
+    try {
+      const res = await fetch('/api/calendar/undo-close-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blockId: undoBlockId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Error deshaciendo cierre');
+        return;
+      }
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      setUndoBlockId(null);
+      setUndoCountdown(0);
+      await fetchAppointments();
+      alert('✅ Agenda reabierta con éxito.');
+    } catch (e: any) {
+      alert(e.message || 'Error al deshacer cierre');
+    }
+  };
+
+  const openWalkInModal = (defaultTime = '12:00') => {
+    setWalkInTab('walk_in');
+    setWalkInName('');
+    setWalkInPhone('');
+    setWalkInTime(defaultTime);
+    setWalkInDuration(30);
+    setWalkInNotes('');
+    setBlockReason('Almuerzo / Trámite personal');
+    if (services.length > 0 && !walkInServiceId) {
+      setWalkInServiceId(services[0].id);
+    }
+    setIsWalkInModalOpen(true);
+  };
+
+  const handleSaveWalkInOrBlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSavingWalkIn(true);
+      const startsAtIso = parseLocalDateTimeToIso(selectedDate, walkInTime);
+
+      if (walkInTab === 'walk_in') {
+        const res = await fetch('/api/calendar/walk-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startsAtIso,
+            durationMinutes: Number(walkInDuration),
+            serviceId: walkInServiceId || undefined,
+            fullName: walkInName.trim() || undefined,
+            phone: walkInPhone.trim() || undefined,
+            notes: walkInNotes.trim() || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.message || 'Error registrando Walk-in');
+          return;
+        }
+        setIsWalkInModalOpen(false);
+        await fetchAppointments();
+      } else {
+        const res = await fetch('/api/calendar/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startsAtIso,
+            durationMinutes: Number(walkInDuration),
+            reason: blockReason.trim() || 'Bloqueo manual',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.message || 'Error bloqueando slot');
+          return;
+        }
+        setIsWalkInModalOpen(false);
+        await fetchAppointments();
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error al guardar');
+    } finally {
+      setIsSavingWalkIn(false);
+    }
   };
 
   const toggleSpecificDateAvailability = (dateStr: string) => {
@@ -269,10 +409,10 @@ export default function CalendarManager() {
   // Open Modal for Edit Appointment
   const openEditModal = (app: AppointmentItem) => {
     setEditingAppointment(app);
-    setFormClientFirstName(app.client.firstName);
-    setFormClientLastName(app.client.lastName);
-    setFormClientPhone(app.client.phone);
-    setFormServiceId(app.service.id);
+    setFormClientFirstName(app.client?.firstName || '');
+    setFormClientLastName(app.client?.lastName || '');
+    setFormClientPhone(app.client?.phone || '');
+    setFormServiceId(app.service?.id || (services[0]?.id || ''));
 
     const start = new Date(app.startsAt);
     const end = new Date(app.endsAt);
@@ -429,31 +569,81 @@ export default function CalendarManager() {
     };
   });
 
+  const getSourceBadge = (source?: string, status?: string) => {
+    if (status === 'blocked' || source === 'blocked') return { label: '⛔ Bloqueo', color: 'bg-slate-800 text-slate-300 border-slate-700' };
+    if (status === 'walk_in' || source === 'walk_in') return { label: '💈 Walk-in', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+    if (source === 'whatsapp') return { label: '💬 WhatsApp', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+    if (source === 'google_calendar') return { label: '📅 Google', color: 'bg-sky-500/20 text-sky-300 border-sky-500/40' };
+    return { label: '🌐 Web', color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' };
+  };
+
   return (
-    <div className="space-y-8 text-left">
+    <div className="space-y-6 text-left">
+      {/* Undo Close Day Top Banner */}
+      {undoCountdown > 0 && undoBlockId && (
+        <div className="p-4 bg-rose-950/80 border-2 border-rose-500/60 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xl">
+          <div className="flex items-center space-x-3 text-rose-200">
+            <DoorClosed className="w-6 h-6 text-rose-400 shrink-0" />
+            <div>
+              <div className="font-bold text-sm text-white">Resto del día cerrado exitosamente</div>
+              <div className="text-xs text-rose-300">Ningún cliente podrá reservar hoy desde la web ni WhatsApp.</div>
+            </div>
+          </div>
+          <button
+            onClick={handleUndoCloseDay}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg flex items-center space-x-1.5 transition-all shrink-0"
+          >
+            <Undo2 className="w-4 h-4" />
+            <span>Deshacer ({undoCountdown}s)</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center space-x-2">
             <CalendarIcon className="w-5 h-5 text-indigo-400" />
             <span>Calendario de Reservas & Horarios</span>
           </h2>
-          <p className="text-slate-400 text-sm">Gestiona tus citas, edita horarios y sincroniza con tu Asistente de Google</p>
+          <p className="text-slate-400 text-sm">Gestiona tus citas, registra walk-ins al instante y cierra el día en 1 toque</p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 1. Walk-in / Bloquear */}
+          <button
+            onClick={() => openWalkInModal('12:00')}
+            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 transition-all"
+          >
+            <Lock className="w-4 h-4" />
+            <span>💈 Walk-in / Bloquear</span>
+          </button>
+
+          {/* 2. Cerrar el resto del día */}
+          <button
+            onClick={handleCloseRestOfDay}
+            disabled={isClosingDay}
+            className="px-3.5 py-2 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 transition-all disabled:opacity-50"
+            title="Cierra todas las horas restantes de hoy"
+          >
+            <DoorClosed className="w-4 h-4" />
+            <span>Cerrar resto del día</span>
+          </button>
+
+          {/* 3. Regular New Appointment */}
           <button
             onClick={() => openNewModal('11:00')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 flex items-center space-x-1.5 transition-all"
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 flex items-center space-x-1.5 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Nueva Cita</span>
           </button>
 
+          {/* 4. Sync Google Calendar */}
           <button
             onClick={handleSyncGoogleEvents}
             disabled={isSyncingGoogle}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md flex items-center space-x-2 transition-all disabled:opacity-50"
+            className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold rounded-xl shadow-md flex items-center space-x-1.5 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGoogle ? 'animate-spin' : ''}`} />
             <span>Sincronizar Google</span>
@@ -472,7 +662,7 @@ export default function CalendarManager() {
       <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4 backdrop-blur-xl">
         <div className="flex items-center space-x-2 text-white font-bold text-sm">
           <Sliders className="w-4 h-4 text-indigo-400" />
-          <span>Configuración de Horario Semanal (10:00 AM - 20:00 PM)</span>
+          <span>Configuración de Horario Semanal (10:00 AM - 20:00 PM · Mar y Mié Cerrado Fijo)</span>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -580,16 +770,25 @@ export default function CalendarManager() {
               <div>
                 <h3 className="text-base font-bold text-white">No hay citas registradas para este día</h3>
                 <p className="text-xs max-w-sm mx-auto mt-1">
-                  Las citas agendadas por tus clientes o sincronizadas desde tu Google Calendar aparecerán listadas aquí.
+                  Las citas agendadas por tus clientes en /john, por WhatsApp o sincronizadas de Google Calendar aparecerán aquí.
                 </p>
               </div>
-              <button
-                onClick={() => openNewModal('11:00')}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md inline-flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Agregar cita manualmente</span>
-              </button>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => openWalkInModal('12:00')}
+                  className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-semibold text-xs rounded-xl shadow-md inline-flex items-center space-x-1.5"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>💈 Walk-in / Bloquear</span>
+                </button>
+                <button
+                  onClick={() => openNewModal('11:00')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md inline-flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Agregar cita</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -597,22 +796,44 @@ export default function CalendarManager() {
                 const start = new Date(app.startsAt);
                 const end = new Date(app.endsAt);
                 const timeStr = `${start.toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })}`;
+                const sourceBadge = getSourceBadge(app.source, app.status);
+
+                const clientName = app.client
+                  ? `${app.client.firstName} ${app.client.lastName}`
+                  : (app.status === 'blocked' ? (app.clientNote || 'Horario Bloqueado') : 'Cliente Walk-in');
 
                 return (
                   <div
                     key={app.id}
-                    className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-xl hover:border-slate-700 transition-colors"
+                    className={`border rounded-3xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors ${
+                      app.status === 'blocked'
+                        ? 'bg-slate-950/90 border-slate-800 opacity-80'
+                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                    }`}
                   >
                     <div className="flex items-start space-x-4">
-                      <div className="h-11 w-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
-                        <User className="w-5 h-5" />
+                      <div className={`h-11 w-11 rounded-2xl border flex items-center justify-center shrink-0 mt-0.5 ${
+                        app.status === 'blocked'
+                          ? 'bg-slate-800/50 border-slate-700 text-slate-400'
+                          : app.status === 'walk_in'
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                          : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                      }`}>
+                        {app.status === 'blocked' ? <Lock className="w-5 h-5" /> : <User className="w-5 h-5" />}
                       </div>
 
                       <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-bold text-white text-sm">
-                            {app.client.firstName} {app.client.lastName}
+                            {clientName}
                           </h4>
+
+                          {/* Source Badge (Web, WhatsApp, Walk-in, Bloqueo, Google) */}
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${sourceBadge.color}`}>
+                            {sourceBadge.label}
+                          </span>
+
+                          {/* Status Badge */}
                           <span
                             className={`px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
                               (app.status === 'cancelled' || app.whatsappStatus === 'cancelada')
@@ -623,6 +844,10 @@ export default function CalendarManager() {
                                 ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                                 : app.status === 'completed'
                                 ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                : app.status === 'walk_in'
+                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                : app.status === 'blocked'
+                                ? 'bg-slate-800 text-slate-400 border-slate-700'
                                 : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
                             }`}
                           >
@@ -634,6 +859,10 @@ export default function CalendarManager() {
                               ? '🟡 Reagendada'
                               : app.status === 'completed'
                               ? '🔵 Completada'
+                              : app.status === 'walk_in'
+                              ? '💈 En Local'
+                              : app.status === 'blocked'
+                              ? '⛔ Bloqueado'
                               : '🟣 Pendiente'}
                           </span>
                         </div>
@@ -643,11 +872,15 @@ export default function CalendarManager() {
                             <Clock className="w-3.5 h-3.5" />
                             <span>{timeStr}</span>
                           </span>
-                          <span>Servicio: <strong className="text-slate-200">{app.service.name}</strong> (${app.service.price} CLP)</span>
-                          <span className="flex items-center space-x-1">
-                            <Phone className="w-3 h-3 text-slate-500" />
-                            <span>{app.client.phone}</span>
-                          </span>
+                          {app.service && (
+                            <span>Servicio: <strong className="text-slate-200">{app.service.name}</strong> (${app.service.price} CLP)</span>
+                          )}
+                          {app.client?.phone && (
+                            <span className="flex items-center space-x-1">
+                              <Phone className="w-3 h-3 text-slate-500" />
+                              <span>{app.client.phone}</span>
+                            </span>
+                          )}
                         </div>
 
                         {app.clientNote && (
@@ -659,18 +892,20 @@ export default function CalendarManager() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {/* 1. WhatsApp */}
-                      <button
-                        onClick={() => handleSendWhatsAppReminder(app)}
-                        className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
-                        title="Enviar mensaje de WhatsApp"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">WhatsApp</span>
-                      </button>
+                      {/* 1. WhatsApp (if client phone exists) */}
+                      {app.client?.phone && (
+                        <button
+                          onClick={() => handleSendWhatsAppReminder(app)}
+                          className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
+                          title="Enviar mensaje de WhatsApp"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">WhatsApp</span>
+                        </button>
+                      )}
 
                       {/* 2. Llegó (Confirmar llegada) */}
-                      {app.status !== 'confirmed' && app.status !== 'completed' && (
+                      {app.status !== 'confirmed' && app.status !== 'completed' && app.status !== 'blocked' && (
                         <button
                           onClick={() => handleUpdateStatus(app.id, 'confirmed')}
                           disabled={updatingId === app.id}
@@ -681,8 +916,8 @@ export default function CalendarManager() {
                         </button>
                       )}
 
-                      {/* 3. Listo (Cerrar cita con Ficha Técnica obligatoria) */}
-                      {app.status !== 'completed' && (
+                      {/* 3. Listo (Cerrar cita con Ficha Técnica) */}
+                      {app.status !== 'completed' && app.status !== 'blocked' && (
                         <button
                           onClick={() => handleMarkAsDone(app)}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center space-x-1"
@@ -693,7 +928,7 @@ export default function CalendarManager() {
                       )}
 
                       {/* 4. No-Show */}
-                      {app.status !== 'completed' && app.status !== 'cancelled' && (
+                      {app.status !== 'completed' && app.status !== 'cancelled' && app.status !== 'blocked' && (
                         <button
                           onClick={() => handleUpdateStatus(app.id, 'cancelled')}
                           disabled={updatingId === app.id}
@@ -706,26 +941,30 @@ export default function CalendarManager() {
                       )}
 
                       {/* 5. Reagendar / Editar */}
-                      <button
-                        onClick={() => openEditModal(app)}
-                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1"
-                        title="Reagendar cita"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Reagendar</span>
-                      </button>
+                      {app.status !== 'blocked' && (
+                        <button
+                          onClick={() => openEditModal(app)}
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1"
+                          title="Reagendar cita"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Reagendar</span>
+                        </button>
+                      )}
 
                       {/* 6. Ficha Técnica CRM */}
-                      <button
-                        onClick={() => {
-                          setTechSheetApp(app);
-                          setIsTechSheetModalOpen(true);
-                        }}
-                        className="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-indigo-400 rounded-xl transition-colors"
-                        title="Ver / Editar Ficha Técnica"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </button>
+                      {app.client?.id && (
+                        <button
+                          onClick={() => {
+                            setTechSheetApp(app);
+                            setIsTechSheetModalOpen(true);
+                          }}
+                          className="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-indigo-400 rounded-xl transition-colors"
+                          title="Ver / Editar Ficha Técnica"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleDeleteAppointment(app.id)}
@@ -772,7 +1011,7 @@ export default function CalendarManager() {
                         className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 p-2 rounded-xl text-left cursor-pointer transition-all"
                       >
                         <div className="text-[11px] font-bold text-white truncate">
-                          {app.client.firstName} {app.client.lastName}
+                          {app.client ? `${app.client.firstName} ${app.client.lastName}` : (app.status === 'blocked' ? 'Bloqueo' : 'Walk-in')}
                         </div>
                         <div className="text-[10px] text-indigo-300 font-mono">
                           {new Date(app.startsAt).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })}
@@ -783,11 +1022,11 @@ export default function CalendarManager() {
                     <button
                       onClick={() => {
                         setSelectedDate(wDay.dateStr);
-                        openNewModal('11:00');
+                        openWalkInModal('12:00');
                       }}
                       className="w-full py-1.5 border border-dashed border-slate-800 hover:border-slate-700 text-slate-500 hover:text-slate-300 text-[10px] font-semibold rounded-xl transition-colors"
                     >
-                      + Agendar
+                      + Walk-in / Bloquear
                     </button>
                   </div>
                 </div>
@@ -854,6 +1093,159 @@ export default function CalendarManager() {
         </div>
       )}
 
+      {/* MODAL: WALK-IN / BLOQUEO RÁPIDO (2 TAPS) */}
+      {isWalkInModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-5 text-left">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Bloqueo Rápido / Walk-in</h3>
+                  <p className="text-[11px] text-slate-400">Evita que la web o el bot vendan este horario</p>
+                </div>
+              </div>
+              <button onClick={() => setIsWalkInModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            {/* Sub-tabs: Walk-in vs Bloqueo */}
+            <div className="flex items-center p-1 bg-slate-950 rounded-2xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setWalkInTab('walk_in')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                  walkInTab === 'walk_in' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                💈 Walk-in en Local
+              </button>
+              <button
+                type="button"
+                onClick={() => setWalkInTab('block')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                  walkInTab === 'block' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                ⛔ Bloqueo Manual
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWalkInOrBlock} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-300 font-semibold mb-1 block">Hora Inicio</label>
+                  <input
+                    type="time"
+                    required
+                    value={walkInTime}
+                    onChange={(e) => setWalkInTime(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 font-semibold mb-1 block">Duración</label>
+                  <select
+                    value={walkInDuration}
+                    onChange={(e) => setWalkInDuration(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value={30}>30 minutos</option>
+                    <option value={45}>45 minutos</option>
+                    <option value={60}>60 minutos (1 hora)</option>
+                    <option value={90}>90 minutos (1.5 horas)</option>
+                    <option value={120}>120 minutos (2 horas)</option>
+                  </select>
+                </div>
+              </div>
+
+              {walkInTab === 'walk_in' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold mb-1 block">Nombre (Opcional)</label>
+                      <input
+                        type="text"
+                        value={walkInName}
+                        onChange={(e) => setWalkInName(e.target.value)}
+                        placeholder="Ej: Marcelo Rojas"
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-300 font-semibold mb-1 block">Teléfono (Opcional)</label>
+                      <input
+                        type="tel"
+                        value={walkInPhone}
+                        onChange={(e) => setWalkInPhone(e.target.value)}
+                        placeholder="+56 9 1234 5678"
+                        className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold mb-1 block">Servicio</label>
+                    <select
+                      value={walkInServiceId}
+                      onChange={(e) => setWalkInServiceId(e.target.value)}
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                    >
+                      {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} (${s.price} CLP)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold mb-1 block">Nota o detalle</label>
+                    <input
+                      type="text"
+                      value={walkInNotes}
+                      onChange={(e) => setWalkInNotes(e.target.value)}
+                      placeholder="Ej: Vino sin hora, degradado medio"
+                      className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="text-slate-300 font-semibold mb-1 block">Motivo del Bloqueo</label>
+                  <input
+                    type="text"
+                    required
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    placeholder="Ej: Almuerzo, Trámite personal, Mantención"
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              <div className="pt-3 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsWalkInModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingWalkIn}
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition-all"
+                >
+                  {isSavingWalkIn ? 'Guardando...' : walkInTab === 'walk_in' ? 'Registrar Walk-in' : 'Bloquear Horario'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* NEW / EDIT APPOINTMENT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -898,7 +1290,7 @@ export default function CalendarManager() {
                   value={formClientPhone}
                   onChange={(e) => setFormClientPhone(e.target.value)}
                   placeholder="+56 9 1234 5678"
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
                 />
               </div>
 
@@ -932,7 +1324,7 @@ export default function CalendarManager() {
                 <div>
                   <label className="text-slate-300 font-semibold mb-1 block">Hora Inicio</label>
                   <input
-                    type="text"
+                    type="time"
                     required
                     value={formStartTime}
                     onChange={(e) => setFormStartTime(e.target.value)}
@@ -943,7 +1335,7 @@ export default function CalendarManager() {
                 <div>
                   <label className="text-slate-300 font-semibold mb-1 block">Hora Fin</label>
                   <input
-                    type="text"
+                    type="time"
                     required
                     value={formEndTime}
                     onChange={(e) => setFormEndTime(e.target.value)}
@@ -986,7 +1378,7 @@ export default function CalendarManager() {
       )}
 
       {/* Modal Ficha Técnica Estructurada v1 */}
-      {isTechSheetModalOpen && techSheetApp && techSheetApp.client.id && (
+      {isTechSheetModalOpen && techSheetApp && techSheetApp.client?.id && (
         <TechnicalSheetModal
           clientId={techSheetApp.client.id}
           clientName={`${techSheetApp.client.firstName} ${techSheetApp.client.lastName}`}

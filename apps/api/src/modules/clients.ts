@@ -1,5 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { authenticateProfessional } from '../plugins/authHook.js';
+import { normalizePhoneChile } from '../lib/phoneUtils.js';
+import { parseNombre } from '../lib/nameParser.js';
 
 export const clientRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.register(async (protectedRoutes) => {
@@ -25,6 +27,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
           { firstName: { contains: query } },
           { lastName: { contains: query } },
           { phone: { contains: query } },
+          { rawName: { contains: query } },
         ];
       }
 
@@ -84,7 +87,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     protectedRoutes.post<{
       Body: {
         firstName: string;
-        lastName: string;
+        lastName?: string;
         phone: string;
         notes?: string;
         tags?: string[];
@@ -93,16 +96,17 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       const userSession = request.userSession!;
       const { firstName, lastName, phone, notes, tags } = request.body;
 
-      if (!firstName || !lastName || !phone) {
+      if (!firstName || !phone) {
         return reply.status(400).send({
           error: 'MissingFields',
-          message: 'Nombre, apellido y teléfono son obligatorios.',
+          message: 'Nombre y teléfono son obligatorios.',
         });
       }
 
-      const cleanPhone = phone.trim();
+      const cleanPhone = normalizePhoneChile(phone);
+      const parsed = parseNombre(`${firstName} ${lastName || ''}`);
 
-      // Check existing client by phone within this professional's scope
+      // Check existing client by unique phone
       const existing = await fastify.prisma.client.findUnique({
         where: {
           professionalId_phone: {
@@ -119,11 +123,17 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      const allTags = [...(tags || [])];
+      if (parsed.suggestedTag && !allTags.includes(parsed.suggestedTag)) {
+        allTags.push(parsed.suggestedTag);
+      }
+
       const client = await fastify.prisma.client.create({
         data: {
           professionalId: userSession.id,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          rawName: `${firstName} ${lastName || ''}`.trim(),
           phone: cleanPhone,
           authMethod: 'otp',
         },
@@ -133,8 +143,8 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           clientId: client.id,
           professionalId: userSession.id,
-          notes: notes?.trim() || null,
-          tags: JSON.stringify(tags || []),
+          notes: notes?.trim() || parsed.suggestedNote || null,
+          tags: JSON.stringify(allTags),
           visitCount: 0,
           totalSpent: 0,
         },
@@ -143,6 +153,60 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(201).send({
         message: 'Cliente registrado con éxito',
         client: { ...client, profile },
+      });
+    });
+
+    // POST /api/clients/clean-names - Batch clean dirty names in CRM
+    protectedRoutes.post('/clients/clean-names', async (request, reply) => {
+      const userSession = request.userSession!;
+
+      const clients = await fastify.prisma.client.findMany({
+        where: { professionalId: userSession.id },
+        include: { profile: true },
+      });
+
+      let cleanedCount = 0;
+
+      for (const c of clients) {
+        const rawToParse = c.rawName || `${c.firstName} ${c.lastName}`.trim();
+        const parsed = parseNombre(rawToParse);
+
+        const isDifferent = parsed.firstName !== c.firstName || parsed.lastName !== c.lastName;
+
+        if (isDifferent || !c.rawName) {
+          await fastify.prisma.client.update({
+            where: { id: c.id },
+            data: {
+              firstName: parsed.firstName,
+              lastName: parsed.lastName,
+              rawName: c.rawName || rawToParse,
+            },
+          });
+
+          // If suggested tag was found (e.g. padre_hijo)
+          if (parsed.suggestedTag && c.profile) {
+            try {
+              const currentTags: string[] = JSON.parse(c.profile.tags || '[]');
+              if (!currentTags.includes(parsed.suggestedTag)) {
+                currentTags.push(parsed.suggestedTag);
+                await fastify.prisma.clientProfile.update({
+                  where: { clientId: c.id },
+                  data: {
+                    tags: JSON.stringify(currentTags),
+                    notes: c.profile.notes ? `${c.profile.notes}. ${parsed.suggestedNote}` : parsed.suggestedNote,
+                  },
+                });
+              }
+            } catch {}
+          }
+
+          cleanedCount++;
+        }
+      }
+
+      return reply.send({
+        message: `Se limpiaron y estandarizaron ${cleanedCount} ficha(s) de cliente.`,
+        cleanedCount,
       });
     });
 

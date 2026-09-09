@@ -40,6 +40,8 @@ export default function ClientsManager() {
   const [newNotes, setNewNotes] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [isCleaningNames, setIsCleaningNames] = useState(false);
+  const [cleanNamesMsg, setCleanNamesMsg] = useState<string | null>(null);
 
   const suggestedTags = ['turno', 'oficina', 'padre', 'vip'];
 
@@ -58,6 +60,27 @@ export default function ClientsManager() {
       console.error('Error al cargar la lista de clientes', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCleanNames = async () => {
+    try {
+      setIsCleaningNames(true);
+      setCleanNamesMsg(null);
+      const res = await fetch('/api/clients/clean-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCleanNamesMsg(data.message || 'Nombres limpiados correctamente.');
+        await fetchClients();
+        setTimeout(() => setCleanNamesMsg(null), 4000);
+      }
+    } catch (e) {
+      console.error('Error limpiando nombres:', e);
+    } finally {
+      setIsCleaningNames(false);
     }
   };
 
@@ -143,17 +166,35 @@ export default function ClientsManager() {
           <p className="text-slate-400 text-sm">Historial de fórmulas de corte, ritmo de visitas y preferencias</p>
         </div>
 
-        <button
-          onClick={() => {
-            setCreateError(null);
-            setIsCreateModalOpen(true);
-          }}
-          className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center space-x-2 w-fit"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Nuevo Cliente Manual</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCleanNames}
+            disabled={isCleaningNames}
+            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 disabled:opacity-50"
+            title="Limpia sufijos, prefijos de Calendar y estandariza nombres a Title Case"
+          >
+            <span>{isCleaningNames ? 'Limpiando...' : '✨ Limpiar Nombres'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setCreateError(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center space-x-2 w-fit"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Nuevo Cliente Manual</span>
+          </button>
+        </div>
       </div>
+
+      {cleanNamesMsg && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs rounded-2xl flex items-center justify-between">
+          <span>{cleanNamesMsg}</span>
+          <button onClick={() => setCleanNamesMsg(null)} className="text-slate-400 hover:text-white text-xs ml-2">✕</button>
+        </div>
+      )}
 
       {/* Bloque: Deberían volver esta semana */}
       {clientsDueThisWeek.length > 0 && (

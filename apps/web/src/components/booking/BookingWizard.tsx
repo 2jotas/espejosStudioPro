@@ -52,7 +52,7 @@ export default function BookingWizard({ slug, businessName, address, phone, serv
     } catch {}
   }, []);
 
-  // Generar próximos 14 días para selección rápida
+  // Generar próximos 14 días para selección rápida con indicación de cerrado en Mar/Mié
   const datesList = Array.from({ length: 14 }).map((_, i) => {
     const d = new Date();
     d.setDate(d.getDate() + i);
@@ -60,12 +60,15 @@ export default function BookingWizard({ slug, businessName, address, phone, serv
     const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' });
     const dayNum = d.getDate();
     const monthName = d.toLocaleDateString('es-CL', { month: 'short' });
-    return { isoDate, dayName, dayNum, monthName };
+    const dayOfWeek = d.getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+    const isClosed = dayOfWeek === 2 || dayOfWeek === 3;
+    return { isoDate, dayName, dayNum, monthName, isClosed };
   });
 
   useEffect(() => {
     if (!selectedDate && datesList.length > 0) {
-      setSelectedDate(datesList[0].isoDate);
+      const firstOpen = datesList.find(d => !d.isClosed) || datesList[0];
+      setSelectedDate(firstOpen.isoDate);
     }
   }, []);
 
@@ -274,13 +277,27 @@ export default function BookingWizard({ slug, businessName, address, phone, serv
             <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
               {datesList.map((d) => {
                 const isSelected = selectedDate === d.isoDate;
+                if (d.isClosed) {
+                  return (
+                    <div
+                      key={d.isoDate}
+                      className="flex-shrink-0 w-16 py-2.5 rounded-xl border border-slate-900 bg-slate-950/40 text-slate-600 text-center cursor-not-allowed opacity-50"
+                      title="Cerrado los días martes y miércoles"
+                    >
+                      <span className="block text-[10px] font-semibold uppercase">{d.dayName}</span>
+                      <span className="block text-base font-bold my-0.5 line-through">{d.dayNum}</span>
+                      <span className="block text-[9px] text-rose-400/80 font-bold uppercase">Cerrado</span>
+                    </div>
+                  );
+                }
+
                 return (
                   <button
                     key={d.isoDate}
                     onClick={() => setSelectedDate(d.isoDate)}
                     className={`flex-shrink-0 w-16 py-2.5 rounded-xl border text-center transition-all ${
                       isSelected
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30'
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30 font-bold'
                         : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >

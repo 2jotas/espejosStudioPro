@@ -159,7 +159,7 @@ export default function Space() {
         {/* Horario Real */}
         <div className="flex items-center justify-center space-x-2 text-xs text-slate-400">
           <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span>Lunes a Sábado: 10:00 a 20:00 hrs</span>
+          <span>Lun, Jue, Vie, Sáb y Dom · 10:00–20:00 · Mar y Mié cerrado</span>
         </div>
 
         {/* CTA Principal Único */}

@@ -296,8 +296,13 @@ export const whatsappRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: 'Cita no encontrada' });
     }
 
-    const timeStr = new Date(appointment.startsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
-    const reminderText = `¡Hola ${appointment.client.firstName}! 👋 Te recordamos tu cita de *${appointment.service.name}* hoy a las *${timeStr}* con *${appointment.professional.businessName}*.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`;
+    if (!appointment.client || !appointment.client.phone) {
+      return reply.code(400).send({ error: 'Esta cita no tiene un cliente o teléfono asociado para enviar WhatsApp.' });
+    }
+
+    const serviceName = appointment.service?.name || 'Corte de Autor';
+    const timeStr = new Date(appointment.startsAt).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false });
+    const reminderText = `¡Hola ${appointment.client.firstName}! 👋 Te recordamos tu cita de *${serviceName}* hoy a las *${timeStr}* con *${appointment.professional.businessName}*.\n\n¿Nos confirmas tu asistencia? 💈\n👉 Responde *'Confirmo'* o *'Cancelar'*.`;
 
     // Try direct sending via connected WhatsApp socket
     await sendDirectWhatsAppMessage(appointment.professionalId, appointment.client.phone, reminderText);

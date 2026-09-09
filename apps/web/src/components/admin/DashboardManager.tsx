@@ -151,9 +151,11 @@ export default function DashboardManager() {
                     </span>
                     <div>
                       <h4 className="font-bold text-white text-xs">
-                        {app.client.firstName} {app.client.lastName}
+                        {app.client ? `${app.client.firstName} ${app.client.lastName}` : (app.status === 'blocked' ? 'Horario Bloqueado' : 'Cliente Walk-in')}
                       </h4>
-                      <span className="text-[11px] text-slate-400">{app.service.name} (${app.service.price} CLP)</span>
+                      <span className="text-[11px] text-slate-400">
+                        {app.service?.name || (app.status === 'blocked' ? 'Bloqueo' : 'Servicio')} {app.service?.price ? `($${app.service.price} CLP)` : ''}
+                      </span>
                     </div>
                   </div>
                   <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">

@@ -9,11 +9,14 @@ import {
   verifyGoogleApiKeyConnection,
   calculateAvailableTimeSlots,
   getSantiagoUtcDate,
+  createGoogleCalendarEvent,
 } from '../lib/googleCalendar.js';
+import { normalizePhoneChile, formatChilePhoneDisplay } from '../lib/phoneUtils.js';
+import { parseNombre } from '../lib/nameParser.js';
 
 export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
-  // Public Endpoint: Calculate availability slots for booking
+  // Public Endpoint: Calculate availability slots for booking (Single Source of Truth)
   fastify.get<{
     Querystring: {
       slug: string;
@@ -40,17 +43,17 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
     const duration = durationMinutes ? parseInt(durationMinutes, 10) : 30;
 
-    // Start & End ISO window (+/- 24h around date to capture all timezones)
+    // Start & End ISO window (+/- 24h around date to capture all timezone shifts)
     const windowStart = new Date(`${date}T00:00:00.000Z`);
     windowStart.setUTCDate(windowStart.getUTCDate() - 1);
     const windowEnd = new Date(`${date}T23:59:59.999Z`);
     windowEnd.setUTCDate(windowEnd.getUTCDate() + 1);
 
-    // Fetch existing appointments in database for this window
+    // Fetch existing appointments, walk-ins, and blocks in database for this window
     const dbAppointments = await fastify.prisma.appointment.findMany({
       where: {
         professionalId: professional.id,
-        status: { in: ['pending', 'confirmed'] },
+        status: { in: ['pending', 'confirmed', 'completed', 'walk_in', 'blocked', 'held'] },
         startsAt: { lte: windowEnd },
         endsAt: { gte: windowStart },
       },
@@ -85,10 +88,12 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       busyRanges.push(...googleBusy);
     }
 
+    // Default: disabledDays [2, 3] = Tuesday (2) & Wednesday (3) closed
     const availableSlots = calculateAvailableTimeSlots({
       dateStr: date,
       durationMinutes: duration,
       busyRanges,
+      disabledDays: [2, 3],
     });
 
     return {
@@ -138,7 +143,7 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
             window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, '*');
             window.close();
           } else {
-            window.location.href = '/${professionalId}';
+            window.location.href = '/panel';
           }
         </script>
       `);
@@ -149,83 +154,341 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
             window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', message: 'Error procesando tokens de Google' }, '*');
             window.close();
           } else {
-            window.location.href = '/';
+            window.location.href = '/panel';
           }
         </script>
       `);
     }
   });
 
-  // Protected Routes Group for Professional Admin
+  // Protected Endpoints
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
 
-    // POST /api/calendar/connect-api-key - Test and save API Key & Calendar ID
+    // GET /api/calendar/appointments - Fetch all appointments, walk-ins, and blocks
+    protectedRoutes.get<{
+      Querystring: {
+        from?: string; // ISO
+        to?: string;   // ISO
+      };
+    }>('/calendar/appointments', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { from, to } = request.query;
+
+      const whereClause: any = {
+        professionalId: userSession.id,
+      };
+
+      if (from || to) {
+        whereClause.startsAt = {};
+        if (from) whereClause.startsAt.gte = new Date(from);
+        if (to) whereClause.startsAt.lte = new Date(to);
+      }
+
+      const appointments = await fastify.prisma.appointment.findMany({
+        where: whereClause,
+        include: {
+          client: {
+            include: {
+              profile: true,
+            },
+          },
+          service: true,
+        },
+        orderBy: { startsAt: 'asc' },
+      });
+
+      return { appointments };
+    });
+
+    // POST /api/calendar/close-rest-of-day - Emergency day close (1 tap)
+    protectedRoutes.post('/calendar/close-rest-of-day', async (request, reply) => {
+      const userSession = request.userSession!;
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+      });
+
+      if (!professional) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+      }
+
+      const now = new Date();
+      const santiagoFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Santiago' });
+      const todayStr = santiagoFormatter.format(now);
+      const endsAt = getSantiagoUtcDate(todayStr, '20:00');
+
+      if (now.getTime() >= endsAt.getTime()) {
+        return reply.status(400).send({
+          error: 'PastWorkingHours',
+          message: 'La jornada de hoy ya ha finalizado.',
+        });
+      }
+
+      let googleEventId: string | null = null;
+      if (professional.googleCalendarConnected && professional.googleRefreshToken) {
+        googleEventId = await createGoogleCalendarEvent(professional.googleRefreshToken, {
+          summary: 'CERRADO - Salida anticipada',
+          description: 'Cierre de emergencia del resto del día realizado desde el panel.',
+          startIso: now.toISOString(),
+          endIso: endsAt.toISOString(),
+        });
+      }
+
+      const blockAppointment = await fastify.prisma.appointment.create({
+        data: {
+          professionalId: professional.id,
+          startsAt: now,
+          endsAt,
+          status: 'blocked',
+          source: 'blocked',
+          clientNote: 'Cierre anticipado del resto del día',
+          googleCalendarEventId: googleEventId,
+        },
+      });
+
+      return reply.status(201).send({
+        message: 'Resto del día cerrado exitosamente. No se recibirán nuevas reservas hoy.',
+        blockId: blockAppointment.id,
+        blockAppointment,
+      });
+    });
+
+    // POST /api/calendar/undo-close-day - Undo day close within 60s
+    protectedRoutes.post<{
+      Body: {
+        blockId: string;
+      };
+    }>('/calendar/undo-close-day', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { blockId } = request.body;
+
+      if (!blockId) {
+        return reply.status(400).send({ error: 'MissingBlockId', message: 'blockId es requerido.' });
+      }
+
+      const block = await fastify.prisma.appointment.findUnique({
+        where: { id: blockId },
+      });
+
+      if (!block || block.professionalId !== userSession.id) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Bloqueo no encontrado.' });
+      }
+
+      const elapsedMs = Date.now() - new Date(block.createdAt).getTime();
+      if (elapsedMs > 120000) { // 2 minute window to be generous
+        return reply.status(400).send({
+          error: 'UndoWindowExpired',
+          message: 'El tiempo para deshacer el cierre ha expirado.',
+        });
+      }
+
+      await fastify.prisma.appointment.delete({
+        where: { id: blockId },
+      });
+
+      return reply.send({ message: 'Cierre del día deshecho. Agenda reabierta con éxito.' });
+    });
+
+    // POST /api/calendar/walk-in - Quick Walk-In Booking (2 taps)
+    protectedRoutes.post<{
+      Body: {
+        startsAtIso: string;
+        durationMinutes?: number;
+        serviceId?: string;
+        phone?: string;
+        fullName?: string;
+        notes?: string;
+      };
+    }>('/calendar/walk-in', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { startsAtIso, durationMinutes = 30, serviceId, phone, fullName, notes } = request.body;
+
+      if (!startsAtIso) {
+        return reply.status(400).send({ error: 'MissingStartsAt', message: 'Fecha y hora requerida.' });
+      }
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+      });
+
+      if (!professional) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+      }
+
+      const startsAt = new Date(startsAtIso);
+      const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
+
+      let client: any = null;
+      let displayName = 'Cliente Walk-in';
+
+      if (phone && phone.trim()) {
+        const normalizedPhone = normalizePhoneChile(phone);
+        const parsed = parseNombre(fullName || 'Cliente Walk-in');
+        displayName = parsed.displayName;
+
+        client = await fastify.prisma.client.findUnique({
+          where: {
+            professionalId_phone: {
+              professionalId: professional.id,
+              phone: normalizedPhone,
+            },
+          },
+        });
+
+        const todaySantiago = new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeZone: 'America/Santiago' }).format(new Date());
+
+        if (!client) {
+          client = await fastify.prisma.client.create({
+            data: {
+              professionalId: professional.id,
+              firstName: parsed.firstName,
+              lastName: parsed.lastName,
+              rawName: fullName?.trim() || null,
+              phone: normalizedPhone,
+              authMethod: 'otp',
+            },
+          });
+
+          await fastify.prisma.clientProfile.create({
+            data: {
+              clientId: client.id,
+              professionalId: professional.id,
+              notes: `Walk-in en local, ${todaySantiago}.${notes ? ` ${notes}` : ''}`,
+              tags: JSON.stringify(parsed.suggestedTag ? ['walk_in', parsed.suggestedTag] : ['walk_in']),
+              visitCount: 1,
+              lastVisitAt: startsAt,
+            },
+          });
+        } else {
+          await fastify.prisma.clientProfile.upsert({
+            where: { clientId: client.id },
+            create: {
+              clientId: client.id,
+              professionalId: professional.id,
+              notes: `Walk-in en local, ${todaySantiago}`,
+              tags: JSON.stringify(['walk_in']),
+              visitCount: 1,
+              lastVisitAt: startsAt,
+            },
+            update: {
+              visitCount: { increment: 1 },
+              lastVisitAt: startsAt,
+            },
+          });
+        }
+      }
+
+      // Sync Google Calendar
+      let googleEventId: string | null = null;
+      if (professional.googleCalendarConnected && professional.googleRefreshToken) {
+        googleEventId = await createGoogleCalendarEvent(professional.googleRefreshToken, {
+          summary: `WALK-IN: ${displayName}`,
+          description: `Cliente en local (Walk-in).\nTeléfono: ${client?.phone || 'No registrado'}\nNota: ${notes || 'Sin notas'}`,
+          startIso: startsAt.toISOString(),
+          endIso: endsAt.toISOString(),
+        });
+      }
+
+      const appointment = await fastify.prisma.appointment.create({
+        data: {
+          professionalId: professional.id,
+          clientId: client?.id || null,
+          serviceId: serviceId || null,
+          startsAt,
+          endsAt,
+          status: 'walk_in',
+          source: 'walk_in',
+          clientNote: notes || 'Walk-in presencial en local',
+          googleCalendarEventId: googleEventId,
+        },
+        include: {
+          client: true,
+          service: true,
+        },
+      });
+
+      return reply.status(201).send({
+        message: 'Walk-in registrado y slot bloqueado con éxito.',
+        appointment,
+      });
+    });
+
+    // POST /api/calendar/block - Manual Slot Block
+    protectedRoutes.post<{
+      Body: {
+        startsAtIso: string;
+        durationMinutes: number;
+        reason: string;
+      };
+    }>('/calendar/block', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { startsAtIso, durationMinutes = 30, reason } = request.body;
+
+      if (!startsAtIso) {
+        return reply.status(400).send({ error: 'MissingFields', message: 'startsAtIso y reason son requeridos.' });
+      }
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+      });
+
+      if (!professional) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+      }
+
+      const startsAt = new Date(startsAtIso);
+      const endsAt = new Date(startsAt.getTime() + durationMinutes * 60 * 1000);
+
+      let googleEventId: string | null = null;
+      if (professional.googleCalendarConnected && professional.googleRefreshToken) {
+        googleEventId = await createGoogleCalendarEvent(professional.googleRefreshToken, {
+          summary: `BLOQUEO: ${reason || 'Tiempo Bloqueado'}`,
+          description: `Bloqueo manual creado desde el panel.\nMotivo: ${reason}`,
+          startIso: startsAt.toISOString(),
+          endIso: endsAt.toISOString(),
+        });
+      }
+
+      const appointment = await fastify.prisma.appointment.create({
+        data: {
+          professionalId: professional.id,
+          startsAt,
+          endsAt,
+          status: 'blocked',
+          source: 'blocked',
+          clientNote: reason || 'Bloqueo manual',
+          googleCalendarEventId: googleEventId,
+        },
+      });
+
+      return reply.status(201).send({
+        message: 'Horario bloqueado con éxito.',
+        appointment,
+      });
+    });
+
+    // POST /api/calendar/verify-key - Test API Key connection
     protectedRoutes.post<{
       Body: {
         calendarId: string;
         apiKey: string;
       };
-    }>('/calendar/connect-api-key', async (request, reply) => {
-      const userSession = request.userSession!;
+    }>('/calendar/verify-key', async (request, reply) => {
       const { calendarId, apiKey } = request.body;
 
       if (!calendarId || !apiKey) {
         return reply.status(400).send({
           error: 'MissingFields',
-          message: 'Se requiere el Nombre/ID del Calendario y la Clave API de Google.',
+          message: 'Nombre/ID de calendario y clave de API son requeridos.',
         });
       }
 
-      const verification = await verifyGoogleApiKeyConnection(calendarId, apiKey);
-
-      if (!verification.success) {
-        return reply.status(400).send({
-          error: 'ConnectionFailed',
-          message: verification.message,
-        });
-      }
-
-      await fastify.prisma.professional.update({
-        where: { id: userSession.id },
-        data: {
-          googleCalendarConnected: true,
-          googleCalendarId: calendarId,
-          googleApiKey: apiKey,
-        },
-      });
-
-      return {
-        message: '¡Calendario de Google conectado exitosamente!',
-        googleCalendarId: calendarId,
-      };
+      const result = await verifyGoogleApiKeyConnection(calendarId, apiKey);
+      return result;
     });
 
-    // GET /api/calendar/auth-url - Get OAuth Authorization URL
-    protectedRoutes.get('/calendar/auth-url', async (request, reply) => {
-      const userSession = request.userSession!;
-      const url = getGoogleAuthUrl(userSession.id);
-      return { url };
-    });
-
-    // POST /api/calendar/disconnect - Disconnect Google Calendar
-    protectedRoutes.post('/calendar/disconnect', async (request, reply) => {
-      const userSession = request.userSession!;
-
-      await fastify.prisma.professional.update({
-        where: { id: userSession.id },
-        data: {
-          googleCalendarConnected: false,
-          googleRefreshToken: null,
-          googleCalendarId: null,
-          googleApiKey: null,
-        },
-      });
-
-      return reply.send({ message: 'Google Calendar desconectado exitosamente' });
-    });
-
-    // POST /api/calendar/sync-events - Sync & Import Google Calendar events into DB
+    // POST /api/calendar/sync-events - Sync & Import Google Calendar events
     protectedRoutes.post('/calendar/sync-events', async (request, reply) => {
       const userSession = request.userSession!;
 
@@ -245,8 +508,8 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const now = new Date();
-      const timeMinIso = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(); // Past 14 days
-      const timeMaxIso = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); // Next 60 days
+      const timeMinIso = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const timeMaxIso = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
 
       let googleEvents: Array<{ id: string; summary?: string; description?: string; startsAt: Date; endsAt: Date }> = [];
 
@@ -261,24 +524,6 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (googleEvents.length === 0) {
         return reply.send({ message: 'No se encontraron eventos nuevos en Google Calendar.', importedCount: 0 });
-      }
-
-      // Get existing active service or create default fallback
-      let service = await fastify.prisma.service.findFirst({
-        where: { professionalId: professional.id, active: true },
-      });
-
-      if (!service) {
-        service = await fastify.prisma.service.create({
-          data: {
-            professionalId: professional.id,
-            name: 'Servicio Google Calendar',
-            description: 'Servicio agendado desde Google Assistant / Google Calendar',
-            price: 0,
-            durationMinutes: 45,
-            active: true,
-          },
-        });
       }
 
       let importedCount = 0;
@@ -297,71 +542,62 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (existing) continue;
 
-        // Smart parse summary to extract clean client name
-        let cleanText = (gEvent.summary || 'Cliente Google').trim();
-        cleanText = cleanText
-          .replace(/^Cita:?\s*/i, '')
-          .replace(/^Reserva:?\s*/i, '')
-          .replace(/^Corte y Barba\s*/i, '')
-          .replace(/^Corte de cabello\s*/i, '')
-          .replace(/^Corte clasico\s*/i, '')
-          .replace(/^Corte fade\s*/i, '')
-          .replace(/para\s+/i, '')
-          .replace(/-\s*.*$/i, '')
-          .trim();
+        // Parse summary with parseNombre
+        const parsed = parseNombre(gEvent.summary || 'Google Calendar Event');
 
-        const words = cleanText.split(/\s+/).filter(Boolean);
-        let firstName = words[0] || 'Cliente';
-        let lastName = words.slice(1).join(' ') || 'Google Assistant';
+        // Check if event text or description contains a Chilean phone number
+        const combinedText = `${gEvent.summary || ''} ${gEvent.description || ''}`;
+        const phoneMatch = combinedText.match(/(?:\+?56\s*9\s*\d{8}|\b9\d{8}\b)/);
 
-        // 1. Try to find existing client by exact or partial first name / last name match
-        let client = await fastify.prisma.client.findFirst({
-          where: {
-            professionalId: professional.id,
-            OR: [
-              { firstName: { contains: firstName } },
-              { lastName: { contains: firstName } },
-              { firstName: { contains: lastName } },
-            ],
-          },
-        });
+        let clientId: string | null = null;
 
-        // 2. If no match, create new Client & Profile in CRM
-        if (!client) {
-          const pseudoPhone = `+569${Math.floor(10000000 + Math.random() * 90000000)}`;
-          client = await fastify.prisma.client.create({
-            data: {
-              professionalId: professional.id,
-              firstName,
-              lastName,
-              phone: pseudoPhone,
-              authMethod: 'otp',
+        if (phoneMatch) {
+          const normalizedPhone = normalizePhoneChile(phoneMatch[0]);
+          let client = await fastify.prisma.client.findUnique({
+            where: {
+              professionalId_phone: {
+                professionalId: professional.id,
+                phone: normalizedPhone,
+              },
             },
           });
 
-          await fastify.prisma.clientProfile.create({
-            data: {
-              clientId: client.id,
-              professionalId: professional.id,
-              notes: `Ficha creada automáticamente desde Google Calendar: "${gEvent.summary}"`,
-              tags: JSON.stringify(['Google Assistant']),
-              visitCount: 1,
-              totalSpent: service.price,
-              lastVisitAt: gEvent.startsAt,
-            },
-          });
+          if (!client) {
+            client = await fastify.prisma.client.create({
+              data: {
+                professionalId: professional.id,
+                firstName: parsed.firstName,
+                lastName: parsed.lastName,
+                rawName: gEvent.summary,
+                phone: normalizedPhone,
+                authMethod: 'otp',
+              },
+            });
+
+            await fastify.prisma.clientProfile.create({
+              data: {
+                clientId: client.id,
+                professionalId: professional.id,
+                notes: `Importado de Google Calendar: "${gEvent.summary}"`,
+                tags: JSON.stringify(['google_calendar']),
+                visitCount: 1,
+                lastVisitAt: gEvent.startsAt,
+              },
+            });
+          }
+          clientId = client.id;
         }
 
-        // Create Appointment in DB
+        // Create appointment in DB (as calendar block if no phone)
         await fastify.prisma.appointment.create({
           data: {
             professionalId: professional.id,
-            clientId: client.id,
-            serviceId: service.id,
+            clientId,
             startsAt: gEvent.startsAt,
             endsAt: gEvent.endsAt,
             status: 'confirmed',
-            clientNote: `Importado de Google Calendar: "${gEvent.summary}"`,
+            source: 'google_calendar',
+            clientNote: `Google Calendar: "${gEvent.summary}"`,
             googleCalendarEventId: gEvent.id,
           },
         });
@@ -370,7 +606,7 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return reply.send({
-        message: `Sincronización completada. Se importaron ${importedCount} cita(s) de Google Calendar.`,
+        message: `Sincronización completada. Se importaron ${importedCount} evento(s) de Google Calendar.`,
         importedCount,
       });
     });
