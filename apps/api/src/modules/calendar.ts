@@ -104,6 +104,29 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // Connect Google Calendar OAuth (Initiates OAuth Flow)
+  fastify.get<{
+    Querystring: {
+      token?: string;
+    };
+  }>('/calendar/connect', async (request, reply) => {
+    const token = request.headers.authorization?.startsWith('Bearer ')
+      ? request.headers.authorization.substring(7)
+      : (request.cookies?.token || request.query.token);
+
+    if (!token) {
+      return reply.redirect('/panel');
+    }
+
+    try {
+      const decoded = fastify.jwt.verify<any>(token);
+      const authUrl = getGoogleAuthUrl(decoded.id);
+      return reply.redirect(authUrl);
+    } catch (err) {
+      return reply.redirect('/panel');
+    }
+  });
+
   // OAuth Callback (Google Redirects Here)
   fastify.get<{
     Querystring: {
@@ -117,7 +140,7 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
     if (error || !code || !state) {
       return reply.type('text/html').send(`
         <script>
-          window.opener ? window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', message: 'Acceso denegado o cancelado' }, '*') : window.location.href = '/';
+          window.opener ? window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', message: 'Acceso denegado o cancelado' }, '*') : window.location.href = '/panel';
           window.close();
         </script>
       `);
@@ -164,6 +187,68 @@ export const calendarRoutes: FastifyPluginAsync = async (fastify) => {
   // Protected Endpoints
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
+
+    // GET /api/calendar/status - Get Google Calendar connection state
+    protectedRoutes.get('/calendar/status', async (request, reply) => {
+      const userSession = request.userSession!;
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+      });
+      if (!professional) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Profesional no encontrado.' });
+      }
+      return {
+        connected: Boolean(professional.googleCalendarConnected),
+        calendarId: professional.googleCalendarId || professional.email || '',
+        hasRefreshToken: Boolean(professional.googleRefreshToken),
+        hasApiKey: Boolean(professional.googleApiKey),
+      };
+    });
+
+    // POST /api/calendar/disconnect - Disconnect Google Calendar
+    protectedRoutes.post('/calendar/disconnect', async (request, reply) => {
+      const userSession = request.userSession!;
+      await fastify.prisma.professional.update({
+        where: { id: userSession.id },
+        data: {
+          googleCalendarConnected: false,
+          googleRefreshToken: null,
+          googleApiKey: null,
+        },
+      });
+      return { success: true, message: 'Google Calendar desconectado exitosamente.' };
+    });
+
+    // POST /api/calendar/apikey - Connect with API Key & Calendar ID
+    protectedRoutes.post<{
+      Body: {
+        calendarId: string;
+        apiKey: string;
+      };
+    }>('/calendar/apikey', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { calendarId, apiKey } = request.body;
+
+      if (!calendarId || !apiKey) {
+        return reply.status(400).send({ error: 'MissingFields', message: 'calendarId y apiKey son requeridos.' });
+      }
+
+      const verifyResult = await verifyGoogleApiKeyConnection(calendarId, apiKey);
+      if (!verifyResult.success) {
+        return reply.status(400).send({ error: 'InvalidKey', message: verifyResult.message });
+      }
+
+      await fastify.prisma.professional.update({
+        where: { id: userSession.id },
+        data: {
+          googleCalendarConnected: true,
+          googleCalendarId: calendarId,
+          googleApiKey: apiKey,
+        },
+      });
+
+      return { success: true, message: 'Google Calendar conectado con API Key exitosamente.' };
+    });
 
     // GET /api/calendar/appointments - Fetch all appointments, walk-ins, and blocks
     protectedRoutes.get<{

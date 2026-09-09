@@ -421,13 +421,18 @@ export default function SettingsIntegrations() {
 
   const handleConnectGoogle = () => {
     setIsLoading(true);
-    window.location.href = '/api/calendar/connect';
+    const token = localStorage.getItem('espejos_token');
+    const url = token ? `/api/calendar/connect?token=${encodeURIComponent(token)}` : '/api/calendar/connect';
+    window.location.href = url;
   };
 
   const handleDisconnectGoogle = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/calendar/disconnect', { method: 'POST' });
+      const res = await fetch('/api/calendar/disconnect', { 
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         setIsConnected(false);
         setApiKey('');
