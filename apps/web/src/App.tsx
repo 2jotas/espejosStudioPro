@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import Landing from './routes/Landing';
 import Login from './routes/Login';
 import Register from './routes/Register';
@@ -16,8 +17,9 @@ export default function App() {
   const isAppSubdomain = hostname.startsWith('app.') || hostname.startsWith('agenda.');
 
   return (
-    <BrowserRouter>
-      <AuthProvider>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
         <Routes>
           {isPerformanceSubdomain ? (
             <Route path="*" element={<PerformanceApp />} />
@@ -47,5 +49,6 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

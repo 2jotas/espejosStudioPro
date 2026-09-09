@@ -37,29 +37,29 @@ export default function MirrorGallery({
   }, [slug]);
 
   // Si no hay fotos o aún está cargando sin fotos, no renderizar nada
-  if (images.length === 0) {
+  if (!images || !Array.isArray(images) || images.length === 0) {
     return null;
   }
 
-  const activePhoto = lightboxIndex !== null ? images[lightboxIndex] : null;
+  const activePhoto = (lightboxIndex !== null && images[lightboxIndex]) ? images[lightboxIndex] : null;
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (lightboxIndex !== null) {
+    if (lightboxIndex !== null && images.length > 0) {
       setLightboxIndex((lightboxIndex - 1 + images.length) % images.length);
     }
   };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (lightboxIndex !== null) {
+    if (lightboxIndex !== null && images.length > 0) {
       setLightboxIndex((lightboxIndex + 1) % images.length);
     }
   };
 
   // Keyboard navigation for lightbox
   useEffect(() => {
-    if (lightboxIndex === null) return;
+    if (lightboxIndex === null || images.length === 0) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setLightboxIndex(null);
       if (e.key === 'ArrowLeft') setLightboxIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));

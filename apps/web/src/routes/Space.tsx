@@ -203,9 +203,9 @@ export default function Space() {
                 <div>
                   <h4 className="font-bold text-white text-sm">{s.name}</h4>
                   <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5">
-                    <span>{s.durationMinutes} min</span>
+                    <span>{s.durationMinutes || 30} min</span>
                     <span>•</span>
-                    <span className="font-semibold text-slate-200">${s.price.toLocaleString('es-CL')} CLP</span>
+                    <span className="font-semibold text-slate-200">${Number(s.price || 0).toLocaleString('es-CL')} CLP</span>
                   </div>
                 </div>
 
