@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { ServiceItem } from '../components/admin/ServicesManager';
 import BookingWizard from '../components/booking/BookingWizard';
+import MirrorGallery from '../components/public/MirrorGallery';
 
 export default function Space() {
   const { slug } = useParams<{ slug: string }>();
@@ -218,6 +219,9 @@ export default function Space() {
             ))}
           </div>
         </div>
+
+        {/* Galería Espejos (Max 12 fotos publicadas, oculta si 0 fotos) */}
+        <MirrorGallery slug={slug || 'john'} displayName={displayName} />
 
       </main>
 

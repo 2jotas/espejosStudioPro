@@ -137,15 +137,20 @@ model WhatsAppMessageLog {
 }
 
 model GalleryImage {
-  id             String       @id @default(uuid())
-  professionalId String       @map("professional_id")
-  filePath       String       @map("file_path")
-  source         String       @default("upload") // "upload" | "watched_folder"
-  caption        String?
-  createdAt      DateTime     @default(now()) @map("created_at")
+  id              String       @id @default(uuid())
+  professionalId  String       @map("professional_id")
+  url             String       @map("url")
+  thumbUrl        String?      @map("thumb_url")
+  title           String?      @map("title")
+  sort            Int          @default(0)
+  published       Boolean      @default(false)
+  hasFaceConsent  Boolean      @default(false) @map("has_face_consent")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
-  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  professional    Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
+  @@index([professionalId, published, sort])
   @@map("gallery_images")
 }
 

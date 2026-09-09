@@ -1,13 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, FolderSync, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Upload, 
+  Sparkles, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
+  Check, 
+  Copy, 
+  ArrowUp, 
+  ArrowDown, 
+  AlertCircle, 
+  Loader2, 
+  ShieldCheck,
+  CheckCircle2,
+  Image as ImageIcon
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import EspejosGalleryEngine from '../gallery/EspejosGalleryEngine';
 
 export interface GalleryItem {
   id: string;
-  filePath: string;
-  source: 'upload' | 'watched_folder';
-  caption: string | null;
+  professionalId: string;
+  url: string;
+  thumbUrl: string | null;
+  title: string | null;
+  sort: number;
+  published: boolean;
+  hasFaceConsent: boolean;
   createdAt: string;
 }
 
@@ -16,15 +34,21 @@ export default function GalleryManager() {
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchGallery = async () => {
     try {
       setIsLoading(true);
       const res = await fetch('/api/gallery');
-      if (!res.ok) throw new Error('Error al cargar la galería');
+      if (!res.ok) throw new Error('Error al cargar la galería.');
       const data = await res.json();
-      setImages(data.images);
+      setImages(data.images || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -36,15 +60,20 @@ export default function GalleryManager() {
     fetchGallery();
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Multi-file upload handler
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
     setError(null);
+    setSuccessMsg(null);
+    setUploadProgress(`Subiendo y optimizando ${files.length} imagen(es)...`);
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
 
     try {
       const res = await fetch('/api/gallery/upload', {
@@ -53,93 +82,410 @@ export default function GalleryManager() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Error al subir imagen');
+      if (!res.ok) throw new Error(data.message || 'Error al subir imágenes');
 
+      setSuccessMsg(`✅ ${data.images?.length || files.length} foto(s) subida(s) como borrador.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       fetchGallery();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
+  // Toggle Publish Status
+  const handleTogglePublish = async (img: GalleryItem) => {
+    setError(null);
+    setSuccessMsg(null);
+
+    // If trying to publish without consent
+    if (!img.published && !img.hasFaceConsent) {
+      setError('Debes marcar la casilla de consentimiento del cliente ("Tengo permiso del cliente") antes de publicar.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/gallery/${img.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: !img.published }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al actualizar estado.');
+
+      setImages((prev) =>
+        prev.map((item) => (item.id === img.id ? { ...item, published: !img.published } : item))
+      );
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Toggle Face Consent Checkbox
+  const handleToggleConsent = async (img: GalleryItem, value: boolean) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/gallery/${img.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          hasFaceConsent: value,
+          // If unchecking consent, automatically unpublish
+          published: value ? img.published : false,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al actualizar consentimiento.');
+
+      setImages((prev) =>
+        prev.map((item) =>
+          item.id === img.id
+            ? { ...item, hasFaceConsent: value, published: value ? img.published : false }
+            : item
+        )
+      );
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Save Title
+  const handleSaveTitle = async (id: string) => {
+    try {
+      const res = await fetch(`/api/gallery/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: titleDraft.trim() || null }),
+      });
+
+      if (!res.ok) throw new Error('Error al guardar título.');
+
+      setImages((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, title: titleDraft.trim() || null } : item))
+      );
+      setEditingTitleId(null);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Reorder Item Up/Down
+  const handleMove = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+
+    const newImages = [...images];
+    const [moved] = newImages.splice(index, 1);
+    newImages.splice(targetIndex, 0, moved);
+
+    setImages(newImages);
+
+    try {
+      const orderedIds = newImages.map((img) => img.id);
+      await fetch('/api/gallery/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (e) {
+      console.error('Error guardando reordenamiento:', e);
+      fetchGallery();
+    }
+  };
+
+  // Delete Image
   const handleDeleteImage = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de eliminar esta imagen de tu galería?')) return;
+    if (!window.confirm('¿Estás seguro de eliminar esta foto? Esta acción no se puede deshacer.')) return;
 
     try {
       const res = await fetch(`/api/gallery/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setImages((prev) => prev.filter((img) => img.id !== id));
+        setSuccessMsg('Foto eliminada correctamente.');
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  // Copy Direct Public URL for Meta Ads
+  const handleCopyUrl = (img: GalleryItem) => {
+    const baseUrl = window.location.origin;
+    const fullPublicUrl = `${baseUrl}${img.url}`;
+    navigator.clipboard.writeText(fullPublicUrl);
+    setCopiedId(img.id);
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const publishedCount = images.filter((img) => img.published).length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-left">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <h2 className="text-xl font-bold text-white">Colección de Espejos Studio</h2>
-          <p className="text-slate-400 text-sm">Gestiona el portafolio visual de tus trabajos. Cada foto es un reflejo de una historia única en tu cliente.</p>
+          <div className="flex items-center space-x-2.5">
+            <Sparkles className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-xl font-extrabold text-white">Galería Espejos</h2>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              {publishedCount} / 12 publicadas
+            </span>
+          </div>
+          <p className="text-slate-400 text-xs mt-1">
+            Muestra tus mejores cortes y visagismos en tu página pública (<span className="text-indigo-400 font-mono">espejosstudio.cl/{user?.slug}</span>). Máximo 12 fotos publicadas.
+          </p>
         </div>
 
-        <label className="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-500/20 transition-all flex items-center space-x-2 w-fit cursor-pointer">
-          {isUploading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Subiendo...</span>
-            </>
-          ) : (
-            <>
-              <Upload className="w-4 h-4" />
-              <span>Subir Foto</span>
-            </>
-          )}
-          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-        </label>
-      </div>
-
-      {/* Auto-Watch Folder Banner for Pro Users */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 backdrop-blur-xl">
-        <div className="flex items-start space-x-4">
-          <div className="h-10 w-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 flex-shrink-0">
-            <FolderSync className="w-5 h-5" />
-          </div>
-
-          <div>
-            <div className="flex items-center space-x-2 mb-1">
-              <h3 className="font-bold text-white text-sm">Auto-Publicación desde Carpeta</h3>
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                Plan Pro
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs leading-relaxed mb-2">
-              Copia o guarda tus fotos en la carpeta asignada a tu espacio y se auto-publicarán con reflejo visual automáticamente:
-            </p>
-            <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 font-mono text-[11px] text-indigo-400 w-fit">
-              ./uploads/gallery-watch/{user?.id}/
-            </div>
-          </div>
+        {/* Upload Button */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleFilesSelected}
+            disabled={isUploading}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center space-x-2 cursor-pointer"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{uploadProgress || 'Procesando...'}</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4" />
+                <span>Subir Fotos (JPG, PNG, WebP)</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* Notifications */}
       {error && (
-        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-rose-400 text-sm flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4" />
+        <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 text-rose-400 text-xs flex items-center space-x-2.5">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Gallery Engine */}
-      <EspejosGalleryEngine
-        slug={user?.slug || ''}
-        mode="admin"
-        images={images}
-        onDelete={handleDeleteImage}
-        isLoading={isLoading}
-      />
+      {successMsg && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-emerald-400 text-xs flex items-center space-x-2.5">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {/* Gallery List / Grid */}
+      {isLoading ? (
+        <div className="py-16 text-center text-slate-500 text-xs flex flex-col items-center justify-center space-y-3">
+          <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          <span>Cargando fotos de tu espacio...</span>
+        </div>
+      ) : images.length === 0 ? (
+        <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-12 text-center text-slate-500 space-y-3">
+          <ImageIcon className="w-10 h-10 text-slate-600 mx-auto" />
+          <h3 className="font-bold text-slate-300 text-sm">Tu Galería Espejos está vacía</h3>
+          <p className="text-xs max-w-sm mx-auto text-slate-500">
+            Sube fotos de tus cortes o perfilados para que tus clientes puedan ver la calidad de tu trabajo antes de agendar.
+          </p>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-semibold rounded-xl transition-colors inline-flex items-center space-x-2 mt-2"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Seleccionar fotos desde tu dispositivo</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3.5">
+          {images.map((img, idx) => (
+            <div
+              key={img.id}
+              className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                img.published
+                  ? 'bg-slate-900/90 border-slate-700/80 shadow-md shadow-indigo-950/20'
+                  : 'bg-slate-950/70 border-slate-800/60 opacity-90'
+              }`}
+            >
+              {/* Left: Thumbnail & Details */}
+              <div className="flex items-start sm:items-center space-x-4 flex-1">
+                {/* Order & Drag position */}
+                <div className="flex flex-col items-center justify-center space-y-1 text-slate-500">
+                  <button
+                    onClick={() => handleMove(idx, 'up')}
+                    disabled={idx === 0}
+                    className="p-1 hover:text-white disabled:opacity-20 transition-colors"
+                    title="Mover arriba"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[11px] font-mono font-bold text-slate-400">#{idx + 1}</span>
+                  <button
+                    onClick={() => handleMove(idx, 'down')}
+                    disabled={idx === images.length - 1}
+                    className="p-1 hover:text-white disabled:opacity-20 transition-colors"
+                    title="Mover abajo"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Photo Thumbnail */}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0 relative group">
+                  <img
+                    src={img.thumbUrl || img.url}
+                    alt={img.title || 'Foto de galería'}
+                    className="w-full h-full object-cover"
+                  />
+                  <a
+                    href={img.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity"
+                  >
+                    Ver HD
+                  </a>
+                </div>
+
+                {/* Info & Inputs */}
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                        img.published
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                      }`}
+                    >
+                      {img.published ? 'Publicada en web' : 'Borrador'}
+                    </span>
+                  </div>
+
+                  {/* Title editor */}
+                  {editingTitleId === img.id ? (
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        placeholder="Ej: Skin Fade + Barba perfilada"
+                        className="bg-slate-950 border border-indigo-500/50 text-white text-xs px-2.5 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-sm"
+                        maxLength={60}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleSaveTitle(img.id)}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditingTitleId(null)}
+                        className="text-xs text-slate-400 hover:text-white"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <p className="text-xs text-slate-200 font-semibold truncate max-w-xs">
+                        {img.title || <span className="text-slate-500 italic font-normal">Sin título (haz clic para agregar)</span>}
+                      </p>
+                      <button
+                        onClick={() => {
+                          setEditingTitleId(img.id);
+                          setTitleDraft(img.title || '');
+                        }}
+                        className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium"
+                      >
+                        Editar título
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Mandatory Face Consent Checkbox */}
+                  <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={img.hasFaceConsent}
+                      onChange={(e) => handleToggleConsent(img, e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0 w-3.5 h-3.5"
+                    />
+                    <span className="flex items-center space-x-1 text-[11px] text-slate-400">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-400 inline" />
+                      <span>Tengo permiso del cliente para exhibir esta foto</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center space-x-2 self-end sm:self-center">
+                {/* Meta Ads Link Copy */}
+                <button
+                  onClick={() => handleCopyUrl(img)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-medium transition-colors flex items-center space-x-1.5"
+                  title="Copiar URL directa para anuncios de Meta / Instagram"
+                >
+                  {copiedId === img.id ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400 font-semibold">¡URL Copiada!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      <span>URL para Ads</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Publish Toggle Button */}
+                <button
+                  onClick={() => handleTogglePublish(img)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                    img.published
+                      ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20'
+                  }`}
+                >
+                  {img.published ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5" />
+                      <span>Pasar a Borrador</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Publicar</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => handleDeleteImage(img.id)}
+                  className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  title="Eliminar foto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

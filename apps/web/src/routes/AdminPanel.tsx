@@ -107,6 +107,18 @@ export default function AdminPanel() {
             </button>
 
             <button
+              onClick={() => setActiveTab('gallery')}
+              className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                activeTab === 'gallery'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Galería Espejos</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 activeTab === 'settings'

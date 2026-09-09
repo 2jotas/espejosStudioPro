@@ -1,9 +1,173 @@
-import EspejosGalleryEngine from '../gallery/EspejosGalleryEngine';
+import { useState, useEffect } from 'react';
+import { Sparkles, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function MirrorGallery({ slug }: { slug: string }) {
+export interface GalleryPhoto {
+  id: string;
+  url: string;
+  thumbUrl?: string | null;
+  title?: string | null;
+  sort: number;
+}
+
+export default function MirrorGallery({ 
+  slug, 
+  displayName 
+}: { 
+  slug: string; 
+  displayName?: string; 
+}) {
+  const [images, setImages] = useState<GalleryPhoto[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!slug) return;
+    const fetchGallery = async () => {
+      try {
+        const res = await fetch(`/api/professionals/${slug}/gallery`);
+        if (res.ok) {
+          const data = await res.json();
+          setImages(data.images || []);
+        }
+      } catch (e) {
+        console.error('Error cargando galería:', e);
+      }
+    };
+
+    fetchGallery();
+  }, [slug]);
+
+  // Si no hay fotos o aún está cargando sin fotos, no renderizar nada
+  if (images.length === 0) {
+    return null;
+  }
+
+  const activePhoto = lightboxIndex !== null ? images[lightboxIndex] : null;
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex - 1 + images.length) % images.length);
+    }
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (lightboxIndex !== null) {
+      setLightboxIndex((lightboxIndex + 1) % images.length);
+    }
+  };
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxIndex(null);
+      if (e.key === 'ArrowLeft') setLightboxIndex((prev) => (prev !== null ? (prev - 1 + images.length) % images.length : null));
+      if (e.key === 'ArrowRight') setLightboxIndex((prev) => (prev !== null ? (prev + 1) % images.length : null));
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, images.length]);
+
   return (
-    <section className="mt-12 text-left">
-      <EspejosGalleryEngine slug={slug} mode="public" />
+    <section className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 text-left space-y-4 pt-4">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div className="flex items-center space-x-2">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Galería Espejos
+          </span>
+        </div>
+        <span className="text-[11px] text-slate-500 font-mono font-medium">
+          {images.length} {images.length === 1 ? 'trabajo' : 'trabajos'}
+        </span>
+      </div>
+
+      {/* Grid: 2 cols on mobile, 3 cols on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+        {images.map((img, idx) => {
+          const altText = `${img.title || 'Corte de Autor'} · Espejos Studio · ${displayName || 'John'}`;
+          return (
+            <div
+              key={img.id}
+              onClick={() => setLightboxIndex(idx)}
+              className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-950 border border-slate-800/80 cursor-pointer shadow-md hover:border-indigo-500/50 transition-all transform-gpu hover:scale-[1.02]"
+            >
+              <img
+                src={img.thumbUrl || img.url}
+                alt={altText}
+                loading="lazy"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
+              {img.title && (
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-2 pt-4">
+                  <p className="text-[11px] text-white font-medium truncate">{img.title}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Lightbox Modal */}
+      {activePhoto && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 selection:bg-indigo-500 selection:text-white"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            aria-label="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Navigation Arrows */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={handlePrev}
+                className="absolute left-3 sm:left-6 z-50 p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                aria-label="Anterior"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+
+              <button
+                onClick={handleNext}
+                className="absolute right-3 sm:right-6 z-50 p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                aria-label="Siguiente"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          {/* Active Image */}
+          <div 
+            className="max-w-3xl max-h-[85vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={activePhoto.url}
+              alt={`${activePhoto.title || 'Corte'} · Espejos Studio`}
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-slate-800/80"
+            />
+            {activePhoto.title && (
+              <div className="mt-3 text-center">
+                <p className="text-sm font-semibold text-white">{activePhoto.title}</p>
+                <p className="text-xs text-slate-400">Espejos Studio · {displayName || 'John'}</p>
+              </div>
+            )}
+            <div className="text-[11px] text-slate-500 mt-1 font-mono">
+              {(lightboxIndex ?? 0) + 1} / {images.length}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
