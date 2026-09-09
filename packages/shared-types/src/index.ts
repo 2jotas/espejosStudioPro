@@ -22,3 +22,17 @@ export interface HealthCheckResponse {
   redis: string;
   timestamp: string;
 }
+
+export interface GalleryItem {
+  id: string;
+  professionalId: string;
+  url: string;
+  thumbUrl: string | null;
+  title: string | null;
+  sort: number;
+  published: boolean;
+  hasFaceConsent: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

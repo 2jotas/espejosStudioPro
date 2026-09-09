@@ -2,11 +2,22 @@ import { FastifyPluginAsync } from 'fastify';
 import { authenticateProfessional } from '../plugins/authHook.js';
 import { galleryStorageService } from '../lib/galleryStorage.js';
 
+// Helper to get calendar date YYYY-MM-DD in America/Santiago timezone
+function getSantiagoDateString(date: Date = new Date()): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(date); // 'YYYY-MM-DD'
+}
+
 export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
   // =========================================================================
   // PUBLIC ENDPOINT: Get published gallery photos for public space /{slug}
-  // Max 12 images, ordered by sort asc, only published === true
+  // Max 12 images, ordered by newest publishedAt desc, only published === true
   // =========================================================================
   fastify.get<{ Params: { slug: string } }>('/professionals/:slug/gallery', async (request, reply) => {
     const { slug } = request.params;
@@ -25,7 +36,10 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         professionalId: professional.id,
         published: true,
       },
-      orderBy: { sort: 'asc' },
+      orderBy: [
+        { publishedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
       take: 12,
       select: {
         id: true,
@@ -33,6 +47,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         thumbUrl: true,
         title: true,
         sort: true,
+        publishedAt: true,
         createdAt: true,
       }
     });
@@ -46,16 +61,32 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
 
-    // GET /api/gallery - Get all gallery items (Drafts + Published) for logged-in professional
+    // GET /api/gallery - Get all gallery items (Drafts + Published) with Santiago daily quota status
     protectedRoutes.get('/gallery', async (request) => {
       const userSession = request.userSession!;
 
       const images = await fastify.prisma.galleryImage.findMany({
         where: { professionalId: userSession.id },
-        orderBy: { sort: 'asc' },
+        orderBy: [
+          { publishedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
       });
 
-      return { images };
+      const todaySantiago = getSantiagoDateString(new Date());
+      const todayPublished = images.find(
+        (img) => img.published && img.publishedAt && getSantiagoDateString(new Date(img.publishedAt)) === todaySantiago
+      );
+
+      return {
+        images,
+        todayQuota: {
+          isPublishedToday: Boolean(todayPublished),
+          todayPublishedId: todayPublished ? todayPublished.id : null,
+          todayPublishedTitle: todayPublished ? todayPublished.title : null,
+          todaySantiago,
+        },
+      };
     });
 
     // POST /api/gallery/upload - Upload new photo(s)
@@ -115,6 +146,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
             sort: nextSort,
             published: false, // Default to Draft
             hasFaceConsent: false,
+            publishedAt: null,
           },
         });
 
@@ -155,13 +187,46 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
       const nextConsent = hasFaceConsent !== undefined ? hasFaceConsent : existing.hasFaceConsent;
       let nextPublished = published !== undefined ? published : existing.published;
+      let nextPublishedAt = existing.publishedAt;
 
-      // Consent Guardrail: Cannot publish with face if consent is not granted
+      // Consent Guardrail: Cannot publish without face consent
       if (nextPublished && !nextConsent) {
         return reply.status(400).send({
           error: 'ConsentRequired',
-          message: 'Debes marcar la casilla de consentimiento del cliente antes de publicar la foto en tu perfil público.',
+          message: 'Debes marcar la casilla de consentimiento del cliente ("Tengo permiso del cliente") antes de publicar.',
         });
+      }
+
+      const todaySantiago = getSantiagoDateString(new Date());
+
+      // Daily Quota Guardrail: Max 1 published photo per tenant per Santiago calendar day
+      if (nextPublished && !existing.published) {
+        // Attempting to transition from Draft -> Published
+        const publishedImages = await fastify.prisma.galleryImage.findMany({
+          where: {
+            professionalId: userSession.id,
+            published: true,
+            id: { not: id },
+          },
+          select: { id: true, publishedAt: true, title: true },
+        });
+
+        const alreadyPublishedToday = publishedImages.find(
+          (p) => p.publishedAt && getSantiagoDateString(new Date(p.publishedAt)) === todaySantiago
+        );
+
+        if (alreadyPublishedToday) {
+          return reply.status(400).send({
+            error: 'DailyQuotaExceeded',
+            message: 'Hoy ya publicaste tu Espejo. Mañana puedes subir otro.',
+          });
+        }
+
+        nextPublishedAt = new Date();
+      }
+
+      if (nextPublished && !nextPublishedAt) {
+        nextPublishedAt = new Date();
       }
 
       const updated = await fastify.prisma.galleryImage.update({
@@ -170,6 +235,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           title: title !== undefined ? title : existing.title,
           published: nextPublished,
           hasFaceConsent: nextConsent,
+          publishedAt: nextPublishedAt,
           sort: sort !== undefined ? sort : existing.sort,
         },
       });

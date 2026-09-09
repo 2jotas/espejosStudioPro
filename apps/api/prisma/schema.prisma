@@ -145,6 +145,7 @@ model GalleryImage {
   sort            Int          @default(0)
   published       Boolean      @default(false)
   hasFaceConsent  Boolean      @default(false) @map("has_face_consent")
+  publishedAt     DateTime?    @map("published_at")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
