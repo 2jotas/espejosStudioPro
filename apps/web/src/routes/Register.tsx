@@ -130,7 +130,7 @@ export default function Register() {
                   required
                   value={businessName}
                   onChange={(e) => handleBusinessNameChange(e.target.value)}
-                  placeholder="Ej: Barbería Palumbo Providencia / Sofía Estética"
+                  placeholder="Ej: Espejos Studio / Bernal Barber"
                   className="w-full pl-12 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors text-sm"
                 />
               </div>

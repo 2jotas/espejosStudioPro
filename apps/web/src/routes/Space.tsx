@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Sparkles, LayoutDashboard, Calendar, Users, Scissors, Image as ImageIcon, Settings, LogOut, ExternalLink, ShieldCheck, UserCheck, Eye } from 'lucide-react';
+import { 
+  Sparkles, 
+  LayoutDashboard, 
+  Calendar, 
+  Users, 
+  Scissors, 
+  Settings, 
+  LogOut, 
+  MessageSquare, 
+  Clock, 
+  MapPin, 
+  Eye, 
+  Check 
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ServicesManager, { ServiceItem } from '../components/admin/ServicesManager';
 import ClientsManager from '../components/admin/ClientsManager';
@@ -9,9 +22,7 @@ import GalleryManager from '../components/admin/GalleryManager';
 import PricingUpgrade from '../components/admin/PricingUpgrade';
 import CalendarManager from '../components/admin/CalendarManager';
 import DashboardTab from '../components/DashboardTab';
-import MirrorGallery from '../components/public/MirrorGallery';
 import BookingWizard from '../components/booking/BookingWizard';
-import VisagismWizardModal from '../components/visagism/VisagismWizardModal';
 
 type AdminTab = 'dashboard' | 'calendar' | 'clients' | 'services' | 'gallery' | 'settings' | 'pricing';
 
@@ -21,21 +32,32 @@ export default function Space() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
 
   // Visitor View State
-  const [profInfo, setProfInfo] = useState<{ businessName: string; bio?: string; phone?: string; address?: string } | null>(null);
+  const [profInfo, setProfInfo] = useState<{ 
+    businessName: string; 
+    bio?: string; 
+    phone?: string; 
+    address?: string;
+    avatarUrl?: string;
+  } | null>(null);
   const [services, setServices] = useState<ServiceItem[]>([]);
-  const [isLoadingPublicServices, setIsLoadingPublicServices] = useState(true);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [isVisagismOpen, setIsVisagismOpen] = useState(false);
 
   const isPreviewMode = new URLSearchParams(window.location.search).get('preview') === 'true';
   const isOwner = Boolean(user && user.slug === slug && !isPreviewMode);
+
+  // Default services fallback for John / Antofagasta
+  const defaultServicesList: ServiceItem[] = [
+    { id: '1', name: 'Corte clásico / tijera', description: 'Corte tradicional a tijera o máquina, lavado y peinado.', durationMinutes: 45, price: 15000, active: true, order: 1 },
+    { id: '2', name: 'Fade', description: 'Degradado limpio (Skin fade, Mid, Low o High fade) con terminación a navaja.', durationMinutes: 45, price: 15000, active: true, order: 2 },
+    { id: '3', name: 'Corte + Barba', description: 'Servicio completo de corte personalizado y perfilado de barba con toalla tibia.', durationMinutes: 60, price: 22000, active: true, order: 3 },
+    { id: '4', name: 'Barba / Perfilado', description: 'Perfilado de contornos, rebaje y toalla tibia con aceite hidratante.', durationMinutes: 30, price: 10000, active: true, order: 4 },
+    { id: '5', name: 'Corte Niño', description: 'Corte paciente y detallado para niños de hasta 12 años.', durationMinutes: 30, price: 12000, active: true, order: 5 },
+  ];
 
   useEffect(() => {
     if (!slug) return;
     const fetchPublicData = async () => {
       try {
-        setIsLoadingPublicServices(true);
-
         const [infoRes, servicesRes] = await Promise.all([
           fetch(`/api/professionals/${slug}/info`),
           fetch(`/api/professionals/${slug}/services`),
@@ -48,18 +70,23 @@ export default function Space() {
 
         if (servicesRes.ok) {
           const data = await servicesRes.json();
-          setServices(data.services);
+          if (data.services && data.services.length > 0) {
+            setServices(data.services);
+          } else {
+            setServices(defaultServicesList);
+          }
+        } else {
+          setServices(defaultServicesList);
         }
       } catch (e) {
-        console.error(e);
-      } finally {
-        setIsLoadingPublicServices(false);
+        setServices(defaultServicesList);
       }
     };
 
     fetchPublicData();
   }, [slug]);
 
+  // VISTA ADMINISTRADOR (DUEÑO DEL ESPACIO)
   if (isOwner && user) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row selection:bg-indigo-500 selection:text-white">
@@ -100,7 +127,7 @@ export default function Space() {
                 }`}
               >
                 <Calendar className="w-4 h-4" />
-                <span>Calendario</span>
+                <span>Calendario & Citas</span>
               </button>
 
               <button
@@ -112,7 +139,7 @@ export default function Space() {
                 }`}
               >
                 <Users className="w-4 h-4" />
-                <span>Clientes (CRM)</span>
+                <span>Fichas de Clientes</span>
               </button>
 
               <button
@@ -124,19 +151,7 @@ export default function Space() {
                 }`}
               >
                 <Scissors className="w-4 h-4" />
-                <span>Servicios</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('gallery')}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors ${
-                  activeTab === 'gallery'
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <ImageIcon className="w-4 h-4" />
-                <span>Galería Espejos</span>
+                <span>Catálogo de Servicios</span>
               </button>
 
               <button
@@ -148,58 +163,32 @@ export default function Space() {
                 }`}
               >
                 <Settings className="w-4 h-4" />
-                <span>Configuración</span>
+                <span>Configuración & WhatsApp</span>
               </button>
             </nav>
           </div>
 
-          <div className="pt-6 border-t border-slate-800 mt-6">
-            <div
-              onClick={() => setActiveTab('pricing')}
-              className="bg-slate-950 p-3 rounded-2xl border border-slate-800 mb-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition-colors"
+          <div className="pt-6 border-t border-slate-800">
+            <Link
+              to={`/${user.slug}?preview=true`}
+              className="w-full flex items-center justify-center space-x-2 py-2 mb-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
             >
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Plan Actual</span>
-                <span className="text-xs font-bold text-indigo-400 uppercase">{user.plan}</span>
-              </div>
-              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold rounded-full border border-emerald-500/20">
-                Ver Planes
-              </span>
-            </div>
+              <Eye className="w-3.5 h-3.5" />
+              <span>Ver mi Link Público</span>
+            </Link>
 
             <button
-              onClick={() => logout()}
-              className="w-full flex items-center justify-center space-x-2 px-3 py-2.5 bg-slate-800/80 hover:bg-rose-500/10 hover:text-rose-400 text-slate-400 text-sm font-semibold rounded-xl transition-colors"
+              onClick={logout}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-slate-400 hover:text-rose-400 text-xs font-medium transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              <span>Cerrar sesión</span>
+              <span>Cerrar Sesión</span>
             </button>
           </div>
         </aside>
 
-        {/* Main Admin Area */}
-        <main className="flex-1 p-6 md:p-10">
-          <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div>
-              <div className="flex items-center space-x-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full w-fit mb-2">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Modo Administración (Dueño del espacio)</span>
-              </div>
-              <h1 className="text-2xl font-bold text-white">Panel de {user.businessName}</h1>
-            </div>
-
-            <a
-              href={`/${slug}?preview=true`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-sm font-semibold rounded-xl flex items-center space-x-2 w-fit transition-colors"
-            >
-              <span>Ver mi página pública</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </header>
-
-          {/* Dynamic Content by Active Tab */}
+        {/* Admin Tab Content */}
+        <main className="flex-1 p-6 md:p-10 overflow-y-auto">
           {activeTab === 'dashboard' && <DashboardTab professionalSlug={user.slug} />}
           {activeTab === 'calendar' && <CalendarManager />}
           {activeTab === 'services' && <ServicesManager />}
@@ -207,160 +196,173 @@ export default function Space() {
           {activeTab === 'settings' && <SettingsIntegrations />}
           {activeTab === 'gallery' && <GalleryManager />}
           {activeTab === 'pricing' && <PricingUpgrade />}
-
-
         </main>
       </div>
     );
   }
 
-  // Visitor View (Client / Guest Landing for Professional)
+  // =========================================================================
+  // VISTA PÚBLICA DEL CLIENTE (ESPEJOS STUDIO · ANTOFAGASTA / JOHN)
+  // =========================================================================
+  const displayName = profInfo?.businessName || (slug === 'john' ? 'John' : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Espejos Studio'));
+  const bioText = profInfo?.bio || 'Cortes clásico, fade y barba. Preciso, tranquilo, a tiempo. Pide hora aquí.';
+  const businessPhone = profInfo?.phone || '+56912345678';
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-indigo-500 selection:text-white">
-      {/* Preview Mode Top Banner for Space Owner */}
+      {/* Banner de Vista Previa si es el dueño */}
       {user && user.slug === slug && isPreviewMode && (
-        <div className="bg-indigo-600/90 text-white text-xs font-bold py-2.5 px-4 text-center flex items-center justify-center space-x-3 backdrop-blur-md sticky top-0 z-50 shadow-lg">
+        <div className="bg-indigo-600 text-white text-xs font-bold py-2.5 px-4 text-center flex items-center justify-center space-x-3 sticky top-0 z-50 shadow-lg">
           <Eye className="w-4 h-4 flex-shrink-0" />
-          <span>Vista Previa: Así es como tus clientes ven tu página de reserva pública</span>
+          <span>Vista Previa: Así es como tus clientes ven tu página de reserva</span>
           <Link
             to={`/${slug}`}
-            className="bg-slate-950 text-indigo-300 hover:text-white px-3 py-1 rounded-lg text-[11px] font-semibold border border-indigo-400/30 transition-colors"
+            className="bg-slate-950 text-indigo-300 hover:text-white px-3 py-1 rounded-lg text-[11px] font-semibold border border-indigo-400/30 transition-colors ml-2"
           >
             Volver a mi Panel
           </Link>
         </div>
       )}
 
-      {/* Background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-b from-indigo-600/20 via-purple-600/10 to-transparent blur-3xl pointer-events-none" />
+      {/* Glow Superior */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-80 bg-gradient-to-b from-indigo-600/15 via-purple-600/5 to-transparent blur-3xl pointer-events-none" />
 
-      <header className="relative z-10 max-w-4xl mx-auto w-full flex items-center justify-between p-6 md:px-0 pt-6">
-        <Link to="/" className="flex items-center space-x-2 text-slate-400 hover:text-white text-sm font-semibold transition-colors">
-          <Sparkles className="w-4 h-4 text-indigo-400" />
-          <span>Espejos</span>
-        </Link>
+      {/* Header Minimalista */}
+      <header className="relative z-10 max-w-lg mx-auto w-full flex items-center justify-between p-4 pt-5">
+        <div className="flex items-center space-x-2 text-slate-400 text-xs font-bold tracking-wider uppercase">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Espejos Studio</span>
+        </div>
+
         {user ? (
-          <span className="text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full flex items-center space-x-1.5">
-            <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Navegando como {user.slug}</span>
+          <span className="text-[11px] text-slate-400 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full">
+            {user.slug}
           </span>
         ) : (
-          <Link to="/login" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300">
-            ¿Eres el dueño? Iniciar sesión
+          <Link to="/login" className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300">
+            Acceso Profesional
           </Link>
         )}
       </header>
 
-      <main className="relative z-10 max-w-2xl mx-auto w-full my-auto text-center py-12">
-        {/* Top Branding Pill */}
-        <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-1.5 rounded-full text-indigo-400 text-xs font-bold uppercase tracking-wider mb-6 backdrop-blur-md">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Refleja Tu Mejor Versión</span>
+      {/* Above the Fold — Perfil & Agendamiento Móvil */}
+      <main className="relative z-10 max-w-lg mx-auto w-full px-4 py-6 text-center space-y-6 flex-1 flex flex-col justify-center">
+
+        {/* Foto de Perfil de John */}
+        <div className="relative inline-block mx-auto">
+          <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-[2px] shadow-2xl shadow-indigo-500/20">
+            <div className="w-full h-full bg-slate-900 rounded-[22px] overflow-hidden flex items-center justify-center">
+              {profInfo?.avatarUrl ? (
+                <img 
+                  src={profInfo.avatarUrl} 
+                  alt={displayName} 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-b from-slate-800 to-slate-950 flex items-center justify-center font-extrabold text-white text-3xl">
+                  {displayName.charAt(0)}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-slate-950 p-1 rounded-full ring-4 ring-slate-950">
+            <Check className="w-3.5 h-3.5 stroke-[3]" />
+          </div>
         </div>
 
-        {/* Business Name Header */}
-        <h1 className="text-4xl sm:text-6xl font-extrabold text-white mb-4 tracking-tight leading-tight">
-          {profInfo?.businessName || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Estudio')}
-        </h1>
+        {/* Nombre & Ubicación */}
+        <div className="space-y-1.5">
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">{displayName}</h1>
+          <div className="inline-flex items-center space-x-1.5 text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full">
+            <MapPin className="w-3.5 h-3.5" />
+            <span>Espejos Studio · Antofagasta</span>
+          </div>
+        </div>
 
-        {/* Professional Slogan / Bio */}
-        <p className="text-slate-300 text-sm sm:text-base mb-6 max-w-xl mx-auto leading-relaxed font-normal">
-          {profInfo?.bio || 'Especialistas en cortes a la medida, visagismo y cuidado personal. Reserva tu hora online y refleja tu mejor versión.'}
+        {/* Bio Fija (máx 160 caracteres) */}
+        <p className="text-slate-300 text-sm max-w-md mx-auto leading-relaxed font-normal">
+          {bioText}
         </p>
 
-        {/* Trust Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-8 text-xs font-medium text-slate-400">
-          <span className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Agendamiento 1-Tap Passkeys</span>
-          </span>
-          <span className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Confirmación Instantánea</span>
-          </span>
+        {/* Horario Real */}
+        <div className="flex items-center justify-center space-x-2 text-xs text-slate-400">
+          <Clock className="w-3.5 h-3.5 text-slate-400" />
+          <span>Lunes a Sábado: 10:00 a 20:00 hrs</span>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+        {/* CTA Principal Único */}
+        <div className="space-y-3 pt-2">
           <button
             onClick={() => setIsBookingOpen(true)}
-            className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-500/25 transition-all"
+            className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center space-x-2"
           >
-            Reservar Hora Ahora
+            <Calendar className="w-5 h-5" />
+            <span>Agendar Hora con John</span>
           </button>
 
-          <button
-            onClick={() => setIsVisagismOpen(true)}
-            className="w-full sm:w-auto px-6 py-4 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 hover:border-purple-500/60 text-purple-300 font-extrabold text-sm rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all"
+          {/* WhatsApp Directo */}
+          <a
+            href={`https://wa.me/${businessPhone.replace(/\D/g, '')}?text=Hola%20John,%20te%20escribo%20desde%20tu%20sitio%20web`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 font-semibold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors"
           >
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>Asesoría de Visagismo IA</span>
-          </button>
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>Consultar por WhatsApp</span>
+          </a>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 backdrop-blur-xl mb-8 text-left shadow-2xl space-y-4">
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 block">
-            Servicios Disponibles
-          </span>
+        {/* Lista de Servicios v1 */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-5 text-left space-y-3 pt-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Servicios & Precios
+            </span>
+            <span className="text-[11px] text-indigo-400 font-medium">Antofagasta</span>
+          </div>
 
-          {isLoadingPublicServices ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-16 bg-slate-950/60 rounded-2xl animate-pulse" />
-              ))}
-            </div>
-          ) : services.length === 0 ? (
-            <p className="text-slate-500 text-xs">No hay servicios publicados actualmente.</p>
-          ) : (
-            <div className="space-y-3">
-              {services.map((s) => (
-                <div
-                  key={s.id}
-                  className="p-4 bg-slate-950 border border-slate-800/80 rounded-2xl flex items-center justify-between"
-                >
-                  <div>
-                    <h4 className="font-bold text-white text-sm">{s.name}</h4>
-                    <p className="text-xs text-slate-400">
-                      {s.durationMinutes} min • ${s.price.toLocaleString('es-CL')} CLP
-                    </p>
+          <div className="space-y-2.5">
+            {services.map((s) => (
+              <div
+                key={s.id}
+                className="p-3.5 bg-slate-950/80 border border-slate-800/60 rounded-2xl flex items-center justify-between"
+              >
+                <div>
+                  <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                  <div className="flex items-center space-x-2 text-xs text-slate-400 mt-0.5">
+                    <span>{s.durationMinutes} min</span>
+                    <span>•</span>
+                    <span className="font-semibold text-slate-200">${s.price.toLocaleString('es-CL')} CLP</span>
                   </div>
-                  <button
-                    onClick={() => setIsBookingOpen(true)}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md transition-colors"
-                  >
-                    Reservar
-                  </button>
                 </div>
-              ))}
-            </div>
-          )}
+
+                <button
+                  onClick={() => setIsBookingOpen(true)}
+                  className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 font-semibold text-xs rounded-xl transition-all"
+                >
+                  Elegir
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Public Mirror Reflection Gallery */}
-        <MirrorGallery slug={slug!} />
       </main>
 
-      <footer className="relative z-10 max-w-4xl mx-auto w-full text-center text-xs text-slate-500">
-        Reserva tu hora en {slug} a través de Espejos Studio.
+      {/* Footer */}
+      <footer className="relative z-10 max-w-lg mx-auto w-full text-center py-4 text-[11px] text-slate-600 border-t border-slate-900">
+        Espejos Studio · Antofagasta · Todos los derechos reservados.
       </footer>
 
-      {/* Booking Wizard Modal Overlay */}
+      {/* Wizard en 4 Pasos Overlay */}
       {isBookingOpen && (
         <BookingWizard
-          slug={slug!}
-          businessName={slug!}
+          slug={slug || 'john'}
+          businessName={displayName}
+          address={profInfo?.address}
+          phone={profInfo?.phone}
           services={services}
           onClose={() => setIsBookingOpen(false)}
-        />
-      )}
-
-      {/* Visagism Wizard Modal Overlay */}
-      {isVisagismOpen && (
-        <VisagismWizardModal
-          onClose={() => setIsVisagismOpen(false)}
-          onSelectHaircutForBooking={() => {
-            setIsVisagismOpen(false);
-            setIsBookingOpen(true);
-          }}
         />
       )}
     </div>

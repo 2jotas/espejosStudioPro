@@ -81,7 +81,7 @@ export default function GalleryManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Colección de Espejos & Reflejos</h2>
+          <h2 className="text-xl font-bold text-white">Colección de Espejos Studio</h2>
           <p className="text-slate-400 text-sm">Gestiona el portafolio visual de tus trabajos. Cada foto es un reflejo de una historia única en tu cliente.</p>
         </div>
 

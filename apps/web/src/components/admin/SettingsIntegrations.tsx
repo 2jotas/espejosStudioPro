@@ -531,7 +531,7 @@ export default function SettingsIntegrations() {
               required
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="Ej: Palumbo Providencia, Bernal Barber"
+              placeholder="Ej: Espejos Studio Antofagasta, Bernal Barber"
               className="w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-indigo-500"
             />
           </div>
