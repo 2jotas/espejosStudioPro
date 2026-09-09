@@ -468,15 +468,18 @@ export default function SuperAdminDashboard() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Slug / Dominio</label>
-                  <input
-                    type="text"
-                    required
-                    value={formSlug}
-                    onChange={(e) => setFormSlug(e.target.value)}
-                    placeholder="palumbo"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 mb-1.5">Slug (URL de reserva) *</label>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-slate-500 font-mono">espejos.cl/</span>
+                    <input
+                      type="text"
+                      required
+                      value={formSlug}
+                      onChange={(e) => setFormSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      placeholder="espejos"
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Plan</label>

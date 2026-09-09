@@ -52,7 +52,7 @@ async function main() {
       slug: 'demo',
       email: 'demo@espejos.cl',
       passwordHash: defaultPasswordHash,
-      businessName: 'Estudio Demo Palumbo',
+      businessName: 'Estudio Demo',
       phone: '+56987654321',
       whatsapp: '+56987654321',
       address: 'Av. Andrés Bello 2425, Providencia, Santiago',

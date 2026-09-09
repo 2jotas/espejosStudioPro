@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, AlertCircle, MessageSquare } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, RefreshCw, User, Phone, Sliders, Plus, Edit2, Trash2, CalendarDays, Grid, ListFilter, FileText, Check, MessageSquare, CheckCircle2, UserX } from 'lucide-react';
 import { ServiceItem } from './ServicesManager';
+import TechnicalSheetModal from './TechnicalSheetModal';
 
 export interface AppointmentItem {
   id: string;
@@ -73,111 +74,21 @@ export default function CalendarManager() {
   const [disabledDays, setDisabledDays] = useState<number[]>([2, 3]); // 2: Tuesday, 3: Wednesday
   const [disabledSpecificDates, setDisabledSpecificDates] = useState<string[]>([]); // YYYY-MM-DD override
 
-  // Modal State for Client Technical Profile & Reassign CRM
-  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [activeAppForProfile, setActiveAppForProfile] = useState<AppointmentItem | null>(null);
-  const [allCrmClients, setAllCrmClients] = useState<Array<{ id: string; firstName: string; lastName: string; phone: string }>>([]);
-  const [clientSearchQuery, setClientSearchQuery] = useState('');
-  const [editClientFirstName, setEditClientFirstName] = useState('');
-  const [editClientLastName, setEditClientLastName] = useState('');
-  const [editClientPhone, setEditClientPhone] = useState('');
-  const [technicalNotes, setTechnicalNotes] = useState('');
-  const [isSavingTechProfile, setIsSavingTechProfile] = useState(false);
-  const [techProfileMsg, setTechProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // Technical Sheet Modal v1 for Fast Closing
+  const [isTechSheetModalOpen, setIsTechSheetModalOpen] = useState(false);
+  const [techSheetApp, setTechSheetApp] = useState<AppointmentItem | null>(null);
 
-  const openClientProfileModal = async (app: AppointmentItem) => {
-    setActiveAppForProfile(app);
-    setEditClientFirstName(app.client.firstName || '');
-    setEditClientLastName(app.client.lastName || '');
-    setEditClientPhone(app.client.phone || '');
-    setTechnicalNotes('');
-    setClientSearchQuery('');
-    setTechProfileMsg(null);
-    setIsClientModalOpen(true);
+  const handleMarkAsDone = (app: AppointmentItem) => {
+    setTechSheetApp(app);
+    setIsTechSheetModalOpen(true);
+  };
 
-    try {
-      // Fetch all clients to allow searching & reassigning
-      const clientRes = await fetch('/api/clients');
-      if (clientRes.ok) {
-        const data = await clientRes.json();
-        setAllCrmClients(data.clients || []);
-      }
-
-      // Fetch client profile notes
-      if (app.client.id) {
-        const singleClientRes = await fetch(`/api/clients/${app.client.id}`);
-        if (singleClientRes.ok) {
-          const cData = await singleClientRes.json();
-          setTechnicalNotes(cData.client?.profile?.notes || '');
-          if (cData.client?.firstName) setEditClientFirstName(cData.client.firstName);
-          if (cData.client?.lastName) setEditClientLastName(cData.client.lastName);
-          if (cData.client?.phone) setEditClientPhone(cData.client.phone);
-        }
-      }
-    } catch (e) {
-      console.error('Error cargando ficha de cliente:', e);
+  const handleTechSheetSaved = async () => {
+    if (techSheetApp) {
+      await handleUpdateStatus(techSheetApp.id, 'completed');
     }
   };
 
-  const handleSaveClientDetailsAndNotes = async () => {
-    if (!activeAppForProfile) return;
-    try {
-      setIsSavingTechProfile(true);
-      setTechProfileMsg(null);
-
-      // 1. Update Appointment Client Name & Phone
-      const updateAppRes = await fetch(`/api/appointments/${activeAppForProfile.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientFirstName: editClientFirstName,
-          clientLastName: editClientLastName,
-          clientPhone: editClientPhone,
-        }),
-      });
-
-      if (!updateAppRes.ok) throw new Error('Error al actualizar datos del cliente');
-
-      // 2. Save Technical Notes if Client ID exists
-      if (activeAppForProfile.client.id) {
-        await fetch(`/api/clients/${activeAppForProfile.client.id}/profile`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: technicalNotes }),
-        });
-      }
-
-      await fetchAppointments();
-      setTechProfileMsg({ type: 'success', text: '¡Cliente y Ficha Técnica guardados e integrados exitosamente en la base de datos!' });
-    } catch (e: any) {
-      setTechProfileMsg({ type: 'error', text: e.message || 'Error guardando datos' });
-    } finally {
-      setIsSavingTechProfile(false);
-    }
-  };
-
-  const handleReassignClientToAppointment = async (targetClientId: string) => {
-    if (!activeAppForProfile || !targetClientId) return;
-    try {
-      setIsSavingTechProfile(true);
-      setTechProfileMsg(null);
-
-      const res = await fetch(`/api/appointments/${activeAppForProfile.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: targetClientId }),
-      });
-
-      if (!res.ok) throw new Error('Error al vincular el cliente');
-
-      await fetchAppointments();
-      setTechProfileMsg({ type: 'success', text: 'Cita vinculada exitosamente al historial del cliente seleccionado' });
-    } catch (e: any) {
-      setTechProfileMsg({ type: 'error', text: e.message });
-    } finally {
-      setIsSavingTechProfile(false);
-    }
-  };
   // Modal State for New / Edit Appointment
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentItem | null>(null);
@@ -748,55 +659,77 @@ export default function CalendarManager() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {/* 1. WhatsApp */}
                       <button
                         onClick={() => handleSendWhatsAppReminder(app)}
-                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 shadow-sm"
-                        title="Enviar Recordatorio por WhatsApp"
+                        className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
+                        title="Enviar mensaje de WhatsApp"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
-                        <span>WhatsApp</span>
+                        <span className="hidden sm:inline">WhatsApp</span>
                       </button>
 
-                      <button
-                        onClick={() => openClientProfileModal(app)}
-                        className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 text-indigo-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 shadow-sm"
-                        title="Ver Ficha Técnica y Vincular con Cliente CRM"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Ficha CRM</span>
-                      </button>
+                      {/* 2. Llegó (Confirmar llegada) */}
+                      {app.status !== 'confirmed' && app.status !== 'completed' && (
+                        <button
+                          onClick={() => handleUpdateStatus(app.id, 'confirmed')}
+                          disabled={updatingId === app.id}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center space-x-1"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Llegó</span>
+                        </button>
+                      )}
 
+                      {/* 3. Listo (Cerrar cita con Ficha Técnica obligatoria) */}
+                      {app.status !== 'completed' && (
+                        <button
+                          onClick={() => handleMarkAsDone(app)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center space-x-1"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Listo</span>
+                        </button>
+                      )}
+
+                      {/* 4. No-Show */}
+                      {app.status !== 'completed' && app.status !== 'cancelled' && (
+                        <button
+                          onClick={() => handleUpdateStatus(app.id, 'cancelled')}
+                          disabled={updatingId === app.id}
+                          className="px-2.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
+                          title="Marcar como No-Show / Inasistencia"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">No-show</span>
+                        </button>
+                      )}
+
+                      {/* 5. Reagendar / Editar */}
                       <button
                         onClick={() => openEditModal(app)}
-                        className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1"
-                        title="Editar cita"
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1"
+                        title="Reagendar cita"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Editar</span>
+                        <span className="hidden sm:inline">Reagendar</span>
                       </button>
 
-                      {app.status === 'confirmed' && (
-                        <>
-                          <button
-                            onClick={() => handleUpdateStatus(app.id, 'completed')}
-                            disabled={updatingId === app.id}
-                            className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white text-xs font-semibold rounded-xl transition-all"
-                          >
-                            Completada
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(app.id, 'cancelled')}
-                            disabled={updatingId === app.id}
-                            className="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 border border-rose-500/30 text-rose-300 hover:text-white text-xs font-semibold rounded-xl transition-all"
-                          >
-                            Cancelar
-                          </button>
-                        </>
-                      )}
+                      {/* 6. Ficha Técnica CRM */}
+                      <button
+                        onClick={() => {
+                          setTechSheetApp(app);
+                          setIsTechSheetModalOpen(true);
+                        }}
+                        className="p-1.5 bg-slate-800 hover:bg-indigo-600/30 text-indigo-400 rounded-xl transition-colors"
+                        title="Ver / Editar Ficha Técnica"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </button>
 
                       <button
                         onClick={() => handleDeleteAppointment(app.id)}
-                        className="p-2 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl transition-colors"
+                        className="p-1.5 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl transition-colors"
                         title="Eliminar de base de datos"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1052,177 +985,16 @@ export default function CalendarManager() {
         </div>
       )}
 
-      {/* CLIENT TECHNICAL PROFILE & CRM REASSIGN MODAL */}
-      {isClientModalOpen && activeAppForProfile && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative space-y-5 text-left max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-                  <User className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    Gestión de Cliente & Ficha Técnica CRM
-                  </h3>
-                  <p className="text-slate-400 text-xs">
-                    Completa la ficha técnica o vincula esta cita al historial de un cliente
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsClientModalOpen(false)}
-                className="text-slate-400 hover:text-white text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            {techProfileMsg && (
-              <div
-                className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center space-x-2 ${
-                  techProfileMsg.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                }`}
-              >
-                {techProfileMsg.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                <span>{techProfileMsg.text}</span>
-              </div>
-            )}
-
-            {/* Option 1: Search & Match Existing Client in CRM */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                  <User className="w-4 h-4 text-indigo-400" />
-                  <span>1. Buscar & Vincular a Cliente Registrado</span>
-                </h4>
-                <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 font-mono">
-                  {allCrmClients.length} clientes en CRM
-                </span>
-              </div>
-              <p className="text-slate-400 text-[11px] leading-relaxed">
-                Si este cliente ya existía en tu base de datos y deseas sumarle esta cita a su historial, búscalo por nombre o teléfono:
-              </p>
-
-              <input
-                type="text"
-                value={clientSearchQuery}
-                onChange={(e) => setClientSearchQuery(e.target.value)}
-                placeholder="Escribe para buscar cliente por nombre o teléfono..."
-                className="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-indigo-500"
-              />
-
-              {clientSearchQuery && (
-                <div className="max-h-36 overflow-y-auto space-y-1.5 bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  {allCrmClients
-                    .filter(
-                      (c) =>
-                        c.firstName.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-                        c.lastName.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-                        c.phone.includes(clientSearchQuery)
-                    )
-                    .map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800 text-xs"
-                      >
-                        <div>
-                          <span className="font-bold text-white block">
-                            {c.firstName} {c.lastName}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">{c.phone}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleReassignClientToAppointment(c.id)}
-                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px]"
-                        >
-                          Vincular Cita
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Option 2: Edit / Create Client Details & Technical File */}
-            <div className="space-y-3 text-xs bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <h4 className="font-bold text-white text-xs flex items-center space-x-1.5">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <span>2. Ficha Técnica & Registro del Cliente</span>
-              </h4>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 block">Nombre</label>
-                  <input
-                    type="text"
-                    value={editClientFirstName}
-                    onChange={(e) => setEditClientFirstName(e.target.value)}
-                    placeholder="Francisco"
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 block">Apellido</label>
-                  <input
-                    type="text"
-                    value={editClientLastName}
-                    onChange={(e) => setEditClientLastName(e.target.value)}
-                    placeholder="Pérez"
-                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 block">Teléfono / WhatsApp</label>
-                <input
-                  type="text"
-                  value={editClientPhone}
-                  onChange={(e) => setEditClientPhone(e.target.value)}
-                  placeholder="+56 9 1234 5678"
-                  className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 block">
-                  Anotaciones Técnicas (Visagismo, Fórmula de tinte, Observaciones)
-                </label>
-                <textarea
-                  rows={3}
-                  value={technicalNotes}
-                  onChange={(e) => setTechnicalNotes(e.target.value)}
-                  placeholder="Ej: Visagismo ovalado, degradado medio con máquina 1.5, fórmula de coloración 6.1..."
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:outline-none focus:border-indigo-500 leading-relaxed"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSaveClientDetailsAndNotes}
-                disabled={isSavingTechProfile}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all"
-              >
-                <Check className="w-4 h-4" />
-                <span>{isSavingTechProfile ? 'Guardando en CRM...' : 'Guardar Cliente & Ficha Técnica en CRM'}</span>
-              </button>
-            </div>
-
-            <div className="pt-1 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => setIsClientModalOpen(false)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Modal Ficha Técnica Estructurada v1 */}
+      {isTechSheetModalOpen && techSheetApp && techSheetApp.client.id && (
+        <TechnicalSheetModal
+          clientId={techSheetApp.client.id}
+          clientName={`${techSheetApp.client.firstName} ${techSheetApp.client.lastName}`}
+          clientPhone={techSheetApp.client.phone}
+          onClose={() => setIsTechSheetModalOpen(false)}
+          onSaved={handleTechSheetSaved}
+          isMandatoryToClose={techSheetApp.status !== 'completed'}
+        />
       )}
     </div>
   );
