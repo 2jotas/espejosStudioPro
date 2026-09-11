@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type LookId = 'none' | 'editorial' | 'profesional' | 'vintage';
+export type LookId = 'none' | 'estudio' | 'campana';
 
 export interface LookOption {
   id: LookId;
@@ -47,39 +47,32 @@ export const LOOK_OPTIONS: LookOption[] = [
     accentColor: 'text-slate-300 border-slate-700 bg-slate-800/50',
   },
   {
-    id: 'editorial',
-    name: 'Editorial',
-    badge: '✨ Editorial',
+    id: 'estudio',
+    name: 'Estudio',
+    badge: '✨ Estudio',
     icon: '✨',
-    cssFilter: 'contrast(1.18) saturate(0.92) brightness(0.96) sepia(0.12)',
-    description: 'Tono ámbar/bronce suave, negros profundos y textura nítida.',
-    accentColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.15)]',
-  },
-  {
-    id: 'profesional',
-    name: 'Profesional',
-    badge: '❄️ Profesional',
-    icon: '❄️',
-    cssFilter: 'contrast(1.12) saturate(0.85) brightness(1.02)',
-    description: 'Tono frío limpio que compensa luces LED amarillas de salón.',
+    cssFilter: 'contrast(1.08) brightness(1.02) saturate(0.94)',
+    description: 'Corrección neutra de luz LED, contraste limpio y textura nítida sin filtros pesados.',
     accentColor: 'text-indigo-300 border-indigo-500/30 bg-indigo-500/10 shadow-[0_0_10px_rgba(99,102,241,0.15)]',
   },
   {
-    id: 'vintage',
-    name: 'Vintage',
-    badge: '🎞️ Vintage',
-    icon: '🎞️',
-    cssFilter: 'sepia(0.28) contrast(0.88) brightness(1.08) saturate(0.75)',
-    description: 'Negros mate/fade atenuados, tono sepia suave y viñeta.',
-    accentColor: 'text-orange-300 border-orange-500/30 bg-orange-500/10 shadow-[0_0_10px_rgba(249,115,22,0.15)]',
+    id: 'campana',
+    name: 'Campaña',
+    badge: '🌟 Campaña',
+    icon: '🌟',
+    cssFilter: 'contrast(1.10) brightness(1.01) saturate(0.95) sepia(0.03)',
+    description: 'Base neutra de estudio con negros más profundos y calidez sutil en piel.',
+    accentColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.15)]',
   },
 ];
 
 export function getLookOption(lookId?: string | null): LookOption {
   if (!lookId) return LOOK_OPTIONS[0];
   const clean = lookId.toLowerCase().trim();
-  if (clean === 'espejos_editorial' || clean === 'golden' || clean === 'bokeh') return LOOK_OPTIONS.find(o => o.id === 'editorial')!;
-  if (clean === 'espejos_neutral') return LOOK_OPTIONS.find(o => o.id === 'profesional')!;
+  if (clean === 'campana' || clean === 'campaña') return LOOK_OPTIONS.find(o => o.id === 'campana')!;
+  if (clean === 'estudio' || clean === 'studio' || clean === 'editorial' || clean === 'profesional' || clean === 'vintage' || clean === 'golden' || clean === 'bokeh' || clean === 'espejos_editorial' || clean === 'espejos_neutral') {
+    return LOOK_OPTIONS.find(o => o.id === 'estudio')!;
+  }
   return LOOK_OPTIONS.find(o => o.id === clean) || LOOK_OPTIONS[0];
 }
 
@@ -138,7 +131,7 @@ export default function GalleryManager() {
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [todayQuota, setTodayQuota] = useState<TodayQuota | null>(null);
   const [bulkImportEnabled, setBulkImportEnabled] = useState<boolean>(false);
-  const [tenantDefaultLook, setTenantDefaultLook] = useState<string>('editorial');
+  const [tenantDefaultLook, setTenantDefaultLook] = useState<string>('estudio');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [bakingId, setBakingId] = useState<string | null>(null);
@@ -152,7 +145,7 @@ export default function GalleryManager() {
   
   // Look preview & comparison modal
   const [modalItem, setModalItem] = useState<GalleryItem | null>(null);
-  const [selectedPreviewLook, setSelectedPreviewLook] = useState<LookId>('editorial');
+  const [selectedPreviewLook, setSelectedPreviewLook] = useState<LookId>('estudio');
   const [showOriginalHold, setShowOriginalHold] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -270,7 +263,7 @@ export default function GalleryManager() {
   // Open Look Modal for specific image
   const handleOpenLookModal = (img: GalleryItem) => {
     setModalItem(img);
-    const currentLook = (img.appliedLook || tenantDefaultLook || 'editorial') as LookId;
+    const currentLook = (img.appliedLook || tenantDefaultLook || 'estudio') as LookId;
     setSelectedPreviewLook(currentLook);
     setShowOriginalHold(false);
   };
@@ -978,7 +971,7 @@ export default function GalleryManager() {
                 <span className="text-[11px] text-slate-500">Preview instantáneo en vivo</span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-3 gap-3">
                 {LOOK_OPTIONS.map((opt) => {
                   const isSelected = selectedPreviewLook === opt.id;
                   const isCurrentBaked = modalItem.appliedLook === opt.id;

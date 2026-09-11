@@ -8,16 +8,15 @@ export interface ProcessedGalleryImage {
   rawUrl: string;
 }
 
-export type GalleryLookPreset = 'none' | 'editorial' | 'profesional' | 'vintage';
+export type GalleryLookPreset = 'none' | 'estudio' | 'campana';
 
-export const VALID_LOOKS: GalleryLookPreset[] = ['none', 'editorial', 'profesional', 'vintage'];
+export const VALID_LOOKS: GalleryLookPreset[] = ['none', 'estudio', 'campana'];
 
 export function normalizeLookPreset(look?: string | null): GalleryLookPreset {
   if (!look) return 'none';
   const clean = look.toLowerCase().trim();
-  if (clean === 'espejos_editorial' || clean === 'editorial' || clean === 'golden' || clean === 'bokeh') return 'editorial';
-  if (clean === 'espejos_neutral' || clean === 'profesional' || clean === 'professional') return 'profesional';
-  if (clean === 'vintage') return 'vintage';
+  if (clean === 'campana' || clean === 'campaña') return 'campana';
+  if (clean === 'estudio' || clean === 'studio' || clean === 'editorial' || clean === 'profesional' || clean === 'vintage' || clean === 'golden' || clean === 'bokeh' || clean === 'espejos_editorial' || clean === 'espejos_neutral') return 'estudio';
   return 'none';
 }
 
@@ -32,126 +31,77 @@ export class GalleryStorageService {
   }
 
   /**
-   * 1. EDITORIAL (MÁS MARCADO):
-   * - Piel cálida ámbar/bronce rica y presente (sin naranja/sepia extremo)
-   * - Negros más hondos y punch en contraste
-   * - Highlights controlados
-   * - Microcontraste y grano fino sutil en textura de fade y corte
-   * - Viñeta periférica sutil
+   * 1. ESTUDIO (Sharp, sutil y limpio - Default John):
+   * - Neutraliza dominante amarillo/verde de iluminación LED de salón
+   * - Contraste nítido 1.08, brillo 1.02, saturación 0.94 (sin desaturar piel a gris)
+   * - Enfoque leve (sigma 0.85) para definición limpia de textura y corte
+   * - SIN sepia, SIN hue-rotate, SIN viñeta pesada, SIN grano sucio
    */
-  private async applyEditorialLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    const editorialWarmMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [1.045, 0.012, 0.000],
-      [0.006, 0.982, 0.008],
-      [0.000, 0.008, 0.925],
-    ];
-
-    const vignetteSvg = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="vignetteEditorial" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
-            <stop offset="50%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.25" />
-          </radialGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#vignetteEditorial)" />
-      </svg>
-    `;
-
-    return await sharp(buffer)
-      .recomb(editorialWarmMatrix)
-      .modulate({
-        brightness: 0.98,
-        saturation: 0.95,
-      })
-      .linear([1.08, 1.07, 1.04], [-10, -9, -6])
-      .sharpen({
-        sigma: 1.25,
-        m1: 1.1,
-        m2: 2.2,
-        x1: 2,
-        y2: 12,
-        y3: 24,
-      })
-      .composite([
-        {
-          input: Buffer.from(vignetteSvg),
-          blend: 'over',
-        },
-      ])
-      .toBuffer();
-  }
-
-  /**
-   * 2. PROFESIONAL:
-   * - Frío limpio, rebalancea LED amarillo/verde de salón
-   * - Contraste moderado, detalle limpio en piel y fade
-   * - Sharpen nítido, sin grano
-   */
-  private async applyProfesionalLook(buffer: Buffer): Promise<Buffer> {
-    const rebalanceMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [0.97, 0.00, 0.01],
-      [0.00, 0.96, 0.01],
-      [0.01, 0.01, 1.04],
+  private async applyEstudioLook(buffer: Buffer): Promise<Buffer> {
+    const neutralMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [0.99, 0.00, 0.01],
+      [0.00, 0.97, 0.01],
+      [0.01, 0.01, 1.02],
     ];
 
     return await sharp(buffer)
-      .recomb(rebalanceMatrix)
+      .recomb(neutralMatrix)
       .modulate({
         brightness: 1.02,
-        saturation: 0.91,
+        saturation: 0.94,
       })
-      .linear([1.04, 1.04, 1.04], [-4, -4, -2])
+      .linear([1.08, 1.08, 1.08], [-6, -6, -6])
       .sharpen({
-        sigma: 1.1,
-        m1: 0.9,
-        m2: 1.8,
-        x1: 2,
-        y2: 10,
-        y3: 20,
-      })
-      .toBuffer();
-  }
-
-  /**
-   * 3. VINTAGE:
-   * - Fade en negros / mate sutil, highlights atenuados
-   * - Tono sepia cálido suave + desaturación elegante
-   * - Viñeta oscura marcada y grano fino
-   */
-  private async applyVintageLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    const vintageMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [1.03, 0.02, 0.00],
-      [0.01, 0.96, 0.01],
-      [0.00, 0.02, 0.85],
-    ];
-
-    const vignetteSvg = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="vignetteVintage" cx="50%" cy="50%" r="62%" fx="50%" fy="50%">
-            <stop offset="45%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.30" />
-          </radialGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#vignetteVintage)" />
-      </svg>
-    `;
-
-    return await sharp(buffer)
-      .recomb(vintageMatrix)
-      .modulate({
-        brightness: 1.04,
-        saturation: 0.78,
-      })
-      .linear([0.92, 0.90, 0.86], [16, 12, 6]) // Fade / matte curve
-      .sharpen({
-        sigma: 0.95,
-        m1: 0.75,
-        m2: 1.5,
+        sigma: 0.85,
+        m1: 0.8,
+        m2: 1.6,
         x1: 2,
         y2: 8,
         y3: 16,
+      })
+      .toBuffer();
+  }
+
+  /**
+   * 2. CAMPAÑA:
+   * - Misma base neutra y limpia de Estudio
+   * - Negros más hondos (linear [1.10, 1.09, 1.08], [-10, -9, -8])
+   * - Calidez de piel mínima (<3% ámbar), saturación 0.95
+   * - Viñeta ultra-suave ≤8% y pelo nítido (sigma 0.95)
+   */
+  private async applyCampanaLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const campanaMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [1.02, 0.01, 0.00],
+      [0.00, 0.98, 0.01],
+      [0.00, 0.00, 0.98],
+    ];
+
+    const vignetteSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="vignetteCampana" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
+            <stop offset="60%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.08" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#vignetteCampana)" />
+      </svg>
+    `;
+
+    return await sharp(buffer)
+      .recomb(campanaMatrix)
+      .modulate({
+        brightness: 1.01,
+        saturation: 0.95,
+      })
+      .linear([1.10, 1.09, 1.08], [-10, -9, -8])
+      .sharpen({
+        sigma: 0.95,
+        m1: 1.0,
+        m2: 2.0,
+        x1: 2,
+        y2: 10,
+        y3: 20,
       })
       .composite([
         {
@@ -165,12 +115,10 @@ export class GalleryStorageService {
   async applyLook(buffer: Buffer, look: string = 'none', width: number = 1280, height: number = 1600): Promise<Buffer> {
     const preset = normalizeLookPreset(look);
     switch (preset) {
-      case 'editorial':
-        return await this.applyEditorialLook(buffer, width, height);
-      case 'profesional':
-        return await this.applyProfesionalLook(buffer);
-      case 'vintage':
-        return await this.applyVintageLook(buffer, width, height);
+      case 'estudio':
+        return await this.applyEstudioLook(buffer);
+      case 'campana':
+        return await this.applyCampanaLook(buffer, width, height);
       case 'none':
       default:
         return buffer;
