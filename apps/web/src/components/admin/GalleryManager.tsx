@@ -71,6 +71,7 @@ export default function GalleryManager() {
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [todayQuota, setTodayQuota] = useState<TodayQuota | null>(null);
   const [bulkImportEnabled, setBulkImportEnabled] = useState<boolean>(false);
+  const [galleryLook, setGalleryLook] = useState<string>('none');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export default function GalleryManager() {
       const data = await res.json();
       setImages(data.images || []);
       setBulkImportEnabled(Boolean(data.bulkImportEnabled));
+      setGalleryLook(data.galleryLook || 'none');
       if (data.todayQuota) {
         setTodayQuota(data.todayQuota);
       }
@@ -345,6 +347,28 @@ export default function GalleryManager() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
+  // Reprocess existing images with active look
+  const handleReprocess = async () => {
+    if (!window.confirm('¿Reprocesar todas las fotos de tu galería con el look actual ("Espejos Neutral+")?')) return;
+    try {
+      setIsUploading(true);
+      setUploadProgress('Reprocesando fotos con el grade Espejos Neutral+...');
+      const res = await fetch('/api/gallery/reprocess', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(`✨ ${data.message}`);
+        fetchGallery();
+      } else {
+        throw new Error(data.message || 'Error al reprocesar.');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error al reprocesar fotos.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+
   const publishedCount = images.filter((img) => img.published).length;
 
   return (
@@ -352,12 +376,18 @@ export default function GalleryManager() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <div className="flex items-center space-x-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Sparkles className="w-5 h-5 text-indigo-400" />
             <h2 className="text-xl font-extrabold text-white">Galería Espejos</h2>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               {publishedCount} / 12 publicadas
             </span>
+            {galleryLook === 'espejos_neutral' && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-[#8B7CFF] border border-[#8B7CFF]/30 flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                Look: Espejos Neutral+
+              </span>
+            )}
             {bulkImportEnabled && (
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
                 <Layers className="w-3 h-3" />
@@ -370,8 +400,20 @@ export default function GalleryManager() {
           </p>
         </div>
 
-        {/* Upload Button */}
-        <div>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          {images.length > 0 && galleryLook === 'espejos_neutral' && (
+            <button
+              onClick={handleReprocess}
+              disabled={isUploading}
+              className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              title="Aplica el look Espejos Neutral+ a todas las fotos existentes"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#8B7CFF]" />
+              <span>Reprocesar Look</span>
+            </button>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"

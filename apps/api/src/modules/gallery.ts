@@ -61,13 +61,13 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
 
-    // GET /api/gallery - Get all gallery items (Drafts + Published) with Santiago daily quota status & bulk flag
+    // GET /api/gallery - Get all gallery items (Drafts + Published) with Santiago daily quota status & bulk/look flags
     protectedRoutes.get('/gallery', async (request) => {
       const userSession = request.userSession!;
 
       const professional = await fastify.prisma.professional.findUnique({
         where: { id: userSession.id },
-        select: { galleryBulkImportEnabled: true },
+        select: { galleryBulkImportEnabled: true, galleryLook: true },
       });
 
       const images = await fastify.prisma.galleryImage.findMany({
@@ -86,6 +86,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       return {
         images,
         bulkImportEnabled: professional ? professional.galleryBulkImportEnabled : false,
+        galleryLook: professional?.galleryLook || 'none',
         todayQuota: {
           isPublishedToday: Boolean(todayPublished),
           todayPublishedId: todayPublished ? todayPublished.id : null,
@@ -95,32 +96,97 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       };
     });
 
-    // PATCH /api/gallery/settings - Toggle bulk import flag
+    // PATCH /api/gallery/settings - Toggle bulk import flag or gallery look preset
     protectedRoutes.patch<{
-      Body: { bulkImportEnabled: boolean };
+      Body: { bulkImportEnabled?: boolean; galleryLook?: string };
     }>('/gallery/settings', async (request, reply) => {
       const userSession = request.userSession!;
-      const { bulkImportEnabled } = request.body;
+      const { bulkImportEnabled, galleryLook } = request.body;
 
-      if (typeof bulkImportEnabled !== 'boolean') {
-        return reply.status(400).send({ error: 'InvalidRequest', message: 'Se requiere bulkImportEnabled como booleano.' });
+      const updateData: { galleryBulkImportEnabled?: boolean; galleryLook?: string } = {};
+
+      if (bulkImportEnabled !== undefined) {
+        if (typeof bulkImportEnabled !== 'boolean') {
+          return reply.status(400).send({ error: 'InvalidRequest', message: 'Se requiere bulkImportEnabled como booleano.' });
+        }
+        updateData.galleryBulkImportEnabled = bulkImportEnabled;
+      }
+
+      if (galleryLook !== undefined) {
+        if (!['none', 'espejos_neutral'].includes(galleryLook)) {
+          return reply.status(400).send({ error: 'InvalidRequest', message: 'Look no soportado. Opciones: "none" | "espejos_neutral".' });
+        }
+        updateData.galleryLook = galleryLook;
       }
 
       const updated = await fastify.prisma.professional.update({
         where: { id: userSession.id },
-        data: { galleryBulkImportEnabled: bulkImportEnabled },
-        select: { id: true, galleryBulkImportEnabled: true },
+        data: updateData,
+        select: { id: true, galleryBulkImportEnabled: true, galleryLook: true },
       });
 
       return {
-        message: `Modo archivo ${bulkImportEnabled ? 'activado' : 'desactivado'}.`,
+        message: 'Ajustes de galería actualizados.',
         bulkImportEnabled: updated.galleryBulkImportEnabled,
+        galleryLook: updated.galleryLook,
+      };
+    });
+
+    // POST /api/gallery/reprocess - Reprocess all images of the professional with current look
+    protectedRoutes.post('/gallery/reprocess', async (request, reply) => {
+      const userSession = request.userSession!;
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+        select: { id: true, galleryLook: true },
+      });
+
+      const images = await fastify.prisma.galleryImage.findMany({
+        where: { professionalId: userSession.id },
+      });
+
+      let reprocessedCount = 0;
+      const skippedIds: string[] = [];
+
+      for (const img of images) {
+        const result = await galleryStorageService.reprocessExistingImage(
+          userSession.id,
+          img.url,
+          img.rawUrl,
+          professional?.galleryLook || 'none'
+        );
+
+        if (result) {
+          await fastify.prisma.galleryImage.update({
+            where: { id: img.id },
+            data: {
+              thumbUrl: result.thumbUrl,
+              rawUrl: result.rawUrl,
+            },
+          });
+          reprocessedCount++;
+        } else {
+          skippedIds.push(img.id);
+        }
+      }
+
+      return {
+        message: `Reprocesadas ${reprocessedCount} fotos con look "${professional?.galleryLook || 'none'}".`,
+        reprocessedCount,
+        skippedCount: skippedIds.length,
+        skippedIds,
       };
     });
 
     // POST /api/gallery/upload - Upload new photo(s)
     protectedRoutes.post('/gallery/upload', async (request, reply) => {
       const userSession = request.userSession!;
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+        select: { galleryLook: true },
+      });
+      const activeLook = professional?.galleryLook || 'none';
 
       if (!request.isMultipart()) {
         return reply.status(400).send({ error: 'InvalidRequest', message: 'Se requiere multipart/form-data.' });
@@ -151,11 +217,12 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        // Process and resize (1280x1600 4:5 center crop, 480x600 thumb)
-        const { url, thumbUrl } = await galleryStorageService.processAndSaveImage(
+        // Process and resize (1280x1600 4:5 center crop, 480x600 thumb, raw saved, look applied)
+        const { url, thumbUrl, rawUrl } = await galleryStorageService.processAndSaveImage(
           userSession.id,
           part.filename,
-          buffer
+          buffer,
+          activeLook
         );
 
         const highestSort = await fastify.prisma.galleryImage.findFirst({
@@ -171,6 +238,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
             professionalId: userSession.id,
             url,
             thumbUrl,
+            rawUrl,
             title: null,
             sort: nextSort,
             published: false, // Default to Draft
@@ -339,7 +407,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'NotFound', message: 'Imagen no encontrada.' });
       }
 
-      await galleryStorageService.deleteImageFiles(image.url, image.thumbUrl);
+      await galleryStorageService.deleteImageFiles(image.url, image.thumbUrl, image.rawUrl);
       await fastify.prisma.galleryImage.delete({
         where: { id },
       });

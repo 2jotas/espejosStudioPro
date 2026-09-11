@@ -14,6 +14,8 @@ export interface UserSession {
   address?: string;
   phone?: string;
   whatsapp?: string;
+  galleryLook?: string;
+  galleryBulkImportEnabled?: boolean;
 }
 
 export interface HealthCheckResponse {
@@ -28,6 +30,7 @@ export interface GalleryItem {
   professionalId: string;
   url: string;
   thumbUrl: string | null;
+  rawUrl?: string | null;
   title: string | null;
   sort: number;
   published: boolean;
