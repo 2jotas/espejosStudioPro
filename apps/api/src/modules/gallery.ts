@@ -113,8 +113,8 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (galleryLook !== undefined) {
-        if (!['none', 'espejos_neutral'].includes(galleryLook)) {
-          return reply.status(400).send({ error: 'InvalidRequest', message: 'Look no soportado. Opciones: "none" | "espejos_neutral".' });
+        if (!['none', 'espejos_neutral', 'espejos_editorial'].includes(galleryLook)) {
+          return reply.status(400).send({ error: 'InvalidRequest', message: 'Look no soportado. Opciones: "none" | "espejos_neutral" | "espejos_editorial".' });
         }
         updateData.galleryLook = galleryLook;
       }
@@ -133,13 +133,20 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // POST /api/gallery/reprocess - Reprocess all images of the professional with current look
-    protectedRoutes.post('/gallery/reprocess', async (request, reply) => {
+    protectedRoutes.post<{
+      Body?: { look?: string };
+    }>('/gallery/reprocess', async (request, reply) => {
       const userSession = request.userSession!;
+      const { look: requestedLook } = request.body || {};
 
       const professional = await fastify.prisma.professional.findUnique({
         where: { id: userSession.id },
         select: { id: true, galleryLook: true },
       });
+
+      const activeLook = requestedLook && ['none', 'espejos_neutral', 'espejos_editorial'].includes(requestedLook)
+        ? requestedLook
+        : (professional?.galleryLook || 'none');
 
       const images = await fastify.prisma.galleryImage.findMany({
         where: { professionalId: userSession.id },
@@ -153,7 +160,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           userSession.id,
           img.url,
           img.rawUrl,
-          professional?.galleryLook || 'none'
+          activeLook
         );
 
         if (result) {
@@ -171,10 +178,65 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return {
-        message: `Reprocesadas ${reprocessedCount} fotos con look "${professional?.galleryLook || 'none'}".`,
+        message: `Reprocesadas ${reprocessedCount} fotos con look "${activeLook}".`,
         reprocessedCount,
         skippedCount: skippedIds.length,
         skippedIds,
+        activeLook,
+      };
+    });
+
+    // POST /api/gallery/:id/reprocess - Reprocess single image on demand ("Mejorar con Espejos")
+    protectedRoutes.post<{
+      Params: { id: string };
+      Body?: { look?: string };
+    }>('/gallery/:id/reprocess', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { id } = request.params;
+      const { look: requestedLook } = request.body || {};
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+        select: { id: true, galleryLook: true },
+      });
+
+      const activeLook = requestedLook && ['none', 'espejos_neutral', 'espejos_editorial'].includes(requestedLook)
+        ? requestedLook
+        : (professional?.galleryLook || 'none');
+
+      const img = await fastify.prisma.galleryImage.findUnique({
+        where: { id },
+      });
+
+      if (!img || img.professionalId !== userSession.id) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Imagen no encontrada.' });
+      }
+
+      const result = await galleryStorageService.reprocessExistingImage(
+        userSession.id,
+        img.url,
+        img.rawUrl,
+        activeLook
+      );
+
+      if (!result) {
+        return reply.status(400).send({
+          error: 'ReprocessFailed',
+          message: 'No se pudo reprocesar la imagen (archivo fuente no encontrado).',
+        });
+      }
+
+      const updated = await fastify.prisma.galleryImage.update({
+        where: { id },
+        data: {
+          thumbUrl: result.thumbUrl,
+          rawUrl: result.rawUrl,
+        },
+      });
+
+      return {
+        message: `Imagen mejorada y reprocesada con look "${activeLook}".`,
+        image: updated,
       };
     });
 

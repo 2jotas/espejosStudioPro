@@ -34,7 +34,7 @@ model Professional {
   whatsappReminderHours   Int            @default(2) @map("whatsapp_reminder_hours")
   whatsappClientTagKeyword String?       @default("cliente") @map("whatsapp_client_tag_keyword")
   galleryBulkImportEnabled Boolean       @default(true) @map("gallery_bulk_import_enabled")
-  galleryLook             String         @default("none") @map("gallery_look") // "none" | "espejos_neutral"
+  galleryLook             String         @default("none") @map("gallery_look") // "none" | "espejos_neutral" | "espejos_editorial"
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 

@@ -15,7 +15,12 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   Calendar,
-  Layers
+  Layers,
+  SlidersHorizontal,
+  X,
+  Maximize2,
+  RefreshCw,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -24,6 +29,7 @@ export interface GalleryItem {
   professionalId: string;
   url: string;
   thumbUrl: string | null;
+  rawUrl?: string | null;
   title: string | null;
   sort: number;
   published: boolean;
@@ -74,6 +80,7 @@ export default function GalleryManager() {
   const [galleryLook, setGalleryLook] = useState<string>('none');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -81,6 +88,11 @@ export default function GalleryManager() {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string>('');
   const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
+  
+  // Comparison & Preview Modal state
+  const [compareItem, setCompareItem] = useState<GalleryItem | null>(null);
+  const [showOriginal, setShowOriginal] = useState<boolean>(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchGallery = async () => {
@@ -105,6 +117,28 @@ export default function GalleryManager() {
   useEffect(() => {
     fetchGallery();
   }, []);
+
+  // Update gallery look preset
+  const handleUpdateLook = async (newLook: string) => {
+    try {
+      const res = await fetch('/api/gallery/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ galleryLook: newLook }),
+      });
+      if (res.ok) {
+        setGalleryLook(newLook);
+        const lookLabels: Record<string, string> = {
+          espejos_editorial: 'Espejos Editorial',
+          espejos_neutral: 'Espejos Neutral+',
+          none: 'Sin Look (Original)',
+        };
+        setSuccessMsg(`Look activo actualizado a "${lookLabels[newLook] || newLook}".`);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error al actualizar look.');
+    }
+  };
 
   // Sequential multi-file upload handler with real-time progress & error protection
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,13 +381,23 @@ export default function GalleryManager() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
-  // Reprocess existing images with active look
-  const handleReprocess = async () => {
-    if (!window.confirm('¿Reprocesar todas las fotos de tu galería con el look actual ("Espejos Neutral+")?')) return;
+  // Reprocess ALL existing images with active look
+  const handleReprocessAll = async () => {
+    const lookName = galleryLook === 'espejos_editorial' 
+      ? 'Espejos Editorial' 
+      : galleryLook === 'espejos_neutral' 
+      ? 'Espejos Neutral+' 
+      : 'Sin Look';
+
+    if (!window.confirm(`¿Reprocesar todas las fotos de tu galería con el look actual ("${lookName}")?`)) return;
     try {
       setIsUploading(true);
-      setUploadProgress('Reprocesando fotos con el grade Espejos Neutral+...');
-      const res = await fetch('/api/gallery/reprocess', { method: 'POST' });
+      setUploadProgress(`Reprocesando fotos con look ${lookName}...`);
+      const res = await fetch('/api/gallery/reprocess', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ look: galleryLook })
+      });
       const data = await res.json();
       if (res.ok) {
         setSuccessMsg(`✨ ${data.message}`);
@@ -366,6 +410,50 @@ export default function GalleryManager() {
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
+    }
+  };
+
+  // Reprocess SINGLE image on demand ("Mejorar con Espejos")
+  const handleReprocessSingle = async (img: GalleryItem) => {
+    try {
+      setReprocessingId(img.id);
+      const res = await fetch(`/api/gallery/${img.id}/reprocess`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ look: galleryLook }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg('✨ Foto mejorada y procesada con el look Espejos.');
+        const timestamp = Date.now();
+        setImages((prev) =>
+          prev.map((item) =>
+            item.id === img.id
+              ? {
+                  ...item,
+                  url: `${item.url.split('?')[0]}?t=${timestamp}`,
+                  thumbUrl: item.thumbUrl ? `${item.thumbUrl.split('?')[0]}?t=${timestamp}` : null,
+                }
+              : item
+          )
+        );
+        if (compareItem?.id === img.id) {
+          setCompareItem((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  url: `${prev.url.split('?')[0]}?t=${timestamp}`,
+                }
+              : null
+          );
+        }
+      } else {
+        throw new Error(data.message || 'Error al mejorar foto.');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error al procesar foto.');
+    } finally {
+      setReprocessingId(null);
     }
   };
 
@@ -382,12 +470,26 @@ export default function GalleryManager() {
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               {publishedCount} / 12 publicadas
             </span>
+            
+            {/* Look Badge */}
+            {galleryLook === 'espejos_editorial' && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.15)]">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                Look: Espejos Editorial
+              </span>
+            )}
             {galleryLook === 'espejos_neutral' && (
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-[#8B7CFF] border border-[#8B7CFF]/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-[#8B7CFF] border border-[#8B7CFF]/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(139,124,255,0.15)]">
+                <Sparkles className="w-3 h-3 text-[#8B7CFF]" />
                 Look: Espejos Neutral+
               </span>
             )}
+            {galleryLook === 'none' && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                Look: Sin Filtro (Real)
+              </span>
+            )}
+
             {bulkImportEnabled && (
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
                 <Layers className="w-3 h-3" />
@@ -400,17 +502,31 @@ export default function GalleryManager() {
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {images.length > 0 && galleryLook === 'espejos_neutral' && (
-            <button
-              onClick={handleReprocess}
-              disabled={isUploading}
-              className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-              title="Aplica el look Espejos Neutral+ a todas las fotos existentes"
+        {/* Action Buttons & Look Selector */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Preset Selector */}
+          <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5">
+            <Sliders className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={galleryLook}
+              onChange={(e) => handleUpdateLook(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-200 focus:outline-none cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#8B7CFF]" />
-              <span>Reprocesar Look</span>
+              <option value="espejos_editorial" className="bg-slate-900 text-amber-300">Look: Espejos Editorial ✨</option>
+              <option value="espejos_neutral" className="bg-slate-900 text-indigo-300">Look: Espejos Neutral+ ❄️</option>
+              <option value="none" className="bg-slate-900 text-slate-300">Sin Look (Original)</option>
+            </select>
+          </div>
+
+          {images.length > 0 && galleryLook !== 'none' && (
+            <button
+              onClick={handleReprocessAll}
+              disabled={isUploading}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              title="Aplica el look activo a todas las fotos con original raw"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${galleryLook === 'espejos_editorial' ? 'text-amber-400' : 'text-[#8B7CFF]'}`} />
+              <span>Reprocesar Todas</span>
             </button>
           )}
 
@@ -426,7 +542,7 @@ export default function GalleryManager() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center space-x-2 cursor-pointer"
+            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center space-x-2 cursor-pointer"
           >
             {isUploading ? (
               <>
@@ -545,9 +661,9 @@ export default function GalleryManager() {
       ) : (
         <div className="space-y-3.5">
           {images.map((img, idx) => {
-            const isThisPublishedToday = todayQuota?.todayPublishedId === img.id;
-            const canPublish = bulkImportEnabled || img.published || !todayQuota?.isPublishedToday || isThisPublishedToday;
+            const canPublish = bulkImportEnabled || img.published || !todayQuota?.isPublishedToday || todayQuota?.todayPublishedId === img.id;
             const currentHaircutDate = dateDrafts[img.id] !== undefined ? dateDrafts[img.id] : (toDateInputValue(img.publishedAt) || toDateInputValue(img.createdAt));
+            const isReprocessingThis = reprocessingId === img.id;
 
             return (
               <div
@@ -583,21 +699,24 @@ export default function GalleryManager() {
 
                   {/* Photo Thumbnail / Frame 4:5 Preview */}
                   <div className="flex flex-col items-center space-y-1 flex-shrink-0">
-                    <div className="w-18 sm:w-20 aspect-[4/5] rounded-xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF]/45 shadow-[0_0_10px_rgba(139,124,255,0.18)] flex-shrink-0 relative group">
+                    <div 
+                      onClick={() => {
+                        setCompareItem(img);
+                        setShowOriginal(false);
+                      }}
+                      className="w-18 sm:w-20 aspect-[4/5] rounded-xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF]/45 shadow-[0_0_10px_rgba(139,124,255,0.18)] flex-shrink-0 relative group cursor-pointer"
+                      title="Haz clic para ver preview con marco y comparar con original"
+                    >
                       <div className="absolute inset-0 ring-1 ring-white/10 ring-inset rounded-xl pointer-events-none z-10" />
                       <img
                         src={img.thumbUrl || img.url}
                         alt={img.title || 'Foto de galería'}
                         className="w-full h-full object-cover object-center"
                       />
-                      <a
-                        href={img.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity z-20"
-                      >
-                        Ver HD
-                      </a>
+                      <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[10px] font-bold transition-opacity z-20 space-y-1">
+                        <Maximize2 className="w-4 h-4 text-indigo-300" />
+                        <span>Preview</span>
+                      </div>
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">
                       {formatShortDate(img.publishedAt || currentHaircutDate)}
@@ -700,7 +819,37 @@ export default function GalleryManager() {
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex items-center space-x-2 self-end sm:self-center">
+                <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                  {/* Comparar Original vs Espejos */}
+                  {img.rawUrl && (
+                    <button
+                      onClick={() => {
+                        setCompareItem(img);
+                        setShowOriginal(false);
+                      }}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
+                      title="Comparar foto original vs terminación Espejos"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Comparar</span>
+                    </button>
+                  )}
+
+                  {/* Mejorar con Espejos (Reprocesar item individual) */}
+                  <button
+                    onClick={() => handleReprocessSingle(img)}
+                    disabled={isReprocessingThis || isUploading}
+                    className="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    title="Aplica o actualiza el look Espejos sobre esta foto"
+                  >
+                    {isReprocessingThis ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    )}
+                    <span>Mejorar</span>
+                  </button>
+
                   {/* Meta Ads Link Copy */}
                   <button
                     onClick={() => handleCopyUrl(img)}
@@ -715,7 +864,7 @@ export default function GalleryManager() {
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5 text-slate-400" />
-                        <span>URL para Ads</span>
+                        <span>URL Ads</span>
                       </>
                     )}
                   </button>
@@ -739,7 +888,7 @@ export default function GalleryManager() {
                     {img.published ? (
                       <>
                         <EyeOff className="w-3.5 h-3.5" />
-                        <span>Pasar a Borrador</span>
+                        <span>Borrador</span>
                       </>
                     ) : (
                       <>
@@ -761,6 +910,115 @@ export default function GalleryManager() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Comparison & Look Preview Modal */}
+      {compareItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-bold text-white">Preview y Comparación de Look</h3>
+              </div>
+              <button
+                onClick={() => setCompareItem(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Look Switch Toggle in Modal */}
+            <div className="flex items-center justify-center space-x-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowOriginal(false)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
+                  !showOriginal
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Terminación Espejos ({galleryLook === 'espejos_editorial' ? 'Editorial' : galleryLook === 'espejos_neutral' ? 'Neutral+' : 'Actual'})</span>
+              </button>
+              {compareItem.rawUrl && (
+                <button
+                  type="button"
+                  onClick={() => setShowOriginal(true)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
+                    showOriginal
+                      ? 'bg-slate-800 text-white border border-slate-700 shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Original (Raw)</span>
+                </button>
+              )}
+            </div>
+
+            {/* 4:5 Framed Preview Container */}
+            <div className="flex flex-col items-center justify-center py-2">
+              <div className="w-64 sm:w-72 aspect-[4/5] rounded-2xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF] shadow-[0_0_25px_rgba(139,124,255,0.3)] relative group">
+                <div className="absolute inset-0 ring-1 ring-white/10 ring-inset rounded-2xl pointer-events-none z-10" />
+                <img
+                  src={showOriginal && compareItem.rawUrl ? compareItem.rawUrl : compareItem.url}
+                  alt={compareItem.title || 'Preview'}
+                  className="w-full h-full object-cover object-center transition-all duration-300"
+                />
+
+                {/* Date Plaque Badge on bottom edge */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-950/80 backdrop-blur-md rounded-full border border-white/10 text-[10px] font-mono text-slate-300 z-20 whitespace-nowrap shadow-lg">
+                  {formatShortDate(compareItem.publishedAt || compareItem.createdAt)}
+                </div>
+
+                {/* Watermark/Status Indicator */}
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[9px] font-bold uppercase tracking-wider text-slate-300 border border-white/10 z-20">
+                  {showOriginal ? '📷 Original' : `✨ Look: ${galleryLook === 'espejos_editorial' ? 'Editorial' : 'Neutral+'}`}
+                </div>
+              </div>
+
+              {/* Hold-to-compare hint */}
+              {compareItem.rawUrl && (
+                <button
+                  onMouseDown={() => setShowOriginal(true)}
+                  onMouseUp={() => setShowOriginal(false)}
+                  onTouchStart={() => setShowOriginal(true)}
+                  onTouchEnd={() => setShowOriginal(false)}
+                  className="mt-3 text-[11px] text-slate-400 hover:text-indigo-300 font-medium cursor-pointer select-none bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/60 transition-colors"
+                >
+                  👉 Mantén presionado aquí para comparar con Original
+                </button>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+              <button
+                onClick={() => handleReprocessSingle(compareItem)}
+                disabled={reprocessingId === compareItem.id}
+                className="px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {reprocessingId === compareItem.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                )}
+                <span>Mejorar / Aplicar Look</span>
+              </button>
+
+              <button
+                onClick={() => setCompareItem(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

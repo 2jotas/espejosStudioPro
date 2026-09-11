@@ -8,7 +8,7 @@ export interface ProcessedGalleryImage {
   rawUrl: string;
 }
 
-export type GalleryLookPreset = 'none' | 'espejos_neutral';
+export type GalleryLookPreset = 'none' | 'espejos_neutral' | 'espejos_editorial';
 
 export class GalleryStorageService {
   private baseUploadDir: string;
@@ -52,6 +52,68 @@ export class GalleryStorageService {
       .toBuffer();
   }
 
+  /**
+   * Applies the signature "Espejos Editorial" grade:
+   * - Piel cálida ámbar/bronce SUAVE (no naranja, no sepia)
+   * - Negros más hondos, highlights controlados
+   * - Sat fondo un poco abajo
+   * - Grano / microcontraste MUY leve en textura de corte y fade
+   * - Viñeta periférica sutil para centrar la mirada en el corte
+   * - Pelo/cara/fade nítidos sin blur destructivo de contornos
+   * - Sin alterar rostro ni añadir elementos sintéticos
+   */
+  private async applyEspejosEditorialLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const editorialWarmMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [1.025, 0.008, 0.000],
+      [0.005, 0.985, 0.010],
+      [0.000, 0.010, 0.955],
+    ];
+
+    const vignetteSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="vignette" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
+            <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.20" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#vignette)" />
+      </svg>
+    `;
+
+    return await sharp(buffer)
+      .recomb(editorialWarmMatrix)
+      .modulate({
+        brightness: 1.00,
+        saturation: 0.94,
+      })
+      .linear([1.05, 1.04, 1.02], [-6, -5, -4])
+      .sharpen({
+        sigma: 1.15,
+        m1: 0.95,
+        m2: 1.9,
+        x1: 2,
+        y2: 10,
+        y3: 20,
+      })
+      .composite([
+        {
+          input: Buffer.from(vignetteSvg),
+          blend: 'over',
+        },
+      ])
+      .toBuffer();
+  }
+
+  private async applyLook(buffer: Buffer, look: string, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    if (look === 'espejos_editorial') {
+      return await this.applyEspejosEditorialLook(buffer, width, height);
+    } else if (look === 'espejos_neutral') {
+      return await this.applyEspejosNeutralLook(buffer);
+    }
+    return buffer;
+  }
+
   async processAndSaveImage(
     professionalId: string,
     _originalFilename: string,
@@ -86,10 +148,8 @@ export class GalleryStorageService {
         .toBuffer()
     );
 
-    // 3. Aplicar grade "Espejos Neutral+" si el preset está activo
-    if (look === 'espejos_neutral') {
-      processedBuffer = Buffer.from(await this.applyEspejosNeutralLook(processedBuffer));
-    }
+    // 3. Aplicar look configurado (editorial / neutral / none)
+    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, look, 1280, 1600));
 
     // 4. Exportar Full-size WebP (1280x1600, 85 quality)
     await sharp(processedBuffer)
@@ -113,7 +173,7 @@ export class GalleryStorageService {
     professionalId: string,
     url: string,
     rawUrl?: string | null,
-    look: string = 'espejos_neutral'
+    look: string = 'espejos_editorial'
   ): Promise<{ url: string; thumbUrl: string; rawUrl: string } | null> {
     const profDir = path.join(this.baseUploadDir, professionalId);
     
@@ -149,9 +209,7 @@ export class GalleryStorageService {
     );
 
     // 2. Apply look if active
-    if (look === 'espejos_neutral') {
-      processedBuffer = Buffer.from(await this.applyEspejosNeutralLook(processedBuffer));
-    }
+    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, look, 1280, 1600));
 
     // 3. Write full WebP
     await sharp(processedBuffer)
