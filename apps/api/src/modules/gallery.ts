@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { authenticateProfessional } from '../plugins/authHook.js';
-import { galleryStorageService } from '../lib/galleryStorage.js';
+import { galleryStorageService, normalizeLookPreset } from '../lib/galleryStorage.js';
 
 // Helper to get calendar date YYYY-MM-DD in America/Santiago timezone
 function getSantiagoDateString(date: Date = new Date()): string {
@@ -113,10 +113,14 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (galleryLook !== undefined) {
-        if (!['none', 'espejos_neutral', 'espejos_editorial'].includes(galleryLook)) {
-          return reply.status(400).send({ error: 'InvalidRequest', message: 'Look no soportado. Opciones: "none" | "espejos_neutral" | "espejos_editorial".' });
+        const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh', 'espejos_editorial', 'espejos_neutral'];
+        if (!validLookNames.includes(galleryLook.toLowerCase().trim())) {
+          return reply.status(400).send({
+            error: 'InvalidRequest',
+            message: 'Look no soportado. Opciones: "none" | "editorial" | "profesional" | "vintage" | "golden" | "bokeh".',
+          });
         }
-        updateData.galleryLook = galleryLook;
+        updateData.galleryLook = normalizeLookPreset(galleryLook);
       }
 
       const updated = await fastify.prisma.professional.update({
@@ -132,7 +136,71 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       };
     });
 
-    // POST /api/gallery/reprocess - Reprocess all images of the professional with current look
+    // POST /api/gallery/:id/apply-look - Apply/Bake look on a specific image (preserves raw)
+    protectedRoutes.post<{
+      Params: { id: string };
+      Body: { look: string };
+    }>('/gallery/:id/apply-look', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { id } = request.params;
+      const { look } = request.body || {};
+
+      if (!look || typeof look !== 'string') {
+        return reply.status(400).send({
+          error: 'InvalidRequest',
+          message: 'Se requiere el campo "look".',
+        });
+      }
+
+      const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh', 'espejos_editorial', 'espejos_neutral'];
+      if (!validLookNames.includes(look.toLowerCase().trim())) {
+        return reply.status(400).send({
+          error: 'InvalidLook',
+          message: `Look desconocido "${look}". Opciones válidas: none, editorial, profesional, vintage, golden, bokeh.`,
+        });
+      }
+
+      const normalizedLook = normalizeLookPreset(look);
+
+      const img = await fastify.prisma.galleryImage.findUnique({
+        where: { id },
+      });
+
+      if (!img || img.professionalId !== userSession.id) {
+        return reply.status(404).send({ error: 'NotFound', message: 'Imagen no encontrada.' });
+      }
+
+      const result = await galleryStorageService.reprocessExistingImage(
+        userSession.id,
+        img.url,
+        img.rawUrl,
+        normalizedLook
+      );
+
+      if (!result) {
+        return reply.status(400).send({
+          error: 'BakeFailed',
+          message: 'No se pudo aplicar el look a la imagen (archivo fuente no encontrado).',
+        });
+      }
+
+      const updated = await fastify.prisma.galleryImage.update({
+        where: { id },
+        data: {
+          thumbUrl: result.thumbUrl,
+          rawUrl: result.rawUrl,
+          appliedLook: normalizedLook,
+        },
+      });
+
+      return {
+        message: `Look "${normalizedLook}" aplicado y bakeado exitosamente.`,
+        image: updated,
+        appliedLook: normalizedLook,
+      };
+    });
+
+    // POST /api/gallery/reprocess - Reprocess all images of the professional with specified or individual look
     protectedRoutes.post<{
       Body?: { look?: string };
     }>('/gallery/reprocess', async (request, reply) => {
@@ -144,10 +212,6 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true, galleryLook: true },
       });
 
-      const activeLook = requestedLook && ['none', 'espejos_neutral', 'espejos_editorial'].includes(requestedLook)
-        ? requestedLook
-        : (professional?.galleryLook || 'none');
-
       const images = await fastify.prisma.galleryImage.findMany({
         where: { professionalId: userSession.id },
       });
@@ -156,11 +220,15 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       const skippedIds: string[] = [];
 
       for (const img of images) {
+        const lookForImg = requestedLook 
+          ? normalizeLookPreset(requestedLook) 
+          : normalizeLookPreset((img as any).appliedLook || professional?.galleryLook || 'none');
+
         const result = await galleryStorageService.reprocessExistingImage(
           userSession.id,
           img.url,
           img.rawUrl,
-          activeLook
+          lookForImg
         );
 
         if (result) {
@@ -169,6 +237,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
             data: {
               thumbUrl: result.thumbUrl,
               rawUrl: result.rawUrl,
+              appliedLook: lookForImg,
             },
           });
           reprocessedCount++;
@@ -178,15 +247,14 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return {
-        message: `Reprocesadas ${reprocessedCount} fotos con look "${activeLook}".`,
+        message: `Reprocesadas ${reprocessedCount} fotos.`,
         reprocessedCount,
         skippedCount: skippedIds.length,
         skippedIds,
-        activeLook,
       };
     });
 
-    // POST /api/gallery/:id/reprocess - Reprocess single image on demand ("Mejorar con Espejos")
+    // POST /api/gallery/:id/reprocess - Alias for apply-look / improve
     protectedRoutes.post<{
       Params: { id: string };
       Body?: { look?: string };
@@ -200,10 +268,6 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true, galleryLook: true },
       });
 
-      const activeLook = requestedLook && ['none', 'espejos_neutral', 'espejos_editorial'].includes(requestedLook)
-        ? requestedLook
-        : (professional?.galleryLook || 'none');
-
       const img = await fastify.prisma.galleryImage.findUnique({
         where: { id },
       });
@@ -211,6 +275,10 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       if (!img || img.professionalId !== userSession.id) {
         return reply.status(404).send({ error: 'NotFound', message: 'Imagen no encontrada.' });
       }
+
+      const activeLook = requestedLook 
+        ? normalizeLookPreset(requestedLook) 
+        : normalizeLookPreset((img as any).appliedLook || professional?.galleryLook || 'none');
 
       const result = await galleryStorageService.reprocessExistingImage(
         userSession.id,
@@ -231,12 +299,14 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           thumbUrl: result.thumbUrl,
           rawUrl: result.rawUrl,
+          appliedLook: activeLook,
         },
       });
 
       return {
-        message: `Imagen mejorada y reprocesada con look "${activeLook}".`,
+        message: `Imagen mejorada y bakeada con look "${activeLook}".`,
         image: updated,
+        appliedLook: activeLook,
       };
     });
 
@@ -248,7 +318,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: userSession.id },
         select: { galleryLook: true },
       });
-      const activeLook = professional?.galleryLook || 'none';
+      const activeLook = normalizeLookPreset(professional?.galleryLook || 'none');
 
       if (!request.isMultipart()) {
         return reply.status(400).send({ error: 'InvalidRequest', message: 'Se requiere multipart/form-data.' });
@@ -280,7 +350,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         // Process and resize (1280x1600 4:5 center crop, 480x600 thumb, raw saved, look applied)
-        const { url, thumbUrl, rawUrl } = await galleryStorageService.processAndSaveImage(
+        const { url, thumbUrl, rawUrl, appliedLook } = await galleryStorageService.processAndSaveImage(
           userSession.id,
           part.filename,
           buffer,
@@ -301,6 +371,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
             url,
             thumbUrl,
             rawUrl,
+            appliedLook,
             title: null,
             sort: nextSort,
             published: false, // Default to Draft

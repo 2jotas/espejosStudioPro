@@ -35,6 +35,7 @@ export interface GalleryItem {
   sort: number;
   published: boolean;
   hasFaceConsent: boolean;
+  appliedLook?: string;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;

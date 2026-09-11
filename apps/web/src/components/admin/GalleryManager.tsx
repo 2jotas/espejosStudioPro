@@ -11,18 +11,95 @@ import {
   ArrowDown, 
   AlertCircle, 
   Loader2, 
-  ShieldCheck,
-  CheckCircle2,
-  Image as ImageIcon,
-  Calendar,
-  Layers,
-  SlidersHorizontal,
-  X,
-  Maximize2,
-  RefreshCw,
-  Sliders
+  ShieldCheck, 
+  CheckCircle2, 
+  Image as ImageIcon, 
+  Calendar, 
+  Layers, 
+  SlidersHorizontal, 
+  X, 
+  Maximize2, 
+  RefreshCw, 
+  Palette
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+
+export type LookId = 'none' | 'editorial' | 'profesional' | 'vintage' | 'golden' | 'bokeh';
+
+export interface LookOption {
+  id: LookId;
+  name: string;
+  badge: string;
+  icon: string;
+  cssFilter: string;
+  description: string;
+  accentColor: string;
+}
+
+export const LOOK_OPTIONS: LookOption[] = [
+  {
+    id: 'none',
+    name: 'Original',
+    badge: '📷 Original',
+    icon: '📷',
+    cssFilter: 'none',
+    description: 'Foto real sin modificaciones ni gradación de color.',
+    accentColor: 'text-slate-300 border-slate-700 bg-slate-800/50',
+  },
+  {
+    id: 'editorial',
+    name: 'Editorial',
+    badge: '✨ Editorial',
+    icon: '✨',
+    cssFilter: 'contrast(1.18) saturate(0.92) brightness(0.96) sepia(0.12)',
+    description: 'Tono ámbar/bronce suave, negros profundos y textura nítida.',
+    accentColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.15)]',
+  },
+  {
+    id: 'profesional',
+    name: 'Profesional',
+    badge: '❄️ Profesional',
+    icon: '❄️',
+    cssFilter: 'contrast(1.12) saturate(0.85) brightness(1.02)',
+    description: 'Tono frío limpio que compensa luces LED amarillas de salón.',
+    accentColor: 'text-indigo-300 border-indigo-500/30 bg-indigo-500/10 shadow-[0_0_10px_rgba(99,102,241,0.15)]',
+  },
+  {
+    id: 'vintage',
+    name: 'Vintage',
+    badge: '🎞️ Vintage',
+    icon: '🎞️',
+    cssFilter: 'sepia(0.28) contrast(0.88) brightness(1.08) saturate(0.75)',
+    description: 'Negros mate/fade atenuados, tono sepia suave y viñeta.',
+    accentColor: 'text-orange-300 border-orange-500/30 bg-orange-500/10 shadow-[0_0_10px_rgba(249,115,22,0.15)]',
+  },
+  {
+    id: 'golden',
+    name: 'Golden',
+    badge: '🌅 Golden',
+    icon: '🌅',
+    cssFilter: 'contrast(1.08) saturate(1.15) brightness(1.04) sepia(0.18) hue-rotate(-8deg)',
+    description: 'Calidez dorada radiante y sombras abiertas estilo hora dorada.',
+    accentColor: 'text-yellow-300 border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_10px_rgba(234,179,8,0.15)]',
+  },
+  {
+    id: 'bokeh',
+    name: 'Fondo suave',
+    badge: '🎯 Fondo suave',
+    icon: '🎯',
+    cssFilter: 'contrast(1.1) brightness(0.97)',
+    description: 'Falso retrato con desenfoque suave periférico para destacar el corte.',
+    accentColor: 'text-purple-300 border-purple-500/30 bg-purple-500/10 shadow-[0_0_10px_rgba(168,85,247,0.15)]',
+  },
+];
+
+export function getLookOption(lookId?: string | null): LookOption {
+  if (!lookId) return LOOK_OPTIONS[0];
+  const clean = lookId.toLowerCase().trim();
+  if (clean === 'espejos_editorial') return LOOK_OPTIONS.find(o => o.id === 'editorial')!;
+  if (clean === 'espejos_neutral') return LOOK_OPTIONS.find(o => o.id === 'profesional')!;
+  return LOOK_OPTIONS.find(o => o.id === clean) || LOOK_OPTIONS[0];
+}
 
 export interface GalleryItem {
   id: string;
@@ -30,12 +107,14 @@ export interface GalleryItem {
   url: string;
   thumbUrl: string | null;
   rawUrl?: string | null;
+  appliedLook?: string;
   title: string | null;
   sort: number;
   published: boolean;
   hasFaceConsent: boolean;
   publishedAt: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface TodayQuota {
@@ -77,10 +156,10 @@ export default function GalleryManager() {
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [todayQuota, setTodayQuota] = useState<TodayQuota | null>(null);
   const [bulkImportEnabled, setBulkImportEnabled] = useState<boolean>(false);
-  const [galleryLook, setGalleryLook] = useState<string>('none');
+  const [tenantDefaultLook, setTenantDefaultLook] = useState<string>('editorial');
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [bakingId, setBakingId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -89,9 +168,10 @@ export default function GalleryManager() {
   const [titleDraft, setTitleDraft] = useState<string>('');
   const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
   
-  // Comparison & Preview Modal state
-  const [compareItem, setCompareItem] = useState<GalleryItem | null>(null);
-  const [showOriginal, setShowOriginal] = useState<boolean>(false);
+  // Look preview & comparison modal
+  const [modalItem, setModalItem] = useState<GalleryItem | null>(null);
+  const [selectedPreviewLook, setSelectedPreviewLook] = useState<LookId>('editorial');
+  const [showOriginalHold, setShowOriginalHold] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +183,7 @@ export default function GalleryManager() {
       const data = await res.json();
       setImages(data.images || []);
       setBulkImportEnabled(Boolean(data.bulkImportEnabled));
-      setGalleryLook(data.galleryLook || 'none');
+      setTenantDefaultLook(data.galleryLook || 'editorial');
       if (data.todayQuota) {
         setTodayQuota(data.todayQuota);
       }
@@ -118,8 +198,8 @@ export default function GalleryManager() {
     fetchGallery();
   }, []);
 
-  // Update gallery look preset
-  const handleUpdateLook = async (newLook: string) => {
+  // Update tenant's default upload look preset
+  const handleUpdateTenantLook = async (newLook: string) => {
     try {
       const res = await fetch('/api/gallery/settings', {
         method: 'PATCH',
@@ -127,20 +207,16 @@ export default function GalleryManager() {
         body: JSON.stringify({ galleryLook: newLook }),
       });
       if (res.ok) {
-        setGalleryLook(newLook);
-        const lookLabels: Record<string, string> = {
-          espejos_editorial: 'Espejos Editorial',
-          espejos_neutral: 'Espejos Neutral+',
-          none: 'Sin Look (Original)',
-        };
-        setSuccessMsg(`Look activo actualizado a "${lookLabels[newLook] || newLook}".`);
+        setTenantDefaultLook(newLook);
+        const opt = getLookOption(newLook);
+        setSuccessMsg(`Look por defecto para nuevas fotos actualizado a "${opt.name}".`);
       }
     } catch (e: any) {
       setError(e.message || 'Error al actualizar look.');
     }
   };
 
-  // Sequential multi-file upload handler with real-time progress & error protection
+  // Upload handler with client size check and auto bake
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
@@ -155,9 +231,8 @@ export default function GalleryManager() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setUploadProgress(`Subiendo y optimizando foto ${i + 1} de ${files.length} (${file.name})...`);
+      setUploadProgress(`Subiendo y aplicando look ${i + 1} de ${files.length} (${file.name})...`);
 
-      // Client-side file size check (25MB)
       if (file.size > 25 * 1024 * 1024) {
         errors.push(`"${file.name}" supera los 25 MB permitidos (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
         continue;
@@ -199,7 +274,7 @@ export default function GalleryManager() {
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     if (uploadedCount > 0) {
-      setSuccessMsg(`✅ ${uploadedCount} foto(s) subida(s) correctamente como borrador.`);
+      setSuccessMsg(`✅ ${uploadedCount} foto(s) subida(s) y procesada(s) con look "${getLookOption(tenantDefaultLook).name}".`);
       fetchGallery();
     }
     if (errors.length > 0) {
@@ -210,12 +285,98 @@ export default function GalleryManager() {
     setUploadProgress(null);
   };
 
+  // Open Look Modal for specific image
+  const handleOpenLookModal = (img: GalleryItem) => {
+    setModalItem(img);
+    const currentLook = (img.appliedLook || tenantDefaultLook || 'editorial') as LookId;
+    setSelectedPreviewLook(currentLook);
+    setShowOriginalHold(false);
+  };
+
+  // Apply & Bake look permanently on a specific photo with Sharp
+  const handleBakeLook = async (img: GalleryItem, lookToBake: LookId) => {
+    try {
+      setBakingId(img.id);
+      const res = await fetch(`/api/gallery/${img.id}/apply-look`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ look: lookToBake }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        const timestamp = Date.now();
+        const lookOpt = getLookOption(lookToBake);
+        setSuccessMsg(`✨ Look "${lookOpt.name}" aplicado y guardado en alta resolución.`);
+
+        setImages((prev) =>
+          prev.map((item) =>
+            item.id === img.id
+              ? {
+                  ...item,
+                  appliedLook: lookToBake,
+                  url: `${item.url.split('?')[0]}?t=${timestamp}`,
+                  thumbUrl: item.thumbUrl ? `${item.thumbUrl.split('?')[0]}?t=${timestamp}` : null,
+                }
+              : item
+          )
+        );
+
+        if (modalItem?.id === img.id) {
+          setModalItem((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  appliedLook: lookToBake,
+                  url: `${prev.url.split('?')[0]}?t=${timestamp}`,
+                  thumbUrl: prev.thumbUrl ? `${prev.thumbUrl.split('?')[0]}?t=${timestamp}` : null,
+                }
+              : null
+          );
+        }
+      } else {
+        throw new Error(data.message || 'Error al aplicar look.');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error al procesar look.');
+    } finally {
+      setBakingId(null);
+    }
+  };
+
+  // Reprocess ALL images
+  const handleReprocessAll = async () => {
+    const lookOpt = getLookOption(tenantDefaultLook);
+    if (!window.confirm(`¿Reprocesar todas las fotos de tu galería con el look "${lookOpt.name}"?`)) return;
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(`Reprocesando fotos con look ${lookOpt.name}...`);
+      const res = await fetch('/api/gallery/reprocess', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ look: tenantDefaultLook })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuccessMsg(`✨ ${data.message}`);
+        fetchGallery();
+      } else {
+        throw new Error(data.message || 'Error al reprocesar.');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error al reprocesar fotos.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
+
   // Toggle Publish Status
   const handleTogglePublish = async (img: GalleryItem) => {
     setError(null);
     setSuccessMsg(null);
 
-    // If trying to publish without consent
     if (!img.published && !img.hasFaceConsent) {
       setError('Debes marcar la casilla de consentimiento del cliente ("Tengo permiso del cliente") antes de publicar.');
       return;
@@ -225,7 +386,6 @@ export default function GalleryManager() {
       published: !img.published,
     };
 
-    // If publishing in Bulk mode, send haircut date
     if (!img.published && bulkImportEnabled) {
       const selectedDate = dateDrafts[img.id] || toDateInputValue(img.publishedAt) || toDateInputValue(img.createdAt);
       if (!selectedDate) {
@@ -262,7 +422,7 @@ export default function GalleryManager() {
     }
   };
 
-  // Toggle Face Consent Checkbox
+  // Toggle Consent
   const handleToggleConsent = async (img: GalleryItem, value: boolean) => {
     setError(null);
     try {
@@ -271,7 +431,6 @@ export default function GalleryManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           hasFaceConsent: value,
-          // If unchecking consent, automatically unpublish
           published: value ? img.published : false,
         }),
       });
@@ -333,7 +492,7 @@ export default function GalleryManager() {
     }
   };
 
-  // Reorder Item Up/Down
+  // Move position
   const handleMove = async (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= images.length) return;
@@ -372,7 +531,7 @@ export default function GalleryManager() {
     }
   };
 
-  // Copy Direct Public URL for Meta Ads
+  // Copy Ads URL
   const handleCopyUrl = (img: GalleryItem) => {
     const baseUrl = window.location.origin;
     const fullPublicUrl = `${baseUrl}${img.url}`;
@@ -381,83 +540,8 @@ export default function GalleryManager() {
     setTimeout(() => setCopiedId(null), 2500);
   };
 
-  // Reprocess ALL existing images with active look
-  const handleReprocessAll = async () => {
-    const lookName = galleryLook === 'espejos_editorial' 
-      ? 'Espejos Editorial' 
-      : galleryLook === 'espejos_neutral' 
-      ? 'Espejos Neutral+' 
-      : 'Sin Look';
-
-    if (!window.confirm(`¿Reprocesar todas las fotos de tu galería con el look actual ("${lookName}")?`)) return;
-    try {
-      setIsUploading(true);
-      setUploadProgress(`Reprocesando fotos con look ${lookName}...`);
-      const res = await fetch('/api/gallery/reprocess', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ look: galleryLook })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccessMsg(`✨ ${data.message}`);
-        fetchGallery();
-      } else {
-        throw new Error(data.message || 'Error al reprocesar.');
-      }
-    } catch (e: any) {
-      setError(e.message || 'Error al reprocesar fotos.');
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(null);
-    }
-  };
-
-  // Reprocess SINGLE image on demand ("Mejorar con Espejos")
-  const handleReprocessSingle = async (img: GalleryItem) => {
-    try {
-      setReprocessingId(img.id);
-      const res = await fetch(`/api/gallery/${img.id}/reprocess`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ look: galleryLook }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccessMsg('✨ Foto mejorada y procesada con el look Espejos.');
-        const timestamp = Date.now();
-        setImages((prev) =>
-          prev.map((item) =>
-            item.id === img.id
-              ? {
-                  ...item,
-                  url: `${item.url.split('?')[0]}?t=${timestamp}`,
-                  thumbUrl: item.thumbUrl ? `${item.thumbUrl.split('?')[0]}?t=${timestamp}` : null,
-                }
-              : item
-          )
-        );
-        if (compareItem?.id === img.id) {
-          setCompareItem((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  url: `${prev.url.split('?')[0]}?t=${timestamp}`,
-                }
-              : null
-          );
-        }
-      } else {
-        throw new Error(data.message || 'Error al mejorar foto.');
-      }
-    } catch (e: any) {
-      setError(e.message || 'Error al procesar foto.');
-    } finally {
-      setReprocessingId(null);
-    }
-  };
-
   const publishedCount = images.filter((img) => img.published).length;
+  const currentModalLookOpt = getLookOption(selectedPreviewLook);
 
   return (
     <div className="space-y-6 text-left">
@@ -471,24 +555,11 @@ export default function GalleryManager() {
               {publishedCount} / 12 publicadas
             </span>
             
-            {/* Look Badge */}
-            {galleryLook === 'espejos_editorial' && (
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(245,158,11,0.15)]">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                Look: Espejos Editorial
-              </span>
-            )}
-            {galleryLook === 'espejos_neutral' && (
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-[#8B7CFF] border border-[#8B7CFF]/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(139,124,255,0.15)]">
-                <Sparkles className="w-3 h-3 text-[#8B7CFF]" />
-                Look: Espejos Neutral+
-              </span>
-            )}
-            {galleryLook === 'none' && (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                Look: Sin Filtro (Real)
-              </span>
-            )}
+            {/* Active Default Look Badge */}
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${getLookOption(tenantDefaultLook).accentColor}`}>
+              <Sparkles className="w-3 h-3" />
+              Default: {getLookOption(tenantDefaultLook).name}
+            </span>
 
             {bulkImportEnabled && (
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
@@ -498,34 +569,36 @@ export default function GalleryManager() {
             )}
           </div>
           <p className="text-slate-400 text-xs mt-1">
-            Muestra tus mejores cortes y visagismos en tu página pública (<span className="text-indigo-400 font-mono">espejosstudio.cl/{user?.slug}</span>). Un Espejo por día. Elige la mejor toma.
+            Muestra tus mejores cortes en tu página pública (<span className="text-indigo-400 font-mono">espejosstudio.cl/{user?.slug}</span>). Marco Espejo Neón con terminación profesional bakeada en alta resolución.
           </p>
         </div>
 
         {/* Action Buttons & Look Selector */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Preset Selector */}
-          <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5">
-            <Sliders className="w-3.5 h-3.5 text-slate-400" />
+          {/* Default Look Selector */}
+          <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5" title="Look aplicado automáticamente a nuevas fotos subidas">
+            <Palette className="w-3.5 h-3.5 text-slate-400" />
             <select
-              value={galleryLook}
-              onChange={(e) => handleUpdateLook(e.target.value)}
+              value={tenantDefaultLook}
+              onChange={(e) => handleUpdateTenantLook(e.target.value)}
               className="bg-transparent text-xs font-bold text-slate-200 focus:outline-none cursor-pointer"
             >
-              <option value="espejos_editorial" className="bg-slate-900 text-amber-300">Look: Espejos Editorial ✨</option>
-              <option value="espejos_neutral" className="bg-slate-900 text-indigo-300">Look: Espejos Neutral+ ❄️</option>
-              <option value="none" className="bg-slate-900 text-slate-300">Sin Look (Original)</option>
+              {LOOK_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id} className="bg-slate-900 text-slate-200">
+                  {opt.icon} {opt.name}
+                </option>
+              ))}
             </select>
           </div>
 
-          {images.length > 0 && galleryLook !== 'none' && (
+          {images.length > 0 && (
             <button
               onClick={handleReprocessAll}
               disabled={isUploading}
               className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white font-semibold text-xs rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-              title="Aplica el look activo a todas las fotos con original raw"
+              title="Aplica el look por defecto a todas las fotos"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${galleryLook === 'espejos_editorial' ? 'text-amber-400' : 'text-[#8B7CFF]'}`} />
+              <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
               <span>Reprocesar Todas</span>
             </button>
           )}
@@ -571,7 +644,7 @@ export default function GalleryManager() {
                 Modo archivo activo
               </span>
               <p className="text-xs text-slate-300 mt-0.5">
-                Modo archivo: carga el álbum atrasado con la fecha de cada corte. El cupo diario se activa cuando se apague este modo.
+                Carga el álbum atrasado con la fecha de cada corte. El cupo diario de 1 foto se activará al desactivar este modo.
               </p>
             </div>
           </div>
@@ -637,7 +710,7 @@ export default function GalleryManager() {
         </div>
       )}
 
-      {/* Gallery List / Grid */}
+      {/* Gallery List */}
       {isLoading ? (
         <div className="py-16 text-center text-slate-500 text-xs flex flex-col items-center justify-center space-y-3">
           <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
@@ -663,7 +736,7 @@ export default function GalleryManager() {
           {images.map((img, idx) => {
             const canPublish = bulkImportEnabled || img.published || !todayQuota?.isPublishedToday || todayQuota?.todayPublishedId === img.id;
             const currentHaircutDate = dateDrafts[img.id] !== undefined ? dateDrafts[img.id] : (toDateInputValue(img.publishedAt) || toDateInputValue(img.createdAt));
-            const isReprocessingThis = reprocessingId === img.id;
+            const imgLookOpt = getLookOption(img.appliedLook);
 
             return (
               <div
@@ -700,12 +773,9 @@ export default function GalleryManager() {
                   {/* Photo Thumbnail / Frame 4:5 Preview */}
                   <div className="flex flex-col items-center space-y-1 flex-shrink-0">
                     <div 
-                      onClick={() => {
-                        setCompareItem(img);
-                        setShowOriginal(false);
-                      }}
+                      onClick={() => handleOpenLookModal(img)}
                       className="w-18 sm:w-20 aspect-[4/5] rounded-xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF]/45 shadow-[0_0_10px_rgba(139,124,255,0.18)] flex-shrink-0 relative group cursor-pointer"
-                      title="Haz clic para ver preview con marco y comparar con original"
+                      title="Haz clic para ver preview con marco, probar looks o comparar"
                     >
                       <div className="absolute inset-0 ring-1 ring-white/10 ring-inset rounded-xl pointer-events-none z-10" />
                       <img
@@ -715,7 +785,7 @@ export default function GalleryManager() {
                       />
                       <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[10px] font-bold transition-opacity z-20 space-y-1">
                         <Maximize2 className="w-4 h-4 text-indigo-300" />
-                        <span>Preview</span>
+                        <span>Ver Looks</span>
                       </div>
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">
@@ -735,6 +805,12 @@ export default function GalleryManager() {
                       >
                         {img.published ? 'Publicada en web' : 'Borrador'}
                       </span>
+
+                      {/* Look Badge */}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${imgLookOpt.accentColor}`}>
+                        {imgLookOpt.badge}
+                      </span>
+
                       {img.publishedAt && (
                         <span className="text-[11px] text-slate-400 font-mono">
                           Fecha corte: {formatShortDate(img.publishedAt)}
@@ -784,7 +860,7 @@ export default function GalleryManager() {
                       </div>
                     )}
 
-                    {/* Date Picker (Fecha del corte para Modo Archivo o Edición) */}
+                    {/* Date Picker */}
                     <div className="flex items-center space-x-2 text-xs">
                       <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                       <span className="text-slate-400 text-[11px]">Fecha del corte:</span>
@@ -802,7 +878,7 @@ export default function GalleryManager() {
                       />
                     </div>
 
-                    {/* Mandatory Face Consent Checkbox */}
+                    {/* Consent Checkbox */}
                     <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -820,34 +896,14 @@ export default function GalleryManager() {
 
                 {/* Right: Actions */}
                 <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
-                  {/* Comparar Original vs Espejos */}
-                  {img.rawUrl && (
-                    <button
-                      onClick={() => {
-                        setCompareItem(img);
-                        setShowOriginal(false);
-                      }}
-                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
-                      title="Comparar foto original vs terminación Espejos"
-                    >
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Comparar</span>
-                    </button>
-                  )}
-
-                  {/* Mejorar con Espejos (Reprocesar item individual) */}
+                  {/* Selector / Editor de Look */}
                   <button
-                    onClick={() => handleReprocessSingle(img)}
-                    disabled={isReprocessingThis || isUploading}
-                    className="px-2.5 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                    title="Aplica o actualiza el look Espejos sobre esta foto"
+                    onClick={() => handleOpenLookModal(img)}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
+                    title="Probar looks y comparar con original"
                   >
-                    {isReprocessingThis ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    )}
-                    <span>Mejorar</span>
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Looks & Comparar</span>
                   </button>
 
                   {/* Meta Ads Link Copy */}
@@ -913,110 +969,148 @@ export default function GalleryManager() {
         </div>
       )}
 
-      {/* Comparison & Look Preview Modal */}
-      {compareItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
+      {/* Comparison & Real-time Look Preview Modal */}
+      {modalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative my-8">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-bold text-white">Preview y Comparación de Look</h3>
+                <h3 className="text-base font-bold text-white">Estudio de Looks Espejos</h3>
               </div>
               <button
-                onClick={() => setCompareItem(null)}
+                onClick={() => setModalItem(null)}
                 className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Look Switch Toggle in Modal */}
-            <div className="flex items-center justify-center space-x-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setShowOriginal(false)}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-                  !showOriginal
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Terminación Espejos ({galleryLook === 'espejos_editorial' ? 'Editorial' : galleryLook === 'espejos_neutral' ? 'Neutral+' : 'Actual'})</span>
-              </button>
-              {compareItem.rawUrl && (
-                <button
-                  type="button"
-                  onClick={() => setShowOriginal(true)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-                    showOriginal
-                      ? 'bg-slate-800 text-white border border-slate-700 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>Original (Raw)</span>
-                </button>
-              )}
+            {/* 6 Look Presets Chips (Instant CSS Preview) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Elige un acabado para previsualizar:
+                </span>
+                <span className="text-[11px] text-slate-500">Preview instantáneo en vivo</span>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {LOOK_OPTIONS.map((opt) => {
+                  const isSelected = selectedPreviewLook === opt.id;
+                  const isCurrentBaked = modalItem.appliedLook === opt.id;
+
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPreviewLook(opt.id);
+                        setShowOriginalHold(false);
+                      }}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex flex-col items-center space-y-1 relative border ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-600/30'
+                          : 'bg-slate-950/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="text-sm">{opt.icon}</span>
+                      <span className="text-[11px] truncate w-full text-center">{opt.name}</span>
+                      {isCurrentBaked && (
+                        <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-emerald-500 border border-slate-900 rounded-full" title="Look actual guardado" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-[11px] text-slate-400 mt-2 italic text-center">
+                {currentModalLookOpt.description}
+              </p>
             </div>
 
-            {/* 4:5 Framed Preview Container */}
-            <div className="flex flex-col items-center justify-center py-2">
-              <div className="w-64 sm:w-72 aspect-[4/5] rounded-2xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF] shadow-[0_0_25px_rgba(139,124,255,0.3)] relative group">
+            {/* 4:5 Framed Preview Container with Live CSS Preview */}
+            <div className="flex flex-col items-center justify-center py-1">
+              <div className="w-64 sm:w-72 aspect-[4/5] rounded-2xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF] shadow-[0_0_30px_rgba(139,124,255,0.35)] relative group">
                 <div className="absolute inset-0 ring-1 ring-white/10 ring-inset rounded-2xl pointer-events-none z-10" />
+                
+                {/* The Preview Image: if user selects a different look, CSS filter previews live over rawUrl/url */}
                 <img
-                  src={showOriginal && compareItem.rawUrl ? compareItem.rawUrl : compareItem.url}
-                  alt={compareItem.title || 'Preview'}
-                  className="w-full h-full object-cover object-center transition-all duration-300"
+                  src={modalItem.rawUrl || modalItem.url}
+                  alt={modalItem.title || 'Preview'}
+                  style={{
+                    filter: showOriginalHold 
+                      ? 'none' 
+                      : (selectedPreviewLook === modalItem.appliedLook ? 'none' : currentModalLookOpt.cssFilter),
+                  }}
+                  className="w-full h-full object-cover object-center transition-all duration-200"
                 />
 
                 {/* Date Plaque Badge on bottom edge */}
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-slate-950/80 backdrop-blur-md rounded-full border border-white/10 text-[10px] font-mono text-slate-300 z-20 whitespace-nowrap shadow-lg">
-                  {formatShortDate(compareItem.publishedAt || compareItem.createdAt)}
+                  {formatShortDate(modalItem.publishedAt || modalItem.createdAt)}
                 </div>
 
                 {/* Watermark/Status Indicator */}
-                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[9px] font-bold uppercase tracking-wider text-slate-300 border border-white/10 z-20">
-                  {showOriginal ? '📷 Original' : `✨ Look: ${galleryLook === 'espejos_editorial' ? 'Editorial' : 'Neutral+'}`}
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-md text-[9px] font-bold uppercase tracking-wider text-slate-200 border border-white/10 z-20 flex items-center space-x-1">
+                  <span>{showOriginalHold ? '📷 Original' : `${currentModalLookOpt.icon} ${currentModalLookOpt.name}`}</span>
                 </div>
               </div>
 
-              {/* Hold-to-compare hint */}
-              {compareItem.rawUrl && (
+              {/* Hold-to-compare button */}
+              {modalItem.rawUrl && (
                 <button
-                  onMouseDown={() => setShowOriginal(true)}
-                  onMouseUp={() => setShowOriginal(false)}
-                  onTouchStart={() => setShowOriginal(true)}
-                  onTouchEnd={() => setShowOriginal(false)}
-                  className="mt-3 text-[11px] text-slate-400 hover:text-indigo-300 font-medium cursor-pointer select-none bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/60 transition-colors"
+                  type="button"
+                  onMouseDown={() => setShowOriginalHold(true)}
+                  onMouseUp={() => setShowOriginalHold(false)}
+                  onTouchStart={() => setShowOriginalHold(true)}
+                  onTouchEnd={() => setShowOriginalHold(false)}
+                  className="mt-3 text-[11px] text-slate-400 hover:text-indigo-300 font-medium cursor-pointer select-none bg-slate-800/70 px-3.5 py-1.5 rounded-xl border border-slate-700/60 transition-colors"
                 >
-                  👉 Mantén presionado aquí para comparar con Original
+                  👉 Mantén presionado para ver Foto Original (Raw)
                 </button>
               )}
             </div>
 
             {/* Modal Actions */}
             <div className="flex items-center justify-between border-t border-slate-800 pt-4">
-              <button
-                onClick={() => handleReprocessSingle(compareItem)}
-                disabled={reprocessingId === compareItem.id}
-                className="px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {reprocessingId === compareItem.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <div className="text-xs text-slate-400">
+                {modalItem.appliedLook === selectedPreviewLook ? (
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> Look ya aplicado
+                  </span>
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Pendiente de guardar</span>
                 )}
-                <span>Mejorar / Aplicar Look</span>
-              </button>
+              </div>
 
-              <button
-                onClick={() => setCompareItem(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Cerrar
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleBakeLook(modalItem, selectedPreviewLook)}
+                  disabled={bakingId === modalItem.id}
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {bakingId === modalItem.id ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Bakeando en servidor...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Aplicar Look "{currentModalLookOpt.name}"</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setModalItem(null)}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1024,3 +1118,4 @@ export default function GalleryManager() {
     </div>
   );
 }
+

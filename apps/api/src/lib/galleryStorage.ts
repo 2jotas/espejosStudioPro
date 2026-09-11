@@ -8,7 +8,20 @@ export interface ProcessedGalleryImage {
   rawUrl: string;
 }
 
-export type GalleryLookPreset = 'none' | 'espejos_neutral' | 'espejos_editorial';
+export type GalleryLookPreset = 'none' | 'editorial' | 'profesional' | 'vintage' | 'golden' | 'bokeh';
+
+export const VALID_LOOKS: GalleryLookPreset[] = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh'];
+
+export function normalizeLookPreset(look?: string | null): GalleryLookPreset {
+  if (!look) return 'none';
+  const clean = look.toLowerCase().trim();
+  if (clean === 'espejos_editorial' || clean === 'editorial') return 'editorial';
+  if (clean === 'espejos_neutral' || clean === 'profesional' || clean === 'professional') return 'profesional';
+  if (clean === 'vintage') return 'vintage';
+  if (clean === 'golden') return 'golden';
+  if (clean === 'bokeh') return 'bokeh';
+  return 'none';
+}
 
 export class GalleryStorageService {
   private baseUploadDir: string;
@@ -21,26 +34,76 @@ export class GalleryStorageService {
   }
 
   /**
-   * Applies the signature "Espejos Neutral+" grade:
-   * - Cools down ambient yellow/green LED salon lighting
-   * - Moderate contrast, protects highlights and lifts shadows for fade & skin detail
-   * - Slight saturation reduction on background/ambient, natural skin tones
-   * - Crisp edge sharpening on hair and fade texture without skin smoothing or distortion
+   * 1. EDITORIAL (MÁS MARCADO):
+   * - Piel cálida ámbar/bronce rica y presente (sin naranja/sepia extremo)
+   * - Negros más hondos y punch en contraste
+   * - Highlights controlados
+   * - Microcontraste y grano fino sutil en textura de fade y corte
+   * - Viñeta periférica sutil
    */
-  private async applyEspejosNeutralLook(buffer: Buffer): Promise<Buffer> {
+  private async applyEditorialLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const editorialWarmMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [1.045, 0.012, 0.000],
+      [0.006, 0.982, 0.008],
+      [0.000, 0.008, 0.925],
+    ];
+
+    const vignetteSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="vignetteEditorial" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
+            <stop offset="50%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.25" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#vignetteEditorial)" />
+      </svg>
+    `;
+
+    return await sharp(buffer)
+      .recomb(editorialWarmMatrix)
+      .modulate({
+        brightness: 0.98,
+        saturation: 0.95,
+      })
+      .linear([1.08, 1.07, 1.04], [-10, -9, -6])
+      .sharpen({
+        sigma: 1.25,
+        m1: 1.1,
+        m2: 2.2,
+        x1: 2,
+        y2: 12,
+        y3: 24,
+      })
+      .composite([
+        {
+          input: Buffer.from(vignetteSvg),
+          blend: 'over',
+        },
+      ])
+      .toBuffer();
+  }
+
+  /**
+   * 2. PROFESIONAL:
+   * - Frío limpio, rebalancea LED amarillo/verde de salón
+   * - Contraste moderado, detalle limpio en piel y fade
+   * - Sharpen nítido, sin grano
+   */
+  private async applyProfesionalLook(buffer: Buffer): Promise<Buffer> {
     const rebalanceMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [0.98, 0.00, 0.01],
-      [0.00, 0.97, 0.01],
-      [0.01, 0.01, 1.03],
+      [0.97, 0.00, 0.01],
+      [0.00, 0.96, 0.01],
+      [0.01, 0.01, 1.04],
     ];
 
     return await sharp(buffer)
       .recomb(rebalanceMatrix)
       .modulate({
-        brightness: 1.01,
-        saturation: 0.93,
+        brightness: 1.02,
+        saturation: 0.91,
       })
-      .linear([1.03, 1.03, 1.03], [-3, -3, -1])
+      .linear([1.04, 1.04, 1.04], [-4, -4, -2])
       .sharpen({
         sigma: 1.1,
         m1: 0.9,
@@ -53,48 +116,44 @@ export class GalleryStorageService {
   }
 
   /**
-   * Applies the signature "Espejos Editorial" grade:
-   * - Piel cálida ámbar/bronce SUAVE (no naranja, no sepia)
-   * - Negros más hondos, highlights controlados
-   * - Sat fondo un poco abajo
-   * - Grano / microcontraste MUY leve en textura de corte y fade
-   * - Viñeta periférica sutil para centrar la mirada en el corte
-   * - Pelo/cara/fade nítidos sin blur destructivo de contornos
-   * - Sin alterar rostro ni añadir elementos sintéticos
+   * 3. VINTAGE:
+   * - Fade en negros / mate sutil, highlights atenuados
+   * - Tono sepia cálido suave + desaturación elegante
+   * - Viñeta oscura marcada y grano fino
    */
-  private async applyEspejosEditorialLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    const editorialWarmMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [1.025, 0.008, 0.000],
-      [0.005, 0.985, 0.010],
-      [0.000, 0.010, 0.955],
+  private async applyVintageLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const vintageMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [1.03, 0.02, 0.00],
+      [0.01, 0.96, 0.01],
+      [0.00, 0.02, 0.85],
     ];
 
     const vignetteSvg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="vignette" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
-            <stop offset="55%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.20" />
+          <radialGradient id="vignetteVintage" cx="50%" cy="50%" r="62%" fx="50%" fy="50%">
+            <stop offset="45%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.30" />
           </radialGradient>
         </defs>
-        <rect width="100%" height="100%" fill="url(#vignette)" />
+        <rect width="100%" height="100%" fill="url(#vignetteVintage)" />
       </svg>
     `;
 
     return await sharp(buffer)
-      .recomb(editorialWarmMatrix)
+      .recomb(vintageMatrix)
       .modulate({
-        brightness: 1.00,
-        saturation: 0.94,
+        brightness: 1.04,
+        saturation: 0.78,
       })
-      .linear([1.05, 1.04, 1.02], [-6, -5, -4])
+      .linear([0.92, 0.90, 0.86], [16, 12, 6]) // Fade / matte curve
       .sharpen({
-        sigma: 1.15,
-        m1: 0.95,
-        m2: 1.9,
+        sigma: 0.95,
+        m1: 0.75,
+        m2: 1.5,
         x1: 2,
-        y2: 10,
-        y3: 20,
+        y2: 8,
+        y3: 16,
       })
       .composite([
         {
@@ -105,13 +164,136 @@ export class GalleryStorageService {
       .toBuffer();
   }
 
-  private async applyLook(buffer: Buffer, look: string, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    if (look === 'espejos_editorial') {
-      return await this.applyEspejosEditorialLook(buffer, width, height);
-    } else if (look === 'espejos_neutral') {
-      return await this.applyEspejosNeutralLook(buffer);
+  /**
+   * 4. GOLDEN (Hora Dorada / LA):
+   * - Cálido radiante, sombras levantadas (lifted shadows)
+   * - Brillo dorado sin piel naranja plástica
+   */
+  private async applyGoldenLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const goldenMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
+      [1.065, 0.020, 0.000],
+      [0.010, 0.995, 0.005],
+      [0.000, 0.010, 0.875],
+    ];
+
+    const warmGlowSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="goldenGlow" cx="50%" cy="40%" r="65%" fx="50%" fy="40%">
+            <stop offset="0%" stop-color="#ffedd5" stop-opacity="0.08" />
+            <stop offset="60%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.22" />
+          </radialGradient>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#goldenGlow)" />
+      </svg>
+    `;
+
+    return await sharp(buffer)
+      .recomb(goldenMatrix)
+      .modulate({
+        brightness: 1.03,
+        saturation: 1.08,
+      })
+      .linear([1.04, 1.03, 1.00], [-3, -2, 0])
+      .sharpen({
+        sigma: 1.15,
+        m1: 1.0,
+        m2: 2.0,
+        x1: 2,
+        y2: 10,
+        y3: 20,
+      })
+      .composite([
+        {
+          input: Buffer.from(warmGlowSvg),
+          blend: 'over',
+        },
+      ])
+      .toBuffer();
+  }
+
+  /**
+   * 5. BOKEH (Falso Retrato / Fondo Suave):
+   * - Blur suave periférico radial (sigma 10) dejando el centro (55-65%) nítido
+   * - Si hay cualquier inconsistencia en composición, degrada limpiamente a editorial + viñeta
+   */
+  private async applyBokehLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
+    try {
+      const blurredBuffer = await sharp(buffer)
+        .blur(10)
+        .toBuffer();
+
+      const maskSvg = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="bokehMask" cx="50%" cy="48%" r="62%" fx="50%" fy="48%">
+              <stop offset="45%" stop-color="#ffffff" stop-opacity="0" />
+              <stop offset="75%" stop-color="#ffffff" stop-opacity="0.75" />
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0.95" />
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#bokehMask)" />
+        </svg>
+      `;
+
+      const maskedBlur = await sharp(blurredBuffer)
+        .composite([
+          {
+            input: Buffer.from(maskSvg),
+            blend: 'dest-in',
+          },
+        ])
+        .toBuffer();
+
+      const vignetteSvg = `
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="bokehVignette" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
+              <stop offset="50%" stop-color="#000000" stop-opacity="0" />
+              <stop offset="100%" stop-color="#000000" stop-opacity="0.22" />
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#bokehVignette)" />
+        </svg>
+      `;
+
+      return await sharp(buffer)
+        .composite([
+          {
+            input: maskedBlur,
+            blend: 'over',
+          },
+          {
+            input: Buffer.from(vignetteSvg),
+            blend: 'over',
+          },
+        ])
+        .modulate({ brightness: 0.98, saturation: 0.96 })
+        .linear([1.04, 1.04, 1.03], [-5, -5, -3])
+        .toBuffer();
+    } catch {
+      return await this.applyEditorialLook(buffer, width, height);
     }
-    return buffer;
+  }
+
+  async applyLook(buffer: Buffer, look: string = 'none', width: number = 1280, height: number = 1600): Promise<Buffer> {
+    const preset = normalizeLookPreset(look);
+    switch (preset) {
+      case 'editorial':
+        return await this.applyEditorialLook(buffer, width, height);
+      case 'profesional':
+        return await this.applyProfesionalLook(buffer);
+      case 'vintage':
+        return await this.applyVintageLook(buffer, width, height);
+      case 'golden':
+        return await this.applyGoldenLook(buffer, width, height);
+      case 'bokeh':
+        return await this.applyBokehLook(buffer, width, height);
+      case 'none':
+      default:
+        return buffer;
+    }
   }
 
   async processAndSaveImage(
@@ -119,7 +301,7 @@ export class GalleryStorageService {
     _originalFilename: string,
     buffer: Buffer,
     look: string = 'none'
-  ): Promise<ProcessedGalleryImage> {
+  ): Promise<ProcessedGalleryImage & { appliedLook: GalleryLookPreset }> {
     const profDir = path.join(this.baseUploadDir, professionalId);
     if (!fs.existsSync(profDir)) {
       fs.mkdirSync(profDir, { recursive: true });
@@ -134,7 +316,7 @@ export class GalleryStorageService {
     const fullPath = path.join(profDir, fullFilename);
     const thumbPath = path.join(profDir, thumbFilename);
 
-    // 1. Guardar ORIGINAL intacto sin look (para reprocesamiento futuro)
+    // 1. Guardar ORIGINAL intacto sin look (NUNCA SE PISA)
     await sharp(buffer)
       .rotate()
       .webp({ quality: 95 })
@@ -148,8 +330,9 @@ export class GalleryStorageService {
         .toBuffer()
     );
 
-    // 3. Aplicar look configurado (editorial / neutral / none)
-    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, look, 1280, 1600));
+    // 3. Aplicar look configurado (bake permanente)
+    const normalizedLook = normalizeLookPreset(look);
+    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, normalizedLook, 1280, 1600));
 
     // 4. Exportar Full-size WebP (1280x1600, 85 quality)
     await sharp(processedBuffer)
@@ -166,6 +349,7 @@ export class GalleryStorageService {
       url: `/uploads/gallery/${professionalId}/${fullFilename}`,
       thumbUrl: `/uploads/gallery/${professionalId}/${thumbFilename}`,
       rawUrl: `/uploads/gallery/${professionalId}/${rawFilename}`,
+      appliedLook: normalizedLook,
     };
   }
 
@@ -173,8 +357,8 @@ export class GalleryStorageService {
     professionalId: string,
     url: string,
     rawUrl?: string | null,
-    look: string = 'espejos_editorial'
-  ): Promise<{ url: string; thumbUrl: string; rawUrl: string } | null> {
+    look: string = 'editorial'
+  ): Promise<{ url: string; thumbUrl: string; rawUrl: string; appliedLook: GalleryLookPreset } | null> {
     const profDir = path.join(this.baseUploadDir, professionalId);
     
     // Check if raw source exists, else fallback to current full url
@@ -185,7 +369,6 @@ export class GalleryStorageService {
     const sourcePath = path.join(this.baseUploadDir, sourceSubPath);
 
     if (!fs.existsSync(sourcePath)) {
-      // If raw didn't exist, try full url path
       const fallbackSub = url.replace('/uploads/gallery/', '');
       const fallbackPath = path.join(this.baseUploadDir, fallbackSub);
       if (!fs.existsSync(fallbackPath)) return null;
@@ -208,8 +391,9 @@ export class GalleryStorageService {
         .toBuffer()
     );
 
-    // 2. Apply look if active
-    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, look, 1280, 1600));
+    // 2. Apply look (bake permanente)
+    const normalizedLook = normalizeLookPreset(look);
+    processedBuffer = Buffer.from(await this.applyLook(processedBuffer, normalizedLook, 1280, 1600));
 
     // 3. Write full WebP
     await sharp(processedBuffer)
@@ -226,6 +410,7 @@ export class GalleryStorageService {
       url,
       thumbUrl: url.replace('.webp', '_thumb.webp'),
       rawUrl: rawUrl || url,
+      appliedLook: normalizedLook,
     };
   }
 
@@ -246,3 +431,4 @@ export class GalleryStorageService {
 }
 
 export const galleryStorageService = new GalleryStorageService();
+
