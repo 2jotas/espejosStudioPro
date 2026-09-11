@@ -123,9 +123,9 @@ export default function GalleryManager() {
       const file = files[i];
       setUploadProgress(`Subiendo y optimizando foto ${i + 1} de ${files.length} (${file.name})...`);
 
-      // Client-side file size check (8MB)
-      if (file.size > 8 * 1024 * 1024) {
-        errors.push(`"${file.name}" supera los 8 MB permitidos (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+      // Client-side file size check (25MB)
+      if (file.size > 25 * 1024 * 1024) {
+        errors.push(`"${file.name}" supera los 25 MB permitidos (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
         continue;
       }
 

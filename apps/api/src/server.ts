@@ -62,7 +62,7 @@ async function main() {
 
   await server.register(fastifyMultipart, {
     limits: {
-      fileSize: 20 * 1024 * 1024, // 20MB per file
+      fileSize: 35 * 1024 * 1024, // 35MB per file (allows 25MB raw gallery uploads)
       files: 25, // Up to 25 files at once
     },
   });

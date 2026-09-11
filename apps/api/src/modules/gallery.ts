@@ -209,11 +209,11 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         const buffer = await part.toBuffer();
-        // Check size limit: 8MB
-        if (buffer.length > 8 * 1024 * 1024) {
+        // Check size limit: 25MB
+        if (buffer.length > 25 * 1024 * 1024) {
           return reply.status(400).send({
             error: 'FileTooLarge',
-            message: 'El archivo excede el tamaño máximo permitido de 8 MB.',
+            message: 'El archivo excede el tamaño máximo permitido de 25 MB.',
           });
         }
 
