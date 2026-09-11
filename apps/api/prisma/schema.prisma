@@ -33,6 +33,7 @@ model Professional {
   whatsappFewShotExamples String?        @map("whatsapp_few_shot_examples")
   whatsappReminderHours   Int            @default(2) @map("whatsapp_reminder_hours")
   whatsappClientTagKeyword String?       @default("cliente") @map("whatsapp_client_tag_keyword")
+  galleryBulkImportEnabled Boolean       @default(true) @map("gallery_bulk_import_enabled")
   createdAt               DateTime       @default(now()) @map("created_at")
   updatedAt               DateTime       @updatedAt @map("updated_at")
 

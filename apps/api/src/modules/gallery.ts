@@ -61,9 +61,14 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.register(async (protectedRoutes) => {
     protectedRoutes.addHook('preHandler', authenticateProfessional);
 
-    // GET /api/gallery - Get all gallery items (Drafts + Published) with Santiago daily quota status
+    // GET /api/gallery - Get all gallery items (Drafts + Published) with Santiago daily quota status & bulk flag
     protectedRoutes.get('/gallery', async (request) => {
       const userSession = request.userSession!;
+
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+        select: { galleryBulkImportEnabled: true },
+      });
 
       const images = await fastify.prisma.galleryImage.findMany({
         where: { professionalId: userSession.id },
@@ -80,12 +85,36 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
 
       return {
         images,
+        bulkImportEnabled: professional ? professional.galleryBulkImportEnabled : false,
         todayQuota: {
           isPublishedToday: Boolean(todayPublished),
           todayPublishedId: todayPublished ? todayPublished.id : null,
           todayPublishedTitle: todayPublished ? todayPublished.title : null,
           todaySantiago,
         },
+      };
+    });
+
+    // PATCH /api/gallery/settings - Toggle bulk import flag
+    protectedRoutes.patch<{
+      Body: { bulkImportEnabled: boolean };
+    }>('/gallery/settings', async (request, reply) => {
+      const userSession = request.userSession!;
+      const { bulkImportEnabled } = request.body;
+
+      if (typeof bulkImportEnabled !== 'boolean') {
+        return reply.status(400).send({ error: 'InvalidRequest', message: 'Se requiere bulkImportEnabled como booleano.' });
+      }
+
+      const updated = await fastify.prisma.professional.update({
+        where: { id: userSession.id },
+        data: { galleryBulkImportEnabled: bulkImportEnabled },
+        select: { id: true, galleryBulkImportEnabled: true },
+      });
+
+      return {
+        message: `Modo archivo ${bulkImportEnabled ? 'activado' : 'desactivado'}.`,
+        bulkImportEnabled: updated.galleryBulkImportEnabled,
       };
     });
 
@@ -122,7 +151,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        // Process and resize (1600px full, 600px thumb)
+        // Process and resize (1280x1600 4:5 center crop, 480x600 thumb)
         const { url, thumbUrl } = await galleryStorageService.processAndSaveImage(
           userSession.id,
           part.filename,
@@ -163,19 +192,20 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       });
     });
 
-    // PATCH /api/gallery/:id - Update title, publish state, consent, or sort
+    // PATCH /api/gallery/:id - Update title, publish state, consent, haircut date, or sort
     protectedRoutes.patch<{
       Params: { id: string };
       Body: {
         title?: string | null;
         published?: boolean;
         hasFaceConsent?: boolean;
+        publishedAt?: string | null;
         sort?: number;
       };
     }>('/gallery/:id', async (request, reply) => {
       const userSession = request.userSession!;
       const { id } = request.params;
-      const { title, published, hasFaceConsent, sort } = request.body;
+      const { title, published, hasFaceConsent, publishedAt, sort } = request.body;
 
       const existing = await fastify.prisma.galleryImage.findUnique({
         where: { id },
@@ -185,9 +215,15 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'NotFound', message: 'Imagen no encontrada.' });
       }
 
+      const professional = await fastify.prisma.professional.findUnique({
+        where: { id: userSession.id },
+        select: { galleryBulkImportEnabled: true },
+      });
+      const isBulkMode = Boolean(professional?.galleryBulkImportEnabled);
+
       const nextConsent = hasFaceConsent !== undefined ? hasFaceConsent : existing.hasFaceConsent;
       let nextPublished = published !== undefined ? published : existing.published;
-      let nextPublishedAt = existing.publishedAt;
+      let nextPublishedAt: Date | null = existing.publishedAt;
 
       // Consent Guardrail: Cannot publish without face consent
       if (nextPublished && !nextConsent) {
@@ -197,36 +233,60 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const todaySantiago = getSantiagoDateString(new Date());
+      if (nextPublished) {
+        if (isBulkMode) {
+          // MODO A — bulk_import_enabled = true
+          // Permite publicar N fotos. Cada foto OBLIGA fecha del CORTE (date picker).
+          if (publishedAt) {
+            const parsed = new Date(publishedAt);
+            if (isNaN(parsed.getTime())) {
+              return reply.status(400).send({
+                error: 'InvalidDate',
+                message: 'Fecha de corte inválida.',
+              });
+            }
+            nextPublishedAt = parsed;
+          } else if (!nextPublishedAt) {
+            return reply.status(400).send({
+              error: 'HaircutDateRequired',
+              message: 'En modo archivo debes especificar la fecha del corte antes de publicar.',
+            });
+          }
+        } else {
+          // MODO B — bulk_import_enabled = false
+          // Máximo 1 foto PUBLICADA por tenant por día calendario America/Santiago
+          const todaySantiago = getSantiagoDateString(new Date());
 
-      // Daily Quota Guardrail: Max 1 published photo per tenant per Santiago calendar day
-      if (nextPublished && !existing.published) {
-        // Attempting to transition from Draft -> Published
-        const publishedImages = await fastify.prisma.galleryImage.findMany({
-          where: {
-            professionalId: userSession.id,
-            published: true,
-            id: { not: id },
-          },
-          select: { id: true, publishedAt: true, title: true },
-        });
+          if (!existing.published) {
+            // Intentando pasar de Borrador a Publicada
+            const publishedImages = await fastify.prisma.galleryImage.findMany({
+              where: {
+                professionalId: userSession.id,
+                published: true,
+                id: { not: id },
+              },
+              select: { id: true, publishedAt: true },
+            });
 
-        const alreadyPublishedToday = publishedImages.find(
-          (p) => p.publishedAt && getSantiagoDateString(new Date(p.publishedAt)) === todaySantiago
-        );
+            const alreadyPublishedToday = publishedImages.find(
+              (p) => p.publishedAt && getSantiagoDateString(new Date(p.publishedAt)) === todaySantiago
+            );
 
-        if (alreadyPublishedToday) {
-          return reply.status(400).send({
-            error: 'DailyQuotaExceeded',
-            message: 'Hoy ya publicaste tu Espejo. Mañana puedes subir otro.',
-          });
+            if (alreadyPublishedToday) {
+              return reply.status(409).send({
+                error: 'DailyQuotaExceeded',
+                message: 'Hoy ya publicaste tu Espejo. Mañana puedes subir otro.',
+              });
+            }
+
+            nextPublishedAt = new Date();
+          } else if (publishedAt) {
+            // Actualizando fecha explícita
+            nextPublishedAt = new Date(publishedAt);
+          } else if (!nextPublishedAt) {
+            nextPublishedAt = new Date();
+          }
         }
-
-        nextPublishedAt = new Date();
-      }
-
-      if (nextPublished && !nextPublishedAt) {
-        nextPublishedAt = new Date();
       }
 
       const updated = await fastify.prisma.galleryImage.update({
@@ -235,7 +295,7 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
           title: title !== undefined ? title : existing.title,
           published: nextPublished,
           hasFaceConsent: nextConsent,
-          publishedAt: nextPublishedAt,
+          publishedAt: nextPublished ? nextPublishedAt : existing.publishedAt,
           sort: sort !== undefined ? sort : existing.sort,
         },
       });

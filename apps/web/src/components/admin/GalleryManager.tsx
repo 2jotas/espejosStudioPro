@@ -13,7 +13,9 @@ import {
   Loader2, 
   ShieldCheck,
   CheckCircle2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Calendar,
+  Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -53,10 +55,22 @@ function formatShortDate(dateStr?: string | null): string {
   }
 }
 
+// Format date to YYYY-MM-DD input value
+function toDateInputValue(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+}
+
 export default function GalleryManager() {
   const { user } = useAuth();
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [todayQuota, setTodayQuota] = useState<TodayQuota | null>(null);
+  const [bulkImportEnabled, setBulkImportEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -65,6 +79,7 @@ export default function GalleryManager() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string>('');
+  const [dateDrafts, setDateDrafts] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchGallery = async () => {
@@ -74,6 +89,7 @@ export default function GalleryManager() {
       if (!res.ok) throw new Error('Error al cargar la galería.');
       const data = await res.json();
       setImages(data.images || []);
+      setBulkImportEnabled(Boolean(data.bulkImportEnabled));
       if (data.todayQuota) {
         setTodayQuota(data.todayQuota);
       }
@@ -169,11 +185,25 @@ export default function GalleryManager() {
       return;
     }
 
+    const payload: { published: boolean; publishedAt?: string } = {
+      published: !img.published,
+    };
+
+    // If publishing in Bulk mode, send haircut date
+    if (!img.published && bulkImportEnabled) {
+      const selectedDate = dateDrafts[img.id] || toDateInputValue(img.publishedAt) || toDateInputValue(img.createdAt);
+      if (!selectedDate) {
+        setError('En modo archivo debes especificar la fecha del corte antes de publicar.');
+        return;
+      }
+      payload.publishedAt = selectedDate;
+    }
+
     try {
       const res = await fetch(`/api/gallery/${img.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ published: !img.published }),
+        body: JSON.stringify(payload),
       });
 
       let data: any = {};
@@ -183,10 +213,13 @@ export default function GalleryManager() {
       } catch {}
 
       if (!res.ok) {
+        if (res.status === 409) {
+          throw new Error(data.message || 'Hoy ya publicaste tu Espejo. Mañana puedes subir otro.');
+        }
         throw new Error(data.message || 'Error al actualizar estado.');
       }
 
-      setSuccessMsg(img.published ? 'Foto pasada a borrador.' : '✨ ¡Foto publicada exitosamente como el Espejo de hoy!');
+      setSuccessMsg(img.published ? 'Foto pasada a borrador.' : '✨ ¡Foto publicada exitosamente en tu vitrina pública!');
       fetchGallery();
     } catch (err: any) {
       setError(err.message);
@@ -217,6 +250,28 @@ export default function GalleryManager() {
             : item
         )
       );
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Save Haircut Date
+  const handleSaveHaircutDate = async (id: string, dateStr: string) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/gallery/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publishedAt: dateStr }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Error al guardar fecha.');
+
+      setImages((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, publishedAt: dateStr } : item))
+      );
+      setSuccessMsg('Fecha de corte actualizada.');
     } catch (err: any) {
       setError(err.message);
     }
@@ -303,9 +358,15 @@ export default function GalleryManager() {
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               {publishedCount} / 12 publicadas
             </span>
+            {bulkImportEnabled && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                Modo Archivo (Bulk)
+              </span>
+            )}
           </div>
           <p className="text-slate-400 text-xs mt-1">
-            Muestra tus mejores cortes y visagismos en tu página pública (<span className="text-indigo-400 font-mono">espejosstudio.cl/{user?.slug}</span>). Máximo 12 fotos publicadas.
+            Muestra tus mejores cortes y visagismos en tu página pública (<span className="text-indigo-400 font-mono">espejosstudio.cl/{user?.slug}</span>). Un Espejo por día. Elige la mejor toma.
           </p>
         </div>
 
@@ -340,50 +401,68 @@ export default function GalleryManager() {
         </div>
       </div>
 
-      {/* Estado del Espejo Diario (America/Santiago) */}
-      <div className={`p-4 rounded-2xl border transition-all ${
-        todayQuota?.isPublishedToday 
-          ? 'bg-indigo-950/40 border-[#8B7CFF]/40 shadow-[0_0_15px_rgba(139,124,255,0.12)]' 
-          : 'bg-slate-900/60 border-slate-800'
-      }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Banner de Régimen de Publicación */}
+      {bulkImportEnabled ? (
+        <div className="p-4 rounded-2xl bg-cyan-950/30 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
           <div className="flex items-start sm:items-center space-x-3">
-            <div className={`p-2 rounded-xl ${todayQuota?.isPublishedToday ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
-              <Sparkles className="w-5 h-5" />
+            <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-400">
+              <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-white">
-                  Espejo de hoy:
-                </span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  todayQuota?.isPublishedToday 
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }`}>
-                  {todayQuota?.isPublishedToday ? '✅ Publicado' : '⏳ Pendiente'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {todayQuota?.isPublishedToday
-                  ? `Hoy ya publicaste tu Espejo ("${todayQuota.todayPublishedTitle || 'Corte del día'}"). Mañana puedes subir otro.`
-                  : 'Un Espejo por día. Elige tu mejor toma y publícala en tu vitrina pública.'}
+              <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                Modo archivo activo
+              </span>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Modo archivo: carga el álbum atrasado con la fecha de cada corte. El cupo diario se activa cuando se apague este modo.
               </p>
             </div>
           </div>
-          {todayQuota?.isPublishedToday && todayQuota.todayPublishedId && (
-            <button
-              onClick={() => {
-                const todayImg = images.find(i => i.id === todayQuota.todayPublishedId);
-                if (todayImg) handleTogglePublish(todayImg);
-              }}
-              className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700 transition-colors whitespace-nowrap self-start sm:self-auto cursor-pointer"
-            >
-              Despublicar para cambiar
-            </button>
-          )}
         </div>
-      </div>
+      ) : (
+        <div className={`p-4 rounded-2xl border transition-all ${
+          todayQuota?.isPublishedToday 
+            ? 'bg-indigo-950/40 border-[#8B7CFF]/40 shadow-[0_0_15px_rgba(139,124,255,0.12)]' 
+            : 'bg-slate-900/60 border-slate-800'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center space-x-3">
+              <div className={`p-2 rounded-xl ${todayQuota?.isPublishedToday ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-white">
+                    Espejo de hoy:
+                  </span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                    todayQuota?.isPublishedToday 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {todayQuota?.isPublishedToday ? '✅ Publicado' : '⏳ Pendiente'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {todayQuota?.isPublishedToday
+                    ? `Hoy ya publicaste tu Espejo ("${todayQuota.todayPublishedTitle || 'Corte del día'}"). Mañana puedes subir otro.`
+                    : 'Un Espejo por día. Elige tu mejor toma y publícala en tu vitrina pública.'}
+                </p>
+              </div>
+            </div>
+            {todayQuota?.isPublishedToday && todayQuota.todayPublishedId && (
+              <button
+                onClick={() => {
+                  const todayImg = images.find(i => i.id === todayQuota.todayPublishedId);
+                  if (todayImg) handleTogglePublish(todayImg);
+                }}
+                className="text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700 transition-colors whitespace-nowrap self-start sm:self-auto cursor-pointer"
+              >
+                Reemplazar la de hoy (Despublicar)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Notifications */}
       {error && (
@@ -425,7 +504,8 @@ export default function GalleryManager() {
         <div className="space-y-3.5">
           {images.map((img, idx) => {
             const isThisPublishedToday = todayQuota?.todayPublishedId === img.id;
-            const canPublish = img.published || !todayQuota?.isPublishedToday || isThisPublishedToday;
+            const canPublish = bulkImportEnabled || img.published || !todayQuota?.isPublishedToday || isThisPublishedToday;
+            const currentHaircutDate = dateDrafts[img.id] !== undefined ? dateDrafts[img.id] : (toDateInputValue(img.publishedAt) || toDateInputValue(img.createdAt));
 
             return (
               <div
@@ -477,11 +557,14 @@ export default function GalleryManager() {
                         Ver HD
                       </a>
                     </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {formatShortDate(img.publishedAt || currentHaircutDate)}
+                    </span>
                   </div>
 
                   {/* Info & Inputs */}
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                           img.published
@@ -493,7 +576,7 @@ export default function GalleryManager() {
                       </span>
                       {img.publishedAt && (
                         <span className="text-[11px] text-slate-400 font-mono">
-                          Publicado: {formatShortDate(img.publishedAt)}
+                          Fecha corte: {formatShortDate(img.publishedAt)}
                         </span>
                       )}
                     </div>
@@ -540,6 +623,24 @@ export default function GalleryManager() {
                       </div>
                     )}
 
+                    {/* Date Picker (Fecha del corte para Modo Archivo o Edición) */}
+                    <div className="flex items-center space-x-2 text-xs">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="text-slate-400 text-[11px]">Fecha del corte:</span>
+                      <input
+                        type="date"
+                        value={currentHaircutDate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDateDrafts(prev => ({ ...prev, [img.id]: val }));
+                          if (img.published) {
+                            handleSaveHaircutDate(img.id, val);
+                          }
+                        }}
+                        className="bg-slate-950 border border-slate-700 text-slate-200 text-xs px-2 py-0.5 rounded-md focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
                     {/* Mandatory Face Consent Checkbox */}
                     <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer select-none">
                       <input
@@ -581,7 +682,7 @@ export default function GalleryManager() {
                   <button
                     onClick={() => {
                       if (!img.published && !canPublish) {
-                        setError('Hoy ya publicaste tu Espejo. Mañana puedes subir otro (o despublica el de hoy para reemplazarlo).');
+                        setError('Hoy ya publicaste tu Espejo. Mañana puedes subir otro.');
                         return;
                       }
                       handleTogglePublish(img);

@@ -34,17 +34,17 @@ export class GalleryStorageService {
     const fullPath = path.join(profDir, fullFilename);
     const thumbPath = path.join(profDir, thumbFilename);
 
-    // 1. Full-size: Max dimension 1600px, WebP quality 85, auto-orient EXIF
+    // 1. Full-size: 4:5 portrait (1280x1600), WebP quality 85, auto-orient EXIF, center crop
     await sharp(buffer)
       .rotate()
-      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .resize(1280, 1600, { fit: 'cover', position: 'center' })
       .webp({ quality: 85 })
       .toFile(fullPath);
 
-    // 2. Thumbnail: Max dimension 600px, WebP quality 80, auto-orient EXIF
+    // 2. Thumbnail: 4:5 portrait (480x600), WebP quality 80, auto-orient EXIF, center crop
     await sharp(buffer)
       .rotate()
-      .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+      .resize(480, 600, { fit: 'cover', position: 'center' })
       .webp({ quality: 80 })
       .toFile(thumbPath);
 
