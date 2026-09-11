@@ -9,9 +9,9 @@ async function main() {
     console.error('John not found');
     return;
   }
-  console.log([Reprocess] Professional: , Look: );
+  console.log(`[Reprocess] Professional: ${prof.slug}, Look: ${prof.galleryLook}`);
   const images = await prisma.galleryImage.findMany({ where: { professionalId: prof.id } });
-  console.log([Reprocess] Found  images.);
+  console.log(`[Reprocess] Found ${images.length} images.`);
   for (const img of images) {
     const res = await galleryStorageService.reprocessExistingImage(
       prof.id,
@@ -19,7 +19,7 @@ async function main() {
       img.rawUrl,
       prof.galleryLook
     );
-    console.log([Reprocess] Image  -> );
+    console.log(`[Reprocess] Image ${img.id} -> ${res ? 'SUCCESS' : 'SKIPPED'}`);
     if (res) {
       await prisma.galleryImage.update({
         where: { id: img.id },
@@ -27,7 +27,8 @@ async function main() {
       });
     }
   }
-  await prisma.();
+  await prisma.$disconnect();
 }
 
 main().catch(console.error);
+
