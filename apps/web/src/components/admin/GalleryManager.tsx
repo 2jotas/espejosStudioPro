@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type LookId = 'none' | 'editorial' | 'profesional' | 'vintage' | 'golden' | 'bokeh';
+export type LookId = 'none' | 'editorial' | 'profesional' | 'vintage';
 
 export interface LookOption {
   id: LookId;
@@ -73,30 +73,12 @@ export const LOOK_OPTIONS: LookOption[] = [
     description: 'Negros mate/fade atenuados, tono sepia suave y viñeta.',
     accentColor: 'text-orange-300 border-orange-500/30 bg-orange-500/10 shadow-[0_0_10px_rgba(249,115,22,0.15)]',
   },
-  {
-    id: 'golden',
-    name: 'Golden',
-    badge: '🌅 Golden',
-    icon: '🌅',
-    cssFilter: 'contrast(1.08) saturate(1.15) brightness(1.04) sepia(0.18) hue-rotate(-8deg)',
-    description: 'Calidez dorada radiante y sombras abiertas estilo hora dorada.',
-    accentColor: 'text-yellow-300 border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_10px_rgba(234,179,8,0.15)]',
-  },
-  {
-    id: 'bokeh',
-    name: 'Fondo suave',
-    badge: '🎯 Fondo suave',
-    icon: '🎯',
-    cssFilter: 'contrast(1.1) brightness(0.97)',
-    description: 'Falso retrato con desenfoque suave periférico para destacar el corte.',
-    accentColor: 'text-purple-300 border-purple-500/30 bg-purple-500/10 shadow-[0_0_10px_rgba(168,85,247,0.15)]',
-  },
 ];
 
 export function getLookOption(lookId?: string | null): LookOption {
   if (!lookId) return LOOK_OPTIONS[0];
   const clean = lookId.toLowerCase().trim();
-  if (clean === 'espejos_editorial') return LOOK_OPTIONS.find(o => o.id === 'editorial')!;
+  if (clean === 'espejos_editorial' || clean === 'golden' || clean === 'bokeh') return LOOK_OPTIONS.find(o => o.id === 'editorial')!;
   if (clean === 'espejos_neutral') return LOOK_OPTIONS.find(o => o.id === 'profesional')!;
   return LOOK_OPTIONS.find(o => o.id === clean) || LOOK_OPTIONS[0];
 }
@@ -996,7 +978,7 @@ export default function GalleryManager() {
                 <span className="text-[11px] text-slate-500">Preview instantáneo en vivo</span>
               </div>
 
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {LOOK_OPTIONS.map((opt) => {
                   const isSelected = selectedPreviewLook === opt.id;
                   const isCurrentBaked = modalItem.appliedLook === opt.id;

@@ -113,11 +113,11 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (galleryLook !== undefined) {
-        const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh', 'espejos_editorial', 'espejos_neutral'];
+        const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'espejos_editorial', 'espejos_neutral'];
         if (!validLookNames.includes(galleryLook.toLowerCase().trim())) {
           return reply.status(400).send({
             error: 'InvalidRequest',
-            message: 'Look no soportado. Opciones: "none" | "editorial" | "profesional" | "vintage" | "golden" | "bokeh".',
+            message: 'Look no soportado. Opciones: "none" | "editorial" | "profesional" | "vintage".',
           });
         }
         updateData.galleryLook = normalizeLookPreset(galleryLook);
@@ -152,11 +152,11 @@ export const galleryRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh', 'espejos_editorial', 'espejos_neutral'];
+      const validLookNames = ['none', 'editorial', 'profesional', 'vintage', 'espejos_editorial', 'espejos_neutral'];
       if (!validLookNames.includes(look.toLowerCase().trim())) {
         return reply.status(400).send({
           error: 'InvalidLook',
-          message: `Look desconocido "${look}". Opciones válidas: none, editorial, profesional, vintage, golden, bokeh.`,
+          message: `Look desconocido "${look}". Opciones válidas: none, editorial, profesional, vintage.`,
         });
       }
 

@@ -8,18 +8,16 @@ export interface ProcessedGalleryImage {
   rawUrl: string;
 }
 
-export type GalleryLookPreset = 'none' | 'editorial' | 'profesional' | 'vintage' | 'golden' | 'bokeh';
+export type GalleryLookPreset = 'none' | 'editorial' | 'profesional' | 'vintage';
 
-export const VALID_LOOKS: GalleryLookPreset[] = ['none', 'editorial', 'profesional', 'vintage', 'golden', 'bokeh'];
+export const VALID_LOOKS: GalleryLookPreset[] = ['none', 'editorial', 'profesional', 'vintage'];
 
 export function normalizeLookPreset(look?: string | null): GalleryLookPreset {
   if (!look) return 'none';
   const clean = look.toLowerCase().trim();
-  if (clean === 'espejos_editorial' || clean === 'editorial') return 'editorial';
+  if (clean === 'espejos_editorial' || clean === 'editorial' || clean === 'golden' || clean === 'bokeh') return 'editorial';
   if (clean === 'espejos_neutral' || clean === 'profesional' || clean === 'professional') return 'profesional';
   if (clean === 'vintage') return 'vintage';
-  if (clean === 'golden') return 'golden';
-  if (clean === 'bokeh') return 'bokeh';
   return 'none';
 }
 
@@ -164,119 +162,6 @@ export class GalleryStorageService {
       .toBuffer();
   }
 
-  /**
-   * 4. GOLDEN (Hora Dorada / LA):
-   * - Cálido radiante, sombras levantadas (lifted shadows)
-   * - Brillo dorado sin piel naranja plástica
-   */
-  private async applyGoldenLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    const goldenMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [1.065, 0.020, 0.000],
-      [0.010, 0.995, 0.005],
-      [0.000, 0.010, 0.875],
-    ];
-
-    const warmGlowSvg = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="goldenGlow" cx="50%" cy="40%" r="65%" fx="50%" fy="40%">
-            <stop offset="0%" stop-color="#ffedd5" stop-opacity="0.08" />
-            <stop offset="60%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.22" />
-          </radialGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#goldenGlow)" />
-      </svg>
-    `;
-
-    return await sharp(buffer)
-      .recomb(goldenMatrix)
-      .modulate({
-        brightness: 1.03,
-        saturation: 1.08,
-      })
-      .linear([1.04, 1.03, 1.00], [-3, -2, 0])
-      .sharpen({
-        sigma: 1.15,
-        m1: 1.0,
-        m2: 2.0,
-        x1: 2,
-        y2: 10,
-        y3: 20,
-      })
-      .composite([
-        {
-          input: Buffer.from(warmGlowSvg),
-          blend: 'over',
-        },
-      ])
-      .toBuffer();
-  }
-
-  /**
-   * 5. BOKEH (Falso Retrato / Fondo Suave):
-   * - Blur suave periférico radial (sigma 10) dejando el centro (55-65%) nítido
-   * - Si hay cualquier inconsistencia en composición, degrada limpiamente a editorial + viñeta
-   */
-  private async applyBokehLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    try {
-      const blurredBuffer = await sharp(buffer)
-        .blur(10)
-        .toBuffer();
-
-      const maskSvg = `
-        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="bokehMask" cx="50%" cy="48%" r="62%" fx="50%" fy="48%">
-              <stop offset="45%" stop-color="#ffffff" stop-opacity="0" />
-              <stop offset="75%" stop-color="#ffffff" stop-opacity="0.75" />
-              <stop offset="100%" stop-color="#ffffff" stop-opacity="0.95" />
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bokehMask)" />
-        </svg>
-      `;
-
-      const maskedBlur = await sharp(blurredBuffer)
-        .composite([
-          {
-            input: Buffer.from(maskSvg),
-            blend: 'dest-in',
-          },
-        ])
-        .toBuffer();
-
-      const vignetteSvg = `
-        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="bokehVignette" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
-              <stop offset="50%" stop-color="#000000" stop-opacity="0" />
-              <stop offset="100%" stop-color="#000000" stop-opacity="0.22" />
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bokehVignette)" />
-        </svg>
-      `;
-
-      return await sharp(buffer)
-        .composite([
-          {
-            input: maskedBlur,
-            blend: 'over',
-          },
-          {
-            input: Buffer.from(vignetteSvg),
-            blend: 'over',
-          },
-        ])
-        .modulate({ brightness: 0.98, saturation: 0.96 })
-        .linear([1.04, 1.04, 1.03], [-5, -5, -3])
-        .toBuffer();
-    } catch {
-      return await this.applyEditorialLook(buffer, width, height);
-    }
-  }
-
   async applyLook(buffer: Buffer, look: string = 'none', width: number = 1280, height: number = 1600): Promise<Buffer> {
     const preset = normalizeLookPreset(look);
     switch (preset) {
@@ -286,10 +171,6 @@ export class GalleryStorageService {
         return await this.applyProfesionalLook(buffer);
       case 'vintage':
         return await this.applyVintageLook(buffer, width, height);
-      case 'golden':
-        return await this.applyGoldenLook(buffer, width, height);
-      case 'bokeh':
-        return await this.applyBokehLook(buffer, width, height);
       case 'none':
       default:
         return buffer;
