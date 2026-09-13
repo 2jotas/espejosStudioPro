@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /panel
+Disallow: /admin
+Disallow: /login
+Disallow: /registro
+Disallow: /super-admin
+Disallow: /api/
+
+Sitemap: https://espejosstudio.cl/sitemap.xml

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import SeoHead from './components/common/SeoHead';
 import Landing from './routes/Landing';
 import Login from './routes/Login';
 import Register from './routes/Register';
@@ -19,6 +20,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <SeoHead />
         <AuthProvider>
         <Routes>
           {isPerformanceSubdomain ? (
