@@ -89,6 +89,12 @@ export default function SeoHead() {
       canonical = `https://espejosstudio.cl${pathname}`;
       ogTitle = title;
       ogUrl = canonical;
+    } else if (pathname === '/demo/panel') {
+      title = 'Panel Demo | Espejos Agenda';
+      robots = 'noindex, nofollow';
+      canonical = 'https://espejosstudio.cl/demo/panel';
+      ogTitle = title;
+      ogUrl = canonical;
     } else if (pathname === '/demo') {
       title = 'Demo | Espejos Agenda';
       description = 'Ejemplo de espacio público. No es un local real.';

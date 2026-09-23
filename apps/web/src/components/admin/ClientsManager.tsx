@@ -22,7 +22,78 @@ export interface ClientItem {
   profile: ClientProfileData | null;
 }
 
-export default function ClientsManager() {
+const DEMO_CLIENTS: ClientItem[] = [
+  {
+    id: 'c-1',
+    firstName: 'Matías',
+    lastName: 'Silva',
+    phone: '+56 9 8765 4321',
+    authMethod: 'passkey',
+    createdAt: '2026-06-15T10:00:00Z',
+    profile: {
+      id: 'cp-1',
+      notes: 'Prefiere degradado medio en punta, máquina 0.5 en patillas y tijera texturizada arriba.',
+      preferences: 'Café negro corto, música rock suave.',
+      tags: JSON.stringify(['vip', 'oficina']),
+      visitCount: 14,
+      totalSpent: 308000,
+      lastVisitAt: '2026-09-12T11:00:00Z'
+    }
+  },
+  {
+    id: 'c-2',
+    firstName: 'Carlos',
+    lastName: 'Vega',
+    phone: '+56 9 7654 3210',
+    authMethod: 'otp',
+    createdAt: '2026-07-02T14:30:00Z',
+    profile: {
+      id: 'cp-2',
+      notes: 'Fade alto comprimido. Cuero cabelludo sensible a lociones con alcohol fuerte.',
+      preferences: 'Sin productos perfumados.',
+      tags: JSON.stringify(['turno', 'vip']),
+      visitCount: 8,
+      totalSpent: 144000,
+      lastVisitAt: '2026-09-18T12:30:00Z'
+    }
+  },
+  {
+    id: 'c-3',
+    firstName: 'Ignacio',
+    lastName: 'Rojas',
+    phone: '+56 9 6543 2109',
+    authMethod: 'otp',
+    createdAt: '2026-08-10T16:00:00Z',
+    profile: {
+      id: 'cp-3',
+      notes: 'Perfilado de barba simétrico, línea de mejilla alta y bigote peinado hacia los lados.',
+      preferences: 'Bálsamo de cedro.',
+      tags: JSON.stringify(['padre']),
+      visitCount: 4,
+      totalSpent: 56000,
+      lastVisitAt: '2026-09-05T15:00:00Z'
+    }
+  },
+  {
+    id: 'c-4',
+    firstName: 'Rodrigo',
+    lastName: 'Muñoz',
+    phone: '+56 9 5432 1098',
+    authMethod: 'passkey',
+    createdAt: '2026-08-20T11:00:00Z',
+    profile: {
+      id: 'cp-4',
+      notes: 'French Crop con flequillo recto despuntado. Peinado con cera mate de arcilla.',
+      preferences: 'Agua mineral con gas.',
+      tags: JSON.stringify(['vip']),
+      visitCount: 3,
+      totalSpent: 84000,
+      lastVisitAt: '2026-09-10T16:30:00Z'
+    }
+  }
+];
+
+export default function ClientsManager({ isDemo }: { isDemo?: boolean }) {
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -46,6 +117,21 @@ export default function ClientsManager() {
   const suggestedTags = ['turno', 'oficina', 'padre', 'vip'];
 
   const fetchClients = async () => {
+    if (isDemo) {
+      setIsLoading(true);
+      let filtered = [...DEMO_CLIENTS];
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(c => `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) || c.phone.includes(q));
+      }
+      if (selectedTag) {
+        filtered = filtered.filter(c => c.profile?.tags && c.profile.tags.includes(selectedTag));
+      }
+      setClients(filtered);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -62,6 +148,10 @@ export default function ClientsManager() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchClients();
+  }, [searchQuery, selectedTag, isDemo]);
 
   const handleCleanNames = async () => {
     try {

@@ -63,7 +63,60 @@ export const parseLocalDateTimeToIso = (dateStr: string, timeStr: string): strin
   return new Date(dummy.getTime() + offsetMs).toISOString();
 };
 
-export default function CalendarManager() {
+const DEMO_SERVICES: ServiceItem[] = [
+  { id: 'srv-1', name: 'Corte de Autor + Perfilado de Barba', description: 'Corte personalizado con visagismo y toalla caliente.', durationMinutes: 45, price: 25000, active: true, order: 1 },
+  { id: 'srv-2', name: 'Degradado / Skin Fade Clásico', description: 'Fade milimétrico a ras de piel y peinado.', durationMinutes: 35, price: 18000, active: true, order: 2 },
+  { id: 'srv-3', name: 'Perfilado de Barba con Toalla Caliente', description: 'Ritual tradicional con navaja y bálsamo.', durationMinutes: 30, price: 14000, active: true, order: 3 },
+  { id: 'srv-4', name: 'Asesoría Visagismo & Estilo', description: 'Análisis morfológico del rostro y corte de prueba.', durationMinutes: 50, price: 28000, active: true, order: 4 },
+];
+
+const getDemoAppointments = (selectedDateStr: string): AppointmentItem[] => [
+  {
+    id: 'demo-app-1',
+    startsAt: `${selectedDateStr}T11:00:00Z`,
+    endsAt: `${selectedDateStr}T11:45:00Z`,
+    status: 'confirmed',
+    source: 'web',
+    whatsappStatus: 'confirmada',
+    clientNote: 'Prefiere degradado medio',
+    client: { id: 'c-1', firstName: 'Matías', lastName: 'Silva', phone: '+56 9 8765 4321' },
+    service: DEMO_SERVICES[0]
+  },
+  {
+    id: 'demo-app-2',
+    startsAt: `${selectedDateStr}T12:30:00Z`,
+    endsAt: `${selectedDateStr}T13:05:00Z`,
+    status: 'confirmed',
+    source: 'whatsapp',
+    whatsappStatus: 'confirmada',
+    clientNote: 'Cliente habitual de fin de mes',
+    client: { id: 'c-2', firstName: 'Carlos', lastName: 'Vega', phone: '+56 9 7654 3210' },
+    service: DEMO_SERVICES[1]
+  },
+  {
+    id: 'demo-app-3',
+    startsAt: `${selectedDateStr}T15:00:00Z`,
+    endsAt: `${selectedDateStr}T15:30:00Z`,
+    status: 'pending',
+    source: 'web',
+    whatsappStatus: 'pendiente',
+    clientNote: 'Primera visita al estudio',
+    client: { id: 'c-3', firstName: 'Ignacio', lastName: 'Rojas', phone: '+56 9 6543 2109' },
+    service: DEMO_SERVICES[2]
+  },
+  {
+    id: 'demo-app-4',
+    startsAt: `${selectedDateStr}T16:30:00Z`,
+    endsAt: `${selectedDateStr}T17:20:00Z`,
+    status: 'completed',
+    source: 'walk_in',
+    whatsappStatus: 'confirmada',
+    client: { id: 'c-4', firstName: 'Rodrigo', lastName: 'Muñoz', phone: '+56 9 5432 1098' },
+    service: DEMO_SERVICES[3]
+  }
+];
+
+export default function CalendarManager({ isDemo }: { isDemo?: boolean }) {
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +188,15 @@ export default function CalendarManager() {
   ];
 
   const fetchAppointments = async () => {
+    if (isDemo) {
+      setIsLoading(true);
+      setServices(DEMO_SERVICES);
+      setAppointments(getDemoAppointments(selectedDate));
+      if (!formServiceId) setFormServiceId(DEMO_SERVICES[0].id);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const [appRes, serviceRes] = await Promise.all([
@@ -164,7 +226,7 @@ export default function CalendarManager() {
 
   useEffect(() => {
     fetchAppointments();
-  }, []);
+  }, [selectedDate, isDemo]);
 
   const handleSyncGoogleEvents = async () => {
     try {

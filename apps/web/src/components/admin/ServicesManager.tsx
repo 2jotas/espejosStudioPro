@@ -12,7 +12,14 @@ export interface ServiceItem {
   order: number;
 }
 
-export default function ServicesManager() {
+const DEMO_SERVICES_LIST: ServiceItem[] = [
+  { id: 'srv-1', name: 'Corte de Autor Espejos', description: 'Visagismo morfológico, lavado y perfilado de contornos.', durationMinutes: 45, price: 22000, active: true, order: 1 },
+  { id: 'srv-2', name: 'Degradado / Skin Fade', description: 'Fade milimétrico rasurado a navaja y peinado profesional.', durationMinutes: 35, price: 18000, active: true, order: 2 },
+  { id: 'srv-3', name: 'Perfilado de Barba & Ritual Toalla Caliente', description: 'Tratamiento con aceites esenciales, toalla caliente y navaja.', durationMinutes: 30, price: 14000, active: true, order: 3 },
+  { id: 'srv-4', name: 'Asesoría Visagismo IA & Corte', description: 'Simulación de corte con IA inpainting y ejecución personalizada.', durationMinutes: 60, price: 28000, active: true, order: 4 },
+];
+
+export default function ServicesManager({ isDemo }: { isDemo?: boolean }) {
   const { user } = useAuth();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +38,13 @@ export default function ServicesManager() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const fetchServices = async () => {
+    if (isDemo) {
+      setIsLoading(true);
+      setServices(DEMO_SERVICES_LIST);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await fetch('/api/services');
@@ -46,7 +60,7 @@ export default function ServicesManager() {
 
   useEffect(() => {
     fetchServices();
-  }, []);
+  }, [isDemo]);
 
   const openCreateModal = () => {
     setEditingService(null);
@@ -72,6 +86,34 @@ export default function ServicesManager() {
     e.preventDefault();
     setFormError(null);
     setIsSubmitting(true);
+
+    if (isDemo) {
+      setTimeout(() => {
+        if (editingService) {
+          setServices((prev) =>
+            prev.map((s) =>
+              s.id === editingService.id
+                ? { ...s, name, description: description || null, durationMinutes: Number(durationMinutes), price: Number(price) }
+                : s
+            )
+          );
+        } else {
+          const newSrv: ServiceItem = {
+            id: `srv-demo-${Date.now()}`,
+            name,
+            description: description || null,
+            durationMinutes: Number(durationMinutes),
+            price: Number(price),
+            active: true,
+            order: services.length + 1,
+          };
+          setServices((prev) => [...prev, newSrv]);
+        }
+        setIsSubmitting(false);
+        setIsModalOpen(false);
+      }, 300);
+      return;
+    }
 
     try {
       const url = editingService ? `/api/services/${editingService.id}` : '/api/services';
@@ -103,6 +145,13 @@ export default function ServicesManager() {
   };
 
   const toggleActive = async (service: ServiceItem) => {
+    if (isDemo) {
+      setServices((prev) =>
+        prev.map((s) => (s.id === service.id ? { ...s, active: !s.active } : s))
+      );
+      return;
+    }
+
     try {
       const res = await fetch(`/api/services/${service.id}`, {
         method: 'PUT',
@@ -121,6 +170,11 @@ export default function ServicesManager() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Estás seguro de eliminar este servicio?')) return;
+
+    if (isDemo) {
+      setServices((prev) => prev.filter((s) => s.id !== id));
+      return;
+    }
 
     try {
       const res = await fetch(`/api/services/${id}`, { method: 'DELETE' });

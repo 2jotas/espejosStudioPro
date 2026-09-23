@@ -40,6 +40,7 @@ export default function App() {
               <Route path="/visagismo" element={<PerformanceApp />} />
               <Route path="/auto" element={<AutoStudio />} />
               <Route path="/studio" element={<AutoStudio />} />
+              <Route path="/demo/panel" element={<AdminPanel isDemo={true} />} />
               <Route path="/panel" element={<AdminPanel />} />
               <Route path="/admin" element={<AdminPanel />} />
               <Route path="/login" element={<Login />} />

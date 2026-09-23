@@ -19,15 +19,15 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export default function SettingsIntegrations() {
+export default function SettingsIntegrations({ isDemo }: { isDemo?: boolean }) {
   const { user, refetchUser } = useAuth();
 
   // Profile Edit State
-  const [businessName, setBusinessName] = useState(user?.businessName || '');
-  const [slug, setSlug] = useState(user?.slug || '');
-  const [bio, setBio] = useState(user?.bio || '');
-  const [address, setAddress] = useState(user?.address || '');
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [businessName, setBusinessName] = useState(isDemo ? 'Estudio Demo Palumbo' : (user?.businessName || ''));
+  const [slug, setSlug] = useState(isDemo ? 'demo' : (user?.slug || ''));
+  const [bio, setBio] = useState(isDemo ? 'Demostración de agenda online para profesionales independientes.' : (user?.bio || ''));
+  const [address, setAddress] = useState(isDemo ? 'Demostración · Chile' : (user?.address || ''));
+  const [phone, setPhone] = useState(isDemo ? '+56 9 9876 5432' : (user?.phone || ''));
   const [isSlugAvailable, setIsSlugAvailable] = useState<boolean | null>(true);
   const [slugReason, setSlugReason] = useState<string | null>(null);
   const [isCheckingSlug, setIsCheckingSlug] = useState(false);
@@ -41,17 +41,17 @@ export default function SettingsIntegrations() {
   ];
 
   // Google Calendar Integration State
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(Boolean(isDemo));
   const [isLoading, setIsLoading] = useState(false);
   const [connectionMode, setConnectionMode] = useState<'apikey' | 'oauth'>('apikey');
-  const [calendarId, setCalendarId] = useState(user?.email || '');
+  const [calendarId, setCalendarId] = useState(isDemo ? 'demo@espejosstudio.cl' : (user?.email || ''));
   const [apiKey, setApiKey] = useState('');
   const [isConnectingApiKey, setIsConnectingApiKey] = useState(false);
   const [apiKeyMessage, setApiKeyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // WhatsApp Bot & Gateway State
-  const [isWhatsappConnected, setIsWhatsappConnected] = useState(false);
+  const [isWhatsappConnected, setIsWhatsappConnected] = useState(Boolean(isDemo));
   const [whatsappBotEnabled, setWhatsappBotEnabled] = useState(true);
   const [whatsappTone, setWhatsappTone] = useState<'cercano' | 'profesional' | 'directo'>('cercano');
   const [whatsappCustomPrompt, setWhatsappCustomPrompt] = useState('');
@@ -76,7 +76,7 @@ export default function SettingsIntegrations() {
   // WhatsApp Simulator Chat
   const [simMessage, setSimMessage] = useState('');
   const [simHistory, setSimHistory] = useState<Array<{ role: 'user' | 'bot'; text: string }>>([
-    { role: 'bot', text: '¡Hola bro! 💈 ¿En qué te puedo ayudar hoy? ¿Te agendamos un corte o barba?' }
+    { role: 'bot', text: '¡Hola! 💈 Te damos la bienvenida a Estudio Demo. ¿Te gustaría agendar una hora o consultar precios?' }
   ]);
   const [isSimLoading, setIsSimLoading] = useState(false);
 
@@ -87,14 +87,14 @@ export default function SettingsIntegrations() {
 
   // Sync user state when loaded
   useEffect(() => {
-    if (user) {
+    if (user && !isDemo) {
       setBusinessName(user.businessName || '');
       setSlug(user.slug || '');
       setBio(user.bio || '');
       setAddress(user.address || '');
       setPhone(user.phone || '');
     }
-  }, [user]);
+  }, [user, isDemo]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('espejos_token');
@@ -107,6 +107,7 @@ export default function SettingsIntegrations() {
 
   // Load WhatsApp Settings on mount
   useEffect(() => {
+    if (isDemo) return;
     fetch('/api/whatsapp/status', { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
@@ -121,7 +122,7 @@ export default function SettingsIntegrations() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isDemo]);
 
   // Debounced Slug Availability Checker
   useEffect(() => {

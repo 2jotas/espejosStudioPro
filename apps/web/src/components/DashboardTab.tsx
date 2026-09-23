@@ -43,7 +43,114 @@ interface DashboardData {
   todayUpcoming: TodayAppointment[];
 }
 
-export default function DashboardTab({ professionalSlug }: { professionalSlug: string }) {
+const DEMO_DASHBOARD_DATA: Record<string, DashboardData> = {
+  month: {
+    timeframe: 'month',
+    metrics: {
+      timeframeRevenue: 1850000,
+      todayRevenue: 95000,
+      totalAppointments: 94,
+      confirmedAppointments: 82,
+      completedAppointments: 78,
+      averageTicket: 19680,
+      profitabilityPerMinute: 656,
+      capacityUtilizationRate: 84,
+      totalClients: 64,
+      recurringClients: 48,
+      retentionRate: 75,
+    },
+    topServices: [
+      { name: 'Corte de Autor + Perfilado de Barba', price: 25000, count: 42, totalRevenue: 1050000 },
+      { name: 'Degradado / Skin Fade Clásico', price: 18000, count: 32, totalRevenue: 576000 },
+      { name: 'Perfilado de Barba con Toalla Caliente', price: 14000, count: 14, totalRevenue: 196000 },
+      { name: 'Asesoría Visagismo & Estilo', price: 28000, count: 6, totalRevenue: 168000 },
+    ],
+    todayUpcoming: [
+      { id: 'demo-1', startsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 105).toISOString(), status: 'confirmed', serviceName: 'Corte de Autor + Barba', servicePrice: 25000, clientName: 'Matías Silva', clientPhone: '+56 9 8765 4321', clientNote: 'Degradado medio en punta' },
+      { id: 'demo-2', startsAt: new Date(Date.now() + 1000 * 60 * 150).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 185).toISOString(), status: 'confirmed', serviceName: 'Degradado Skin Fade', servicePrice: 18000, clientName: 'Carlos Vega', clientPhone: '+56 9 7654 3210', clientNote: 'Cliente habitual' },
+      { id: 'demo-3', startsAt: new Date(Date.now() + 1000 * 60 * 240).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 285).toISOString(), status: 'pending', serviceName: 'Perfilado de Barba', servicePrice: 14000, clientName: 'Ignacio Rojas', clientPhone: '+56 9 6543 2109' },
+    ]
+  },
+  today: {
+    timeframe: 'today',
+    metrics: {
+      timeframeRevenue: 95000,
+      todayRevenue: 95000,
+      totalAppointments: 5,
+      confirmedAppointments: 4,
+      completedAppointments: 2,
+      averageTicket: 19000,
+      profitabilityPerMinute: 633,
+      capacityUtilizationRate: 80,
+      totalClients: 5,
+      recurringClients: 3,
+      retentionRate: 60,
+    },
+    topServices: [
+      { name: 'Corte de Autor + Perfilado de Barba', price: 25000, count: 2, totalRevenue: 50000 },
+      { name: 'Degradado / Skin Fade Clásico', price: 18000, count: 2, totalRevenue: 36000 },
+      { name: 'Perfilado de Barba con Toalla Caliente', price: 14000, count: 1, totalRevenue: 14000 },
+    ],
+    todayUpcoming: [
+      { id: 'demo-1', startsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 105).toISOString(), status: 'confirmed', serviceName: 'Corte de Autor + Barba', servicePrice: 25000, clientName: 'Matías Silva', clientPhone: '+56 9 8765 4321', clientNote: 'Degradado medio en punta' },
+      { id: 'demo-2', startsAt: new Date(Date.now() + 1000 * 60 * 150).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 185).toISOString(), status: 'confirmed', serviceName: 'Degradado Skin Fade', servicePrice: 18000, clientName: 'Carlos Vega', clientPhone: '+56 9 7654 3210' },
+      { id: 'demo-3', startsAt: new Date(Date.now() + 1000 * 60 * 240).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 285).toISOString(), status: 'pending', serviceName: 'Perfilado de Barba', servicePrice: 14000, clientName: 'Ignacio Rojas', clientPhone: '+56 9 6543 2109' },
+    ]
+  },
+  week: {
+    timeframe: 'week',
+    metrics: {
+      timeframeRevenue: 480000,
+      todayRevenue: 95000,
+      totalAppointments: 24,
+      confirmedAppointments: 22,
+      completedAppointments: 18,
+      averageTicket: 20000,
+      profitabilityPerMinute: 666,
+      capacityUtilizationRate: 85,
+      totalClients: 20,
+      recurringClients: 15,
+      retentionRate: 75,
+    },
+    topServices: [
+      { name: 'Corte de Autor + Perfilado de Barba', price: 25000, count: 10, totalRevenue: 250000 },
+      { name: 'Degradado / Skin Fade Clásico', price: 18000, count: 8, totalRevenue: 144000 },
+      { name: 'Perfilado de Barba con Toalla Caliente', price: 14000, count: 4, totalRevenue: 56000 },
+      { name: 'Asesoría Visagismo & Estilo', price: 28000, count: 2, totalRevenue: 56000 },
+    ],
+    todayUpcoming: [
+      { id: 'demo-1', startsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 105).toISOString(), status: 'confirmed', serviceName: 'Corte de Autor + Barba', servicePrice: 25000, clientName: 'Matías Silva', clientPhone: '+56 9 8765 4321' },
+      { id: 'demo-2', startsAt: new Date(Date.now() + 1000 * 60 * 150).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 185).toISOString(), status: 'confirmed', serviceName: 'Degradado Skin Fade', servicePrice: 18000, clientName: 'Carlos Vega', clientPhone: '+56 9 7654 3210' },
+    ]
+  },
+  all: {
+    timeframe: 'all',
+    metrics: {
+      timeframeRevenue: 8450000,
+      todayRevenue: 95000,
+      totalAppointments: 430,
+      confirmedAppointments: 410,
+      completedAppointments: 395,
+      averageTicket: 19650,
+      profitabilityPerMinute: 655,
+      capacityUtilizationRate: 82,
+      totalClients: 210,
+      recurringClients: 160,
+      retentionRate: 76,
+    },
+    topServices: [
+      { name: 'Corte de Autor + Perfilado de Barba', price: 25000, count: 180, totalRevenue: 4500000 },
+      { name: 'Degradado / Skin Fade Clásico', price: 18000, count: 150, totalRevenue: 2700000 },
+      { name: 'Perfilado de Barba con Toalla Caliente', price: 14000, count: 60, totalRevenue: 840000 },
+      { name: 'Asesoría Visagismo & Estilo', price: 28000, count: 25, totalRevenue: 700000 },
+    ],
+    todayUpcoming: [
+      { id: 'demo-1', startsAt: new Date(Date.now() + 1000 * 60 * 60).toISOString(), endsAt: new Date(Date.now() + 1000 * 60 * 105).toISOString(), status: 'confirmed', serviceName: 'Corte de Autor + Barba', servicePrice: 25000, clientName: 'Matías Silva', clientPhone: '+56 9 8765 4321' },
+    ]
+  }
+};
+
+export default function DashboardTab({ professionalSlug, isDemo }: { professionalSlug: string; isDemo?: boolean }) {
   const [timeframe, setTimeframe] = useState<'today' | 'week' | 'month' | 'all'>('month');
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +158,12 @@ export default function DashboardTab({ professionalSlug }: { professionalSlug: s
 
   const fetchDashboardStats = async () => {
     setIsLoading(true);
+    if (isDemo || professionalSlug === 'demo') {
+      setData(DEMO_DASHBOARD_DATA[timeframe] || DEMO_DASHBOARD_DATA.month);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('espejos_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -70,7 +183,7 @@ export default function DashboardTab({ professionalSlug }: { professionalSlug: s
 
   useEffect(() => {
     fetchDashboardStats();
-  }, [timeframe]);
+  }, [timeframe, isDemo, professionalSlug]);
 
   const handleCopyPublicLink = () => {
     const publicUrl = `${window.location.origin}/${professionalSlug}`;

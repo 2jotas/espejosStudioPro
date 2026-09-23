@@ -97,6 +97,18 @@ export default function Register() {
       <div className="w-full max-w-lg relative z-10 py-12">
         {/* Header */}
         <div className="text-center mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <Link 
+              to="/" 
+              className="inline-flex items-center space-x-1 text-xs text-slate-400 hover:text-white transition-colors bg-slate-900/60 hover:bg-slate-850 border border-slate-800 px-3 py-1.5 rounded-full"
+            >
+              <span>← Volver al inicio</span>
+            </Link>
+            <Link to="/login" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+              Ya tengo cuenta (Ingresar)
+            </Link>
+          </div>
+
           <Link to="/" className="inline-flex items-center space-x-2 mb-4 group">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="h-full w-full bg-slate-950 rounded-[11px] flex items-center justify-center">

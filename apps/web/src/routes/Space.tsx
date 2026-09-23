@@ -85,9 +85,17 @@ export default function Space() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-indigo-500 selection:text-white">
       {/* Banner discreto si es espacio Demo */}
       {isDemo && (
-        <div className="bg-amber-950/80 border-b border-amber-500/30 text-amber-200 text-xs py-2 px-4 flex items-center justify-center space-x-2 sticky top-0 z-40 backdrop-blur-md">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Esto es una demostración. Tus clientes no ven esto.</span>
+        <div className="bg-amber-950/80 border-b border-amber-500/30 text-amber-200 text-xs py-2 px-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Esto es una demostración. Tus clientes no ven esto.</span>
+          </div>
+          <Link
+            to="/demo/panel"
+            className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all"
+          >
+            Ver Panel Demo →
+          </Link>
         </div>
       )}
 
@@ -113,14 +121,29 @@ export default function Space() {
 
       {/* Header Minimalista */}
       <header className="relative z-10 max-w-lg mx-auto w-full flex items-center justify-between p-4 pt-5">
-        <div className="flex items-center space-x-2 text-slate-400 text-xs font-bold tracking-wider uppercase">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+        <Link 
+          to="/" 
+          className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors text-xs font-bold tracking-wider uppercase group"
+          title="Volver a la página principal de Espejos"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400 group-hover:rotate-12 transition-transform" />
           <span>{isDemo ? 'Espejos Demo' : 'Espejos Studio'}</span>
-        </div>
+        </Link>
 
-        {user ? (
-          <Link to="/panel" className="text-[11px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full transition-colors">
-            {user.slug} • Panel
+        {isDemo ? (
+          <Link 
+            to="/demo/panel" 
+            className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-950/70 hover:bg-amber-900/80 border border-amber-500/40 px-3 py-1 rounded-full transition-all font-semibold shadow-sm flex items-center space-x-1.5"
+          >
+            <span>demo • Panel</span>
+          </Link>
+        ) : isOwner ? (
+          <Link to="/panel" className="text-[11px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full transition-colors font-medium">
+            {user?.slug} • Panel
+          </Link>
+        ) : user ? (
+          <Link to="/panel" className="text-[11px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full transition-colors font-medium">
+            Mi Panel ({user.slug})
           </Link>
         ) : (
           <Link to="/login" className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300">

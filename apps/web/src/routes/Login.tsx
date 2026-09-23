@@ -140,6 +140,18 @@ export default function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md z-10">
         {/* Logo Header */}
         <div className="text-center mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <Link 
+              to="/" 
+              className="inline-flex items-center space-x-1 text-xs text-slate-400 hover:text-white transition-colors bg-slate-900/60 hover:bg-slate-850 border border-slate-800 px-3 py-1.5 rounded-full"
+            >
+              <span>← Volver al inicio</span>
+            </Link>
+            <Link to="/registro" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+              Crear cuenta gratis
+            </Link>
+          </div>
+
           <Link to="/" className="inline-flex items-center space-x-3 mb-4">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="h-full w-full bg-slate-950 rounded-[11px] flex items-center justify-center">

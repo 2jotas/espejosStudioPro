@@ -126,7 +126,55 @@ function toDateInputValue(dateStr?: string | null): string {
   }
 }
 
-export default function GalleryManager() {
+const DEMO_GALLERY_ITEMS: GalleryItem[] = [
+  {
+    id: 'demo-img-1',
+    professionalId: 'demo-prof',
+    url: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=800&auto=format&fit=crop&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=800&auto=format&fit=crop&q=80',
+    rawUrl: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=800&auto=format&fit=crop&q=80',
+    appliedLook: 'estudio',
+    title: 'Textured Crop + Mid Fade',
+    sort: 1,
+    published: true,
+    hasFaceConsent: true,
+    publishedAt: '2026-09-15T12:00:00Z',
+    createdAt: '2026-09-15T12:00:00Z',
+    updatedAt: '2026-09-15T12:00:00Z',
+  },
+  {
+    id: 'demo-img-2',
+    professionalId: 'demo-prof',
+    url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&auto=format&fit=crop&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&auto=format&fit=crop&q=80',
+    rawUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&auto=format&fit=crop&q=80',
+    appliedLook: 'campana',
+    title: 'Perfilado de Barba & Taper Clásico',
+    sort: 2,
+    published: true,
+    hasFaceConsent: true,
+    publishedAt: '2026-09-18T15:30:00Z',
+    createdAt: '2026-09-18T15:30:00Z',
+    updatedAt: '2026-09-18T15:30:00Z',
+  },
+  {
+    id: 'demo-img-3',
+    professionalId: 'demo-prof',
+    url: 'https://images.unsplash.com/photo-1517832606589-7629c3397143?w=800&auto=format&fit=crop&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1517832606589-7629c3397143?w=800&auto=format&fit=crop&q=80',
+    rawUrl: 'https://images.unsplash.com/photo-1517832606589-7629c3397143?w=800&auto=format&fit=crop&q=80',
+    appliedLook: 'none',
+    title: 'Fade Militar con Toalla Caliente',
+    sort: 3,
+    published: true,
+    hasFaceConsent: true,
+    publishedAt: '2026-09-20T17:00:00Z',
+    createdAt: '2026-09-20T17:00:00Z',
+    updatedAt: '2026-09-20T17:00:00Z',
+  }
+];
+
+export default function GalleryManager({ isDemo }: { isDemo?: boolean }) {
   const { user } = useAuth();
   const [images, setImages] = useState<GalleryItem[]>([]);
   const [todayQuota, setTodayQuota] = useState<TodayQuota | null>(null);
@@ -151,6 +199,20 @@ export default function GalleryManager() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchGallery = async () => {
+    if (isDemo) {
+      setIsLoading(true);
+      setImages(DEMO_GALLERY_ITEMS);
+      setTenantDefaultLook('estudio');
+      setTodayQuota({
+        isPublishedToday: true,
+        todayPublishedId: 'demo-img-1',
+        todayPublishedTitle: 'Textured Crop + Mid Fade',
+        todaySantiago: '2026-09-23'
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await fetch('/api/gallery');
@@ -171,7 +233,7 @@ export default function GalleryManager() {
 
   useEffect(() => {
     fetchGallery();
-  }, []);
+  }, [isDemo]);
 
   // Update tenant's default upload look preset
   const handleUpdateTenantLook = async (newLook: string) => {
