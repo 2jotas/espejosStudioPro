@@ -107,7 +107,7 @@ export default function MirrorGallery({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 sm:gap-4">
         {images.map((img, idx) => {
           const dateLabel = formatShortDate(img.publishedAt || img.createdAt);
-          const altText = `${img.title || 'Corte de Autor'} · Espejos Studio · ${displayName || 'John'}`;
+          const altText = `${img.title || 'Corte de Autor'} · Espejos Studio · ${displayName || 'Espejos Studio'}`;
           
           return (
             <div
@@ -206,7 +206,7 @@ export default function MirrorGallery({
                   <p className="font-semibold text-white text-sm">{activePhoto.title}</p>
                 )}
                 <p className="text-slate-400 text-xs">
-                  {formatShortDate(activePhoto.publishedAt || activePhoto.createdAt)} · {displayName || 'John'}
+                  {formatShortDate(activePhoto.publishedAt || activePhoto.createdAt)} · {displayName || 'Espejos Studio'}
                 </p>
               </div>
               <div className="text-slate-500 font-mono text-[11px]">

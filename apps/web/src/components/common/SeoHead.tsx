@@ -91,8 +91,16 @@ export default function SeoHead() {
       ogUrl = canonical;
     } else if (pathname === '/demo') {
       title = 'Demo | Espejos Agenda';
-      description = 'Ejemplo de agenda pública Espejos.';
+      description = 'Ejemplo de espacio público. No es un local real.';
       canonical = 'https://espejosstudio.cl/demo';
+      robots = 'index, follow';
+      ogTitle = title;
+      ogDescription = description;
+      ogUrl = canonical;
+    } else if (pathname === '/john') {
+      title = 'Espejos Studio · Antofagasta | Agenda de horas';
+      description = 'Agenda tu hora en Espejos Studio Antofagasta con John Ortiz. Cortes clásicos, fade y perfilado de barba de autor.';
+      canonical = 'https://espejosstudio.cl/john';
       robots = 'index, follow';
       ogTitle = title;
       ogDescription = description;

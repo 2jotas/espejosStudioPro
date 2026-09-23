@@ -71,17 +71,28 @@ export default function Space() {
   }, [slug]);
 
   // =========================================================================
-  // VISTA PÚBLICA DEL CLIENTE (ESPEJOS STUDIO · ANTOFAGASTA / JOHN)
+  // VISTA PÚBLICA DEL CLIENTE (ESPEJOS STUDIO · ANTOFAGASTA / JOHN / DEMO)
   // =========================================================================
-  const displayName = profInfo?.businessName || (slug === 'john' ? 'John' : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Espejos Studio'));
-  const bioText = profInfo?.bio || 'Cortes clásico, fade y barba. Preciso, tranquilo, a tiempo. Pide hora aquí.';
+  const isDemo = slug === 'demo';
+  const displayName = profInfo?.businessName || (slug === 'john' ? 'John' : (isDemo ? 'Estudio Demo' : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Espejos Studio')));
+  const bioText = profInfo?.bio || (isDemo ? 'Demostración de agenda online para profesionales independientes. Prueba el flujo de reserva real.' : 'Cortes clásico, fade y barba. Preciso, tranquilo, a tiempo. Pide hora aquí.');
   const businessPhone = profInfo?.phone || '+56912345678';
   const isOwner = Boolean(user && user.slug === slug);
+  const locationLabel = isDemo ? 'Demostración · Chile' : (slug === 'john' ? 'Espejos Studio · Antofagasta' : (profInfo?.address || 'Espejos Studio'));
+  const bookingButtonText = isDemo ? 'Agendar hora (demo)' : (slug === 'john' ? 'Agendar Hora con John' : `Agendar hora con ${displayName}`);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-indigo-500 selection:text-white">
+      {/* Banner discreto si es espacio Demo */}
+      {isDemo && (
+        <div className="bg-amber-950/80 border-b border-amber-500/30 text-amber-200 text-xs py-2 px-4 flex items-center justify-center space-x-2 sticky top-0 z-40 backdrop-blur-md">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Esto es una demostración. Tus clientes no ven esto.</span>
+        </div>
+      )}
+
       {/* Banner flotante discreto si el dueño está conectado */}
-      {isOwner && (
+      {isOwner && !isDemo && (
         <div className="bg-indigo-950/90 border-b border-indigo-500/30 text-indigo-200 text-xs py-2 px-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
@@ -104,7 +115,7 @@ export default function Space() {
       <header className="relative z-10 max-w-lg mx-auto w-full flex items-center justify-between p-4 pt-5">
         <div className="flex items-center space-x-2 text-slate-400 text-xs font-bold tracking-wider uppercase">
           <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Espejos Studio</span>
+          <span>{isDemo ? 'Espejos Demo' : 'Espejos Studio'}</span>
         </div>
 
         {user ? (
@@ -121,7 +132,7 @@ export default function Space() {
       {/* Above the Fold — Perfil & Agendamiento Móvil */}
       <main className="relative z-10 max-w-lg mx-auto w-full px-4 py-6 text-center space-y-6 flex-1 flex flex-col justify-center">
 
-        {/* Foto de Perfil de John */}
+        {/* Foto de Perfil */}
         <div className="relative inline-block mx-auto">
           <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-[2px] shadow-2xl shadow-indigo-500/20">
             <div className="w-full h-full bg-slate-900 rounded-[22px] overflow-hidden flex items-center justify-center">
@@ -148,7 +159,7 @@ export default function Space() {
           <h1 className="text-3xl font-extrabold text-white tracking-tight">{displayName}</h1>
           <div className="inline-flex items-center space-x-1.5 text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full">
             <MapPin className="w-3.5 h-3.5" />
-            <span>Espejos Studio · Antofagasta</span>
+            <span>{locationLabel}</span>
           </div>
         </div>
 
@@ -160,7 +171,7 @@ export default function Space() {
         {/* Horario Real */}
         <div className="flex items-center justify-center space-x-2 text-xs text-slate-400">
           <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span>Lun, Jue, Vie, Sáb y Dom · 10:00–20:00 · Mar y Mié cerrado</span>
+          <span>{isDemo ? 'Horario de atención configurable · Lun a Dom' : 'Lun, Jue, Vie, Sáb y Dom · 10:00–20:00 · Mar y Mié cerrado'}</span>
         </div>
 
         {/* CTA Principal Único */}
@@ -170,12 +181,12 @@ export default function Space() {
             className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center space-x-2"
           >
             <Calendar className="w-5 h-5" />
-            <span>Agendar Hora con John</span>
+            <span>{bookingButtonText}</span>
           </button>
 
           {/* WhatsApp Directo */}
           <a
-            href={`https://wa.me/${businessPhone.replace(/\D/g, '')}?text=Hola%20John,%20te%20escribo%20desde%20tu%20sitio%20web`}
+            href={`https://wa.me/${businessPhone.replace(/\D/g, '')}?text=${encodeURIComponent(isDemo ? 'Hola, te escribo desde la demo de Espejos Agenda' : (slug === 'john' ? 'Hola John, te escribo desde tu sitio web' : `Hola, te escribo desde tu sitio web`))}`}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full py-3 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 text-slate-300 font-semibold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors"
@@ -191,7 +202,7 @@ export default function Space() {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Servicios & Precios
             </span>
-            <span className="text-[11px] text-indigo-400 font-medium">Antofagasta</span>
+            <span className="text-[11px] text-indigo-400 font-medium">{isDemo ? 'Ejemplo' : 'Antofagasta'}</span>
           </div>
 
           <div className="space-y-2.5">
@@ -227,7 +238,7 @@ export default function Space() {
 
       {/* Footer */}
       <footer className="relative z-10 max-w-lg mx-auto w-full text-center py-4 text-[11px] text-slate-600 border-t border-slate-900">
-        Espejos Studio · Antofagasta · Todos los derechos reservados.
+        {isDemo ? 'Espejos Agenda · Demostración pública · Todos los derechos reservados.' : 'Espejos Studio · Antofagasta · Todos los derechos reservados.'}
       </footer>
 
       {/* Wizard en 4 Pasos Overlay */}

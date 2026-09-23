@@ -527,13 +527,13 @@ export default function BookingWizard({ slug, businessName, address, phone, serv
             <div className="space-y-2 max-w-xs mx-auto pt-2">
               {phone && (
                 <a
-                  href={`https://wa.me/${phone.replace(/\D/g, '')}?text=Hola%20John,%20acabo%20de%20agendar%20mi%20hora%20para%20${encodeURIComponent(confirmedAppointment.serviceName)}`}
+                  href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, acabo de agendar mi hora para ${confirmedAppointment.serviceName}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl flex items-center justify-center space-x-2 transition-colors"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span>Abrir Chat con John</span>
+                  <span>Abrir Chat con {businessName || 'el Profesional'}</span>
                 </a>
               )}
 

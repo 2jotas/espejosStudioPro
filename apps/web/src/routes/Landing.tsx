@@ -70,7 +70,7 @@ export default function Landing() {
       <section className="relative z-10 max-w-5xl mx-auto px-6 pt-12 pb-20 text-center">
         <div className="inline-flex items-center space-x-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold px-4 py-2 rounded-full mb-6 backdrop-blur-md">
           <Zap className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Diseñado para barberos, estilistas y profesionales independientes</span>
+          <span>Para barberos, estilistas, manicuristas y masajistas independientes</span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-6 leading-[1.15]">
@@ -82,7 +82,7 @@ export default function Landing() {
           Tu propio link personalizado con wizard en 4 pasos por WhatsApp, recordatorios automáticos para reducir inasistencias y Ficha Técnica de corte en 20 segundos.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto mb-12">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-xl mx-auto mb-12">
           <Link
             to="/registro"
             className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base rounded-2xl shadow-xl shadow-indigo-600/25 transition-all flex items-center justify-center space-x-2"
@@ -93,22 +93,34 @@ export default function Landing() {
 
           <Link
             to="/john"
-            className="w-full sm:w-auto px-6 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm rounded-2xl transition-all"
+            className="w-full sm:w-auto px-6 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm rounded-2xl transition-all flex items-center justify-center"
           >
-            Ver espacio en vivo (/john)
+            Ver un espacio real
+          </Link>
+
+          <Link
+            to="/demo"
+            className="w-full sm:w-auto px-6 py-4 bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/30 text-indigo-300 font-semibold text-sm rounded-2xl transition-all flex items-center justify-center"
+          >
+            Ver demo
           </Link>
         </div>
 
         {/* Live Preview Card */}
         <div className="relative max-w-3xl mx-auto rounded-3xl bg-slate-900/80 border border-slate-800 p-4 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center space-x-2 mb-4 px-2">
-            <div className="w-3 h-3 rounded-full bg-rose-500/80" />
-            <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-            <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-            <div className="ml-4 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-400 font-mono flex items-center space-x-2">
-              <span className="text-emerald-400">https://</span>
-              <span>espejosstudio.cl/john</span>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 rounded-full bg-rose-500/80" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+              <div className="ml-4 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-400 font-mono flex items-center space-x-2">
+                <span className="text-emerald-400">https://</span>
+                <span>espejosstudio.cl/john</span>
+              </div>
             </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+              Ejemplo
+            </span>
           </div>
 
           <div className="bg-slate-950 rounded-2xl p-5 sm:p-6 text-left border border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
