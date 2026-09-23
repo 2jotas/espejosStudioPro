@@ -31,57 +31,38 @@ export class GalleryStorageService {
   }
 
   /**
-   * 1. ESTUDIO (Sharp, sutil y limpio - Default John):
-   * - Neutraliza dominante amarillo/verde de iluminación LED de salón
-   * - Contraste nítido 1.08, brillo 1.02, saturación 0.94 (sin desaturar piel a gris)
-   * - Enfoque leve (sigma 0.85) para definición limpia de textura y corte
-   * - SIN sepia, SIN hue-rotate, SIN viñeta pesada, SIN grano sucio
+   * 1. ESTUDIO (Natural, limpio y orgánico - Default John):
+   * - Preserva los tonos reales de piel y cabello sin distorsión
+   * - Micro-ajuste fotográfico limpio: brillo 1.01, saturación 0.98
+   * - Contraste suave natural (sin quemar luces ni empastar sombras)
+   * - CERO halos artificiales, CERO máscaras de enfoque agresivas, CERO efecto HDR
    */
   private async applyEstudioLook(buffer: Buffer): Promise<Buffer> {
-    const neutralMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [0.99, 0.00, 0.01],
-      [0.00, 0.97, 0.01],
-      [0.01, 0.01, 1.02],
-    ];
-
     return await sharp(buffer)
-      .recomb(neutralMatrix)
       .modulate({
-        brightness: 1.02,
-        saturation: 0.94,
+        brightness: 1.01,
+        saturation: 0.98,
       })
-      .linear([1.08, 1.08, 1.08], [-6, -6, -6])
+      .linear(1.02, -2)
       .sharpen({
-        sigma: 0.85,
-        m1: 0.8,
-        m2: 1.6,
-        x1: 2,
-        y2: 8,
-        y3: 16,
+        sigma: 0.5,
       })
       .toBuffer();
   }
 
   /**
    * 2. CAMPAÑA:
-   * - Misma base neutra y limpia de Estudio
-   * - Negros más hondos (linear [1.10, 1.09, 1.08], [-10, -9, -8])
-   * - Calidez de piel mínima (<3% ámbar), saturación 0.95
-   * - Viñeta ultra-suave ≤8% y pelo nítido (sigma 0.95)
+   * - Misma base natural de Estudio con negros ligeramente más ricos
+   * - Contraste elegante sin alterar la piel ni crear halos
+   * - Viñeta periférica ultra sutil (<4%)
    */
   private async applyCampanaLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
-    const campanaMatrix: [[number, number, number], [number, number, number], [number, number, number]] = [
-      [1.02, 0.01, 0.00],
-      [0.00, 0.98, 0.01],
-      [0.00, 0.00, 0.98],
-    ];
-
     const vignetteSvg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="vignetteCampana" cx="50%" cy="50%" r="65%" fx="50%" fy="50%">
-            <stop offset="60%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.08" />
+          <radialGradient id="vignetteCampana" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
+            <stop offset="70%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.04" />
           </radialGradient>
         </defs>
         <rect width="100%" height="100%" fill="url(#vignetteCampana)" />
@@ -89,19 +70,13 @@ export class GalleryStorageService {
     `;
 
     return await sharp(buffer)
-      .recomb(campanaMatrix)
       .modulate({
-        brightness: 1.01,
-        saturation: 0.95,
+        brightness: 1.00,
+        saturation: 0.98,
       })
-      .linear([1.10, 1.09, 1.08], [-10, -9, -8])
+      .linear(1.04, -4)
       .sharpen({
-        sigma: 0.95,
-        m1: 1.0,
-        m2: 2.0,
-        x1: 2,
-        y2: 10,
-        y3: 20,
+        sigma: 0.5,
       })
       .composite([
         {

@@ -43,7 +43,7 @@ export const LOOK_OPTIONS: LookOption[] = [
     badge: '📷 Original',
     icon: '📷',
     cssFilter: 'none',
-    description: 'Foto real sin modificaciones ni gradación de color.',
+    description: 'Foto real sin modificaciones.',
     accentColor: 'text-slate-300 border-slate-700 bg-slate-800/50',
   },
   {
@@ -51,8 +51,8 @@ export const LOOK_OPTIONS: LookOption[] = [
     name: 'Estudio',
     badge: '✨ Estudio',
     icon: '✨',
-    cssFilter: 'contrast(1.08) brightness(1.02) saturate(0.94)',
-    description: 'Corrección neutra de luz LED, contraste limpio y textura nítida sin filtros pesados.',
+    cssFilter: 'contrast(1.02) brightness(1.01)',
+    description: 'Acabado natural, limpio y fotográfico sin filtros pesados.',
     accentColor: 'text-indigo-300 border-indigo-500/30 bg-indigo-500/10 shadow-[0_0_10px_rgba(99,102,241,0.15)]',
   },
   {
@@ -60,8 +60,8 @@ export const LOOK_OPTIONS: LookOption[] = [
     name: 'Campaña',
     badge: '🌟 Campaña',
     icon: '🌟',
-    cssFilter: 'contrast(1.10) brightness(1.01) saturate(0.95) sepia(0.03)',
-    description: 'Base neutra de estudio con negros más profundos y calidez sutil en piel.',
+    cssFilter: 'contrast(1.04) brightness(1.00)',
+    description: 'Negros más profundos y contraste suave editorial.',
     accentColor: 'text-amber-300 border-amber-500/30 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.15)]',
   },
 ];
