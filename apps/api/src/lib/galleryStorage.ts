@@ -31,38 +31,38 @@ export class GalleryStorageService {
   }
 
   /**
-   * 1. ESTUDIO (Natural, limpio y orgánico - Default John):
-   * - Preserva los tonos reales de piel y cabello sin distorsión
-   * - Micro-ajuste fotográfico limpio: brillo 1.01, saturación 0.98
-   * - Contraste suave natural (sin quemar luces ni empastar sombras)
-   * - CERO halos artificiales, CERO máscaras de enfoque agresivas, CERO efecto HDR
+   * 1. ESTUDIO (Limpio, nítido y profesional):
+   * - Preserva los tonos reales de piel y textura del cabello
+   * - Ajuste fotográfico de iluminación neutral: brillo 1.02, saturación 0.96
+   * - Contraste suave limpio (linear 1.05, -3) y micro-enfoque óptico (sigma 0.65)
+   * - CERO halos artificiales, CERO saturaciones plásticas
    */
   private async applyEstudioLook(buffer: Buffer): Promise<Buffer> {
     return await sharp(buffer)
       .modulate({
-        brightness: 1.01,
-        saturation: 0.98,
+        brightness: 1.02,
+        saturation: 0.96,
       })
-      .linear(1.02, -2)
+      .linear(1.05, -3)
       .sharpen({
-        sigma: 0.5,
+        sigma: 0.65,
       })
       .toBuffer();
   }
 
   /**
-   * 2. CAMPAÑA:
-   * - Misma base natural de Estudio con negros ligeramente más ricos
-   * - Contraste elegante sin alterar la piel ni crear halos
-   * - Viñeta periférica ultra sutil (<4%)
+   * 2. CAMPAÑA (Editorial de alta gama):
+   * - Base fotográfica con negros más ricos y profundos
+   * - Contraste elegante editorial (linear 1.08, -6) y micro-enfoque cinematográfico (sigma 0.70)
+   * - Viñeta periférica sutil (6%) para centrar el corte
    */
   private async applyCampanaLook(buffer: Buffer, width: number = 1280, height: number = 1600): Promise<Buffer> {
     const vignetteSvg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="vignetteCampana" cx="50%" cy="50%" r="70%" fx="50%" fy="50%">
-            <stop offset="70%" stop-color="#000000" stop-opacity="0" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0.04" />
+            <stop offset="65%" stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.06" />
           </radialGradient>
         </defs>
         <rect width="100%" height="100%" fill="url(#vignetteCampana)" />
@@ -74,9 +74,9 @@ export class GalleryStorageService {
         brightness: 1.00,
         saturation: 0.98,
       })
-      .linear(1.04, -4)
+      .linear(1.08, -6)
       .sharpen({
-        sigma: 0.5,
+        sigma: 0.70,
       })
       .composite([
         {

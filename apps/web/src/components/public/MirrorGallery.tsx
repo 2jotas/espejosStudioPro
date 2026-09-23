@@ -186,11 +186,11 @@ export default function MirrorGallery({
 
           {/* Active Image Container */}
           <div 
-            className="max-w-md w-full flex flex-col items-center"
+            className="max-w-xs sm:max-w-sm md:max-w-md w-full flex flex-col items-center my-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Marco Espejo Neón en Lightbox */}
-            <div className="relative w-full aspect-[4/5] rounded-3xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF]/60 shadow-[0_0_28px_rgba(139,124,255,0.25)]">
+            <div className="relative w-full max-h-[70vh] aspect-[4/5] rounded-3xl overflow-hidden bg-slate-950 border-2 border-[#8B7CFF]/60 shadow-[0_0_28px_rgba(139,124,255,0.25)] flex items-center justify-center">
               <div className="absolute inset-0 ring-1 ring-white/20 ring-inset rounded-3xl pointer-events-none z-10" />
               <img
                 src={activePhoto.url}
